@@ -26,6 +26,7 @@ export async function GET() {
         hostels: d.hostels ?? [],
         isActive: d.isActive,
         isPartner: d.isPartner ?? false,
+        partnerSplitPercent: d.partnerSplitPercent ?? 0,
         createdBy: d.createdBy ?? "",
         createdAt: d.createdAt?.toDate?.()?.toISOString() ?? null,
       };
@@ -49,6 +50,7 @@ export async function POST(request: NextRequest) {
     hostels: string[];
     createdBy: string;
     isPartner?: boolean;
+    partnerSplitPercent?: number;
   };
 
   try {
@@ -60,7 +62,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { username, email, whatsappPhone, password, modulePermissions, hostels, createdBy, isPartner } =
+  const { username, email, whatsappPhone, password, modulePermissions, hostels, createdBy, isPartner, partnerSplitPercent } =
     body;
 
   if (!username?.trim()) {
@@ -78,6 +80,12 @@ export async function POST(request: NextRequest) {
   if (!modulePermissions?.length) {
     return NextResponse.json(
       { error: "At least one module permission must be granted" },
+      { status: 400 },
+    );
+  }
+  if (isPartner && (typeof partnerSplitPercent !== "number" || partnerSplitPercent < 0 || partnerSplitPercent > 100)) {
+    return NextResponse.json(
+      { error: "Partner split must be between 0 and 100" },
       { status: 400 },
     );
   }
@@ -110,6 +118,7 @@ export async function POST(request: NextRequest) {
       isActive: true,
       createdBy: createdBy ?? "",
       isPartner: isPartner ?? false,
+      partnerSplitPercent: isPartner ? partnerSplitPercent : 0,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });

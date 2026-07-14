@@ -230,6 +230,8 @@ export interface AdminUser {
   updatedAt: Date;
   /** Partner accounts see a restricted read-only split view */
   isPartner?: boolean;
+  /** Percentage of net revenue (after standard deductions) owed to this partner. */
+  partnerSplitPercent?: number;
 }
 
 export interface AdminProfile {
@@ -241,4 +243,6 @@ export interface AdminProfile {
   isSuperAdmin: boolean;
   /** Partner accounts see a restricted read-only split view */
   isPartner?: boolean;
+  /** Percentage of net revenue (after standard deductions) owed to this partner. */
+  partnerSplitPercent?: number;
 }

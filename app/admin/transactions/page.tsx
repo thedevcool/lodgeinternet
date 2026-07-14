@@ -35,6 +35,8 @@ interface DataPurchaseRow {
   planType: "device" | "unlimited";
   usersCount?: number;
   price: number;
+  /** Server-calculated net share, supplied only by the FastAPI partner view. */
+  partnerShare?: number;
   codeId?: string;
   customerEmail?: string;
   paymentRef?: string;
@@ -49,6 +51,8 @@ interface TvPurchaseRow {
   planType: "tv";
   usersCount?: undefined;
   price: number;
+  /** Server-calculated net share, supplied only by the FastAPI partner view. */
+  partnerShare?: number;
   codeId?: undefined;
   customerEmail?: string;
   paymentRef?: string;
@@ -131,9 +135,6 @@ export default function AdminTransactionsPage() {
   const [activeTab, setActiveTab] = useState<"transactions" | "splits">(
     "transactions",
   );
-  useEffect(() => {
-    if (isPartner) setActiveTab("splits");
-  }, [isPartner]);
 
   // Transaction filters
   const [searchTerm, setSearchTerm] = useState("");
@@ -241,6 +242,7 @@ export default function AdminTransactionsPage() {
           planType: d.planType,
           usersCount: d.usersCount,
           price: d.price,
+          partnerShare: d.partnerShare,
           codeId: d.codeId,
           customerEmail: d.customerEmail,
           paymentRef: d.paymentRef,
@@ -256,6 +258,7 @@ export default function AdminTransactionsPage() {
           planName: d.planName,
           planType: "tv" as const,
           price: d.price,
+          partnerShare: d.partnerShare,
           customerEmail: d.customerEmail,
           paymentRef: d.paymentRef,
           hostel: d.hostel,
@@ -350,6 +353,22 @@ export default function AdminTransactionsPage() {
 
   const totalRevenue = filtered.reduce((s, t) => s + t.price, 0);
 
+  // A partner never sees the gross transaction amount. Their share is based on
+  // the same net-revenue formula used by the existing split counter.
+  const partnerSplitPercent = adminProfile?.partnerSplitPercent ?? 0;
+  const partnerShareFor = (transaction: TransactionRow) => {
+    if (typeof transaction.partnerShare === "number") return transaction.partnerShare;
+    const netRevenue =
+      transaction.price -
+      Math.round((transaction.price * MAINTENANCE_PCT) / 100) -
+      Math.round((transaction.price * PAYSTACK_PCT) / 100);
+    return Math.round((netRevenue * partnerSplitPercent) / 100);
+  };
+  const totalPartnerShare = filtered.reduce(
+    (sum, transaction) => sum + partnerShareFor(transaction),
+    0,
+  );
+
   const byHostel = useMemo(() => {
     const map: Record<string, { count: number; revenue: number }> = {};
     for (const t of filtered) {
@@ -373,25 +392,41 @@ export default function AdminTransactionsPage() {
   }, [transactions, allowedHostels, allowedHostelNames]);
 
   const exportToExcel = () => {
-    const rows = filtered.map((t) => ({
-      Date: t.purchasedAt.toLocaleString(),
-      "Plan Name": t.planName,
-      "Plan Type": PLAN_TYPE_LABELS[t.planType] ?? t.planType,
-      Hostel: t.hostel ?? "Unknown",
-      "Customer Email": t.customerEmail ?? "N/A",
-      "Payment Ref": t.paymentRef ?? "N/A",
-      "Price (₦)": t.price,
-    }));
+    const rows = filtered.map((t) =>
+      isPartner
+        ? {
+            Date: t.purchasedAt.toLocaleString(),
+            "Plan Name": t.planName,
+            "Plan Type": PLAN_TYPE_LABELS[t.planType] ?? t.planType,
+            Hostel: t.hostel ?? "Unknown",
+            "Your Share (₦)": partnerShareFor(t),
+          }
+        : {
+            Date: t.purchasedAt.toLocaleString(),
+            "Plan Name": t.planName,
+            "Plan Type": PLAN_TYPE_LABELS[t.planType] ?? t.planType,
+            Hostel: t.hostel ?? "Unknown",
+            "Customer Email": t.customerEmail ?? "N/A",
+            "Payment Ref": t.paymentRef ?? "N/A",
+            "Price (₦)": t.price,
+          },
+    );
     const summaryRows = [
       { Label: "Total Transactions", Value: filtered.length },
-      { Label: "Total Revenue (₦)", Value: totalRevenue },
-      { Label: "", Value: "" },
-      { Label: "Hostel", Value: "Transactions", Revenue: "Revenue (₦)" },
-      ...byHostel.map(([hostel, stats]) => ({
-        Label: hostel,
-        Value: stats.count,
-        Revenue: stats.revenue,
-      })),
+      isPartner
+        ? { Label: "Your Total Share (₦)", Value: totalPartnerShare }
+        : { Label: "Total Revenue (₦)", Value: totalRevenue },
+      ...(isPartner
+        ? []
+        : [
+            { Label: "", Value: "" },
+            { Label: "Hostel", Value: "Transactions", Revenue: "Revenue (₦)" },
+            ...byHostel.map(([hostel, stats]) => ({
+              Label: hostel,
+              Value: stats.count,
+              Revenue: stats.revenue,
+            })),
+          ]),
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(
@@ -870,9 +905,8 @@ export default function AdminTransactionsPage() {
           {/* Tabs */}
           <div className="overflow-x-auto">
             <div className="inline-flex items-center bg-apple-gray-100 rounded-2xl p-1.5 shadow-inner min-w-max">
-              {!isPartner && (
-                <button
-                  onClick={() => setActiveTab("transactions")}
+              <button
+                onClick={() => setActiveTab("transactions")}
                   className={`flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                     activeTab === "transactions"
                       ? "bg-white text-apple-gray-900 shadow-sm"
@@ -880,10 +914,9 @@ export default function AdminTransactionsPage() {
                   }`}
                 >
                   <BarChart3 className="w-4 h-4" />
-                  Transactions
-                </button>
-              )}
-              <button
+                  {isPartner ? "My Transactions" : "Transactions"}
+              </button>
+              {!isPartner && <button
                 onClick={() => setActiveTab("splits")}
                 className={`flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                   activeTab === "splits"
@@ -898,7 +931,7 @@ export default function AdminTransactionsPage() {
                     {splitRecords.length}
                   </span>
                 )}
-              </button>
+              </button>}
             </div>
           </div>
 
@@ -906,7 +939,26 @@ export default function AdminTransactionsPage() {
           {activeTab === "transactions" && (
             <>
               {/* Summary cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${isPartner ? "" : "lg:grid-cols-4"}`}>
+                {isPartner ? (
+                  <>
+                    <div className="bg-white rounded-2xl shadow-sm p-5">
+                      <p className="text-sm text-apple-gray-500 mb-1">Transactions</p>
+                      <p className="text-3xl font-bold text-apple-gray-900">
+                        {loading ? "—" : filtered.length.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="bg-white rounded-2xl shadow-sm p-5">
+                      <p className="text-sm text-apple-gray-500 mb-1">Your Share</p>
+                      <p className="text-3xl font-bold text-purple-600">
+                        {loading ? "—" : `₦${totalPartnerShare.toLocaleString()}`}
+                      </p>
+                      <p className="text-xs text-apple-gray-400 mt-1">
+                        {partnerSplitPercent}% of net revenue
+                      </p>
+                    </div>
+                  </>
+                ) : <>
                 <div className="bg-white rounded-2xl shadow-sm p-5">
                   <p className="text-sm text-apple-gray-500 mb-1">
                     Total Transactions
@@ -945,10 +997,11 @@ export default function AdminTransactionsPage() {
                           .length.toLocaleString()}
                   </p>
                 </div>
+                </>}
               </div>
 
               {/* Per-hostel breakdown */}
-              {!loading && byHostel.length > 0 && (
+              {!isPartner && !loading && byHostel.length > 0 && (
                 <div className="bg-white rounded-3xl shadow-sm p-6">
                   <h2 className="text-base font-semibold text-apple-gray-900 mb-4 flex items-center gap-2">
                     <Building2 className="w-4 h-4 text-blue-500" />
@@ -1035,9 +1088,9 @@ export default function AdminTransactionsPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-apple-gray-500">
-                      {filtered.length} transaction
-                      {filtered.length !== 1 ? "s" : ""} • ₦
-                      {totalRevenue.toLocaleString()} total
+                      {isPartner
+                        ? `${filtered.length} transaction${filtered.length !== 1 ? "s" : ""} • ₦${totalPartnerShare.toLocaleString()} your share`
+                        : `${filtered.length} transaction${filtered.length !== 1 ? "s" : ""} • ₦${totalRevenue.toLocaleString()} total`}
                     </p>
                     <button
                       onClick={exportToExcel}
@@ -1078,14 +1131,16 @@ export default function AdminTransactionsPage() {
                           <th className="px-5 py-3 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide">
                             Hostel
                           </th>
-                          <th className="px-5 py-3 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide">
-                            Email
-                          </th>
-                          <th className="px-5 py-3 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide">
-                            Ref
-                          </th>
+                          {!isPartner && <>
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide">
+                              Email
+                            </th>
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide">
+                              Ref
+                            </th>
+                          </>}
                           <th className="px-5 py-3 text-right text-xs font-semibold text-apple-gray-500 uppercase tracking-wide">
-                            Amount
+                            {isPartner ? "Your Share" : "Amount"}
                           </th>
                         </tr>
                       </thead>
@@ -1122,24 +1177,26 @@ export default function AdminTransactionsPage() {
                                 </span>
                               )}
                             </td>
-                            <td className="px-5 py-3.5 text-sm text-apple-gray-600 max-w-[180px] truncate">
-                              {t.customerEmail ?? (
-                                <span className="text-apple-gray-400">N/A</span>
-                              )}
-                            </td>
-                            <td className="px-5 py-3.5 text-xs text-apple-gray-500 font-mono">
-                              {t.paymentRef ? (
-                                <span title={t.paymentRef}>
-                                  {t.paymentRef.length > 14
-                                    ? t.paymentRef.slice(0, 14) + "…"
-                                    : t.paymentRef}
-                                </span>
-                              ) : (
-                                <span className="text-apple-gray-400">—</span>
-                              )}
-                            </td>
+                            {!isPartner && <>
+                              <td className="px-5 py-3.5 text-sm text-apple-gray-600 max-w-[180px] truncate">
+                                {t.customerEmail ?? (
+                                  <span className="text-apple-gray-400">N/A</span>
+                                )}
+                              </td>
+                              <td className="px-5 py-3.5 text-xs text-apple-gray-500 font-mono">
+                                {t.paymentRef ? (
+                                  <span title={t.paymentRef}>
+                                    {t.paymentRef.length > 14
+                                      ? t.paymentRef.slice(0, 14) + "…"
+                                      : t.paymentRef}
+                                  </span>
+                                ) : (
+                                  <span className="text-apple-gray-400">—</span>
+                                )}
+                              </td>
+                            </>}
                             <td className="px-5 py-3.5 text-sm font-semibold text-apple-gray-900 text-right whitespace-nowrap">
-                              ₦{t.price.toLocaleString()}
+                              ₦{(isPartner ? partnerShareFor(t) : t.price).toLocaleString()}
                             </td>
                           </tr>
                         ))}

@@ -41,6 +41,9 @@ declare global {
 }
 
 type PlanView = "device" | "tv" | "unlimited";
+type PendingPayment =
+  | { kind: "device" }
+  | { kind: "tv"; isExisting: boolean };
 
 export default function HostelPlansPage({
   params,
@@ -53,6 +56,8 @@ export default function HostelPlansPage({
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
+  const [showPaymentWarning, setShowPaymentWarning] = useState(false);
+  const [pendingPayment, setPendingPayment] = useState<PendingPayment | null>(null);
   const [revealedCode, setRevealedCode] = useState<string | null>(null);
   // Drives the post-payment modal's "loading" state. Flipped on the moment
   // Paystack returns success so the modal appears before any API work runs.
@@ -487,7 +492,11 @@ export default function HostelPlansPage({
     }
   };
 
-  const handlePurchase = async () => {
+  const paymentWarningKey = currentUser?.uid
+    ? `lodge-payment-return-warning:${currentUser.uid}`
+    : "";
+
+  const handlePurchase = async (warningAcknowledged = false) => {
     if (!selectedPlan) {
       setError("Please select a plan");
       return;
@@ -542,6 +551,16 @@ export default function HostelPlansPage({
         title: "Configuration Error",
         message: "Paystack is not configured. Please contact support.",
       });
+      return;
+    }
+
+    if (
+      !warningAcknowledged &&
+      paymentWarningKey &&
+      localStorage.getItem(paymentWarningKey) !== "acknowledged"
+    ) {
+      setPendingPayment({ kind: "device" });
+      setShowPaymentWarning(true);
       return;
     }
 
@@ -609,8 +628,8 @@ export default function HostelPlansPage({
           reservationId,
         },
         onClose: function () {
-          setPurchasing(false);
           if (paymentSucceeded) return;
+          setPurchasing(false);
           // User closed without paying — return the code to inventory.
           releaseReservation(reservationId);
           setActiveReservationId("");
@@ -893,7 +912,7 @@ export default function HostelPlansPage({
     handleTvPayment(false);
   };
 
-  const handleTvPayment = async (isExisting: boolean) => {
+  const handleTvPayment = async (isExisting: boolean, warningAcknowledged = false) => {
     if (!selectedPlan || !paystackLoaded || !window.PaystackPop) {
       setError("Payment system is not ready. Please try again.");
       return;
@@ -909,11 +928,22 @@ export default function HostelPlansPage({
       return;
     }
 
+    if (
+      !warningAcknowledged &&
+      paymentWarningKey &&
+      localStorage.getItem(paymentWarningKey) !== "acknowledged"
+    ) {
+      setPendingPayment({ kind: "tv", isExisting });
+      setShowPaymentWarning(true);
+      return;
+    }
+
     setPurchasing(true);
     setError("");
 
     try {
       const totalAmount = selectedPlan.price + 100; // Add ₦100 bank charges
+      let paymentSucceeded = false;
       const handler = window.PaystackPop.setup({
         key: paystackKey,
         email: email,
@@ -929,9 +959,12 @@ export default function HostelPlansPage({
           macAddress: tvMacAddress,
           hostel: selectedHostel,
         },
-        callback: (response: any) =>
-          handleTvPaymentSuccess(response, isExisting),
+        callback: (response: any) => {
+          paymentSucceeded = true;
+          handleTvPaymentSuccess(response, isExisting);
+        },
         onClose: () => {
+          if (paymentSucceeded) return;
           setPurchasing(false);
           setError("Payment was cancelled");
         },
@@ -942,6 +975,19 @@ export default function HostelPlansPage({
       console.error("Payment error:", err);
       setError("Failed to initiate payment");
       setPurchasing(false);
+    }
+  };
+
+  const acknowledgePaymentWarning = () => {
+    if (!pendingPayment) return;
+    if (paymentWarningKey) localStorage.setItem(paymentWarningKey, "acknowledged");
+    const payment = pendingPayment;
+    setPendingPayment(null);
+    setShowPaymentWarning(false);
+    if (payment.kind === "device") {
+      handlePurchase(true);
+    } else {
+      handleTvPayment(payment.isExisting, true);
     }
   };
 
@@ -1216,6 +1262,39 @@ export default function HostelPlansPage({
           </div>
         </div>
       </section>
+
+      {/* One-time reminder before the user is sent to Paystack. */}
+      {showPaymentWarning && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="payment-warning-title"
+            className="w-full max-w-md rounded-3xl border-2 border-red-300 bg-white p-6 shadow-2xl payment-warning-shake"
+          >
+            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 text-2xl">
+              ⚠️
+            </div>
+            <h2 id="payment-warning-title" className="text-xl font-bold text-red-700">
+              Bad Things Will Happen If You Do Not Read This Modal
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-red-700">
+              After making payment, you must return to this site to get your access code.
+              If you leave before your code appears, it may be difficult to recover it.
+            </p>
+            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">
+              Keep this page open until your code is displayed.
+            </div>
+            <button
+              type="button"
+              onClick={acknowledgePaymentWarning}
+              className="mt-6 w-full rounded-2xl bg-red-600 px-5 py-3.5 text-sm font-semibold text-white shadow-lg transition-all hover:bg-red-700 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2"
+            >
+              I Understand
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Post-payment Code Modal — pops up the instant Paystack returns
           success (processingClaim), then morphs into the code reveal once

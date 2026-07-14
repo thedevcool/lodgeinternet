@@ -132,6 +132,7 @@ interface AdminRow {
   hostels: string[];
   isActive: boolean;
   isPartner: boolean;
+  partnerSplitPercent: number;
   createdBy: string;
   createdAt: string | null;
 }
@@ -146,6 +147,7 @@ interface FormState {
   modulePermissions: Record<AdminModule, ModuleAccess>;
   hostels: string[];
   isPartner: boolean;
+  partnerSplitPercent: number | "";
 }
 
 const EMPTY_MODULE_PERMISSIONS = Object.fromEntries(
@@ -160,6 +162,7 @@ const DEFAULT_FORM: FormState = {
   modulePermissions: { ...EMPTY_MODULE_PERMISSIONS },
   hostels: [],
   isPartner: false,
+  partnerSplitPercent: 0,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -270,6 +273,7 @@ export default function AdminManagementPage() {
       modulePermissions,
       hostels: [...admin.hostels],
       isPartner: admin.isPartner,
+      partnerSplitPercent: admin.partnerSplitPercent ?? 0,
     });
     setFormError("");
     setFormSuccess("");
@@ -349,6 +353,15 @@ export default function AdminManagementPage() {
       setFormError("Grant at least one module permission.");
       return;
     }
+    if (
+      form.isPartner &&
+      (typeof form.partnerSplitPercent !== "number" ||
+        form.partnerSplitPercent < 0 ||
+        form.partnerSplitPercent > 100)
+    ) {
+      setFormError("Partner split must be between 0 and 100.");
+      return;
+    }
 
     setSubmitting(true);
 
@@ -359,6 +372,7 @@ export default function AdminManagementPage() {
         modulePermissions,
         hostels: form.hostels,
         isPartner: form.isPartner,
+        partnerSplitPercent: form.isPartner ? form.partnerSplitPercent : 0,
       };
       if (form.password) body.password = form.password;
 
@@ -391,6 +405,7 @@ export default function AdminManagementPage() {
             hostels: form.hostels,
             createdBy: adminProfile?.username ?? "super-admin",
             isPartner: form.isPartner,
+            partnerSplitPercent: form.isPartner ? form.partnerSplitPercent : 0,
           }),
         });
         const data = await res.json();
@@ -577,7 +592,7 @@ export default function AdminManagementPage() {
                           )}
                           {admin.isPartner && (
                             <span className='px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700'>
-                              Partner
+                              Partner · {admin.partnerSplitPercent ?? 0}% net split
                             </span>
                           )}
                         </div>
@@ -807,7 +822,7 @@ export default function AdminManagementPage() {
                         Partner Account
                       </label>
                       <p className='text-xs text-apple-gray-400'>
-                        Restricts this admin to a read-only split view
+                        Gives this admin a read-only view of their transaction shares
                       </p>
                     </div>
                     <label className='relative inline-flex items-center cursor-pointer shrink-0'>
@@ -830,6 +845,34 @@ export default function AdminManagementPage() {
                       />
                     </label>
                   </div>
+                  {form.isPartner && (
+                    <div className='mt-4 rounded-xl border border-purple-200 bg-purple-50 p-4'>
+                      <label className='block text-sm font-medium text-purple-900 mb-1.5'>
+                        Partner Split (%)
+                      </label>
+                      <div className='flex items-center gap-3'>
+                        <input
+                          type='number'
+                          min='0'
+                          max='100'
+                          step='0.01'
+                          value={form.partnerSplitPercent}
+                          onChange={(e) =>
+                            setForm((p) => ({
+                              ...p,
+                              partnerSplitPercent:
+                                e.target.value === "" ? "" : Number(e.target.value),
+                            }))
+                          }
+                          className='w-28 px-3 py-2 rounded-lg border border-purple-200 bg-white text-sm font-semibold text-purple-900 focus:outline-none focus:ring-2 focus:ring-purple-300'
+                          aria-label='Partner split percentage'
+                        />
+                        <p className='text-xs text-purple-700'>
+                          Applied after the 10% maintenance and 1.5% Paystack deductions.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Password */}

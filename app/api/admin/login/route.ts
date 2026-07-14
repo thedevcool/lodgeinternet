@@ -60,6 +60,7 @@ export async function POST(request: Request) {
       modulePermissions: adminData.modulePermissions ?? [],
       hostels: adminData.hostels ?? [],
       isPartner: adminData.isPartner ?? false,
+      partnerSplitPercent: adminData.partnerSplitPercent ?? 0,
     });
   } catch (error) {
     console.error("Login error:", error);

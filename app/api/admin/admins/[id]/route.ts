@@ -20,6 +20,7 @@ export async function PATCH(
     hostels?: string[];
     isActive?: boolean;
     isPartner?: boolean;
+    partnerSplitPercent?: number;
   };
 
   try {
@@ -42,6 +43,19 @@ export async function PATCH(
   if (body.hostels !== undefined) updates.hostels = body.hostels;
   if (body.isActive !== undefined) updates.isActive = body.isActive;
   if (body.isPartner !== undefined) updates.isPartner = body.isPartner;
+  if (body.partnerSplitPercent !== undefined) {
+    if (
+      typeof body.partnerSplitPercent !== "number" ||
+      body.partnerSplitPercent < 0 ||
+      body.partnerSplitPercent > 100
+    ) {
+      return NextResponse.json(
+        { error: "Partner split must be between 0 and 100" },
+        { status: 400 },
+      );
+    }
+    updates.partnerSplitPercent = body.partnerSplitPercent;
+  }
 
   if (body.password) {
     if (body.password.length < 6) {

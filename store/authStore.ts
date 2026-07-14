@@ -71,6 +71,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           hostels: data.hostels ?? [],
           isSuperAdmin: data.isSuperAdmin ?? false,
           isPartner: data.isPartner ?? false,
+          partnerSplitPercent: data.partnerSplitPercent ?? 0,
         };
         set({ isAuthenticated: true, adminProfile: profile });
         if (typeof window !== "undefined") {
