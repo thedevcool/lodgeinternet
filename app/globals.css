@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply antialiased;
+  }
+
+  body {
+    @apply bg-white text-apple-gray-800 font-sans;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-5 py-2 text-base font-medium rounded-full bg-apple-blue text-white hover:bg-apple-blue-dark transition-colors duration-200;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center px-5 py-2 text-base font-medium rounded-full border border-apple-blue text-apple-blue hover:bg-apple-blue hover:text-white transition-colors duration-200;
+  }
+
+  .link-primary {
+    @apply text-apple-blue hover:underline cursor-pointer;
+  }
+
+  .container-padding {
+    @apply px-4 sm:px-6 lg:px-8;
+  }
+
+  .section-spacing {
+    @apply py-12 sm:py-16 lg:py-20;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .gradient-text-shadow {
+    filter: drop-shadow(0 1px 2px rgba(59, 130, 246, 0.15))
+      drop-shadow(0 4px 8px rgba(59, 130, 246, 0.1))
+      drop-shadow(0 8px 16px rgba(59, 130, 246, 0.08));
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
