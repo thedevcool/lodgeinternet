@@ -353,16 +353,13 @@ export default function AdminTransactionsPage() {
 
   const totalRevenue = filtered.reduce((s, t) => s + t.price, 0);
 
-  // A partner never sees the gross transaction amount. Their share is based on
-  // the same net-revenue formula used by the existing split counter.
+  // A partner never sees the gross transaction amount. Their share is their
+  // split percentage of the FULL transaction amount — the admin decides the
+  // split from the whole 100% (no maintenance/Paystack deductions).
   const partnerSplitPercent = adminProfile?.partnerSplitPercent ?? 0;
   const partnerShareFor = (transaction: TransactionRow) => {
     if (typeof transaction.partnerShare === "number") return transaction.partnerShare;
-    const netRevenue =
-      transaction.price -
-      Math.round((transaction.price * MAINTENANCE_PCT) / 100) -
-      Math.round((transaction.price * PAYSTACK_PCT) / 100);
-    return Math.round((netRevenue * partnerSplitPercent) / 100);
+    return Math.round((transaction.price * partnerSplitPercent) / 100);
   };
   const totalPartnerShare = filtered.reduce(
     (sum, transaction) => sum + partnerShareFor(transaction),
@@ -954,7 +951,7 @@ export default function AdminTransactionsPage() {
                         {loading ? "—" : `₦${totalPartnerShare.toLocaleString()}`}
                       </p>
                       <p className="text-xs text-apple-gray-400 mt-1">
-                        {partnerSplitPercent}% of net revenue
+                        {partnerSplitPercent}% of revenue
                       </p>
                     </div>
                   </>
