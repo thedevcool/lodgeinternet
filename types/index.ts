@@ -230,9 +230,16 @@ export interface AdminUser {
   updatedAt: Date;
   /** Partner accounts see a restricted read-only split view */
   isPartner?: boolean;
-  /** Percentage of net revenue (after standard deductions) owed to this partner. */
+  /** Partner's cut as a % of each transaction's full amount (used in "whole" mode). */
   partnerSplitPercent?: number;
+  /** "whole" = one split for all hostels; "perHostel" = a split per hostel. */
+  partnerSplitMode?: PartnerSplitMode;
+  /** Per-hostel split %, keyed by hostel ID. Used only in "perHostel" mode. */
+  partnerHostelSplits?: Record<string, number>;
 }
+
+/** How a partner's split is configured across their hostels. */
+export type PartnerSplitMode = "whole" | "perHostel";
 
 export interface AdminProfile {
   username: string;
@@ -243,6 +250,10 @@ export interface AdminProfile {
   isSuperAdmin: boolean;
   /** Partner accounts see a restricted read-only split view */
   isPartner?: boolean;
-  /** Percentage of net revenue (after standard deductions) owed to this partner. */
+  /** Partner's cut as a % of each transaction's full amount (used in "whole" mode). */
   partnerSplitPercent?: number;
+  /** "whole" = one split for all hostels; "perHostel" = a split per hostel. */
+  partnerSplitMode?: PartnerSplitMode;
+  /** Per-hostel split %, keyed by hostel ID. Used only in "perHostel" mode. */
+  partnerHostelSplits?: Record<string, number>;
 }

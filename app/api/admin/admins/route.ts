@@ -27,6 +27,8 @@ export async function GET() {
         isActive: d.isActive,
         isPartner: d.isPartner ?? false,
         partnerSplitPercent: d.partnerSplitPercent ?? 0,
+        partnerSplitMode: d.partnerSplitMode ?? "whole",
+        partnerHostelSplits: d.partnerHostelSplits ?? {},
         createdBy: d.createdBy ?? "",
         createdAt: d.createdAt?.toDate?.()?.toISOString() ?? null,
       };
@@ -51,6 +53,8 @@ export async function POST(request: NextRequest) {
     createdBy: string;
     isPartner?: boolean;
     partnerSplitPercent?: number;
+    partnerSplitMode?: string;
+    partnerHostelSplits?: Record<string, number>;
   };
 
   try {
@@ -62,7 +66,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { username, email, whatsappPhone, password, modulePermissions, hostels, createdBy, isPartner, partnerSplitPercent } =
+  const { username, email, whatsappPhone, password, modulePermissions, hostels, createdBy, isPartner, partnerSplitPercent, partnerSplitMode, partnerHostelSplits } =
     body;
 
   if (!username?.trim()) {
@@ -88,6 +92,22 @@ export async function POST(request: NextRequest) {
       { error: "Partner split must be between 0 and 100" },
       { status: 400 },
     );
+  }
+
+  // Per-hostel splits: keep the map only in perHostel mode; validate each 0–100.
+  const splitMode = partnerSplitMode === "perHostel" ? "perHostel" : "whole";
+  const cleanedHostelSplits: Record<string, number> = {};
+  if (isPartner && splitMode === "perHostel") {
+    for (const [hostelId, pct] of Object.entries(partnerHostelSplits ?? {})) {
+      const n = Number(pct);
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        return NextResponse.json(
+          { error: "Each hostel split must be between 0 and 100" },
+          { status: 400 },
+        );
+      }
+      cleanedHostelSplits[hostelId] = n;
+    }
   }
 
   try {
@@ -119,6 +139,8 @@ export async function POST(request: NextRequest) {
       createdBy: createdBy ?? "",
       isPartner: isPartner ?? false,
       partnerSplitPercent: isPartner ? partnerSplitPercent : 0,
+      partnerSplitMode: isPartner ? splitMode : "whole",
+      partnerHostelSplits: cleanedHostelSplits,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });

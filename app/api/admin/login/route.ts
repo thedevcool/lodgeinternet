@@ -61,6 +61,8 @@ export async function POST(request: Request) {
       hostels: adminData.hostels ?? [],
       isPartner: adminData.isPartner ?? false,
       partnerSplitPercent: adminData.partnerSplitPercent ?? 0,
+      partnerSplitMode: adminData.partnerSplitMode ?? "whole",
+      partnerHostelSplits: adminData.partnerHostelSplits ?? {},
     });
   } catch (error) {
     console.error("Login error:", error);

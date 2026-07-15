@@ -72,6 +72,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           isSuperAdmin: data.isSuperAdmin ?? false,
           isPartner: data.isPartner ?? false,
           partnerSplitPercent: data.partnerSplitPercent ?? 0,
+          partnerSplitMode: data.partnerSplitMode ?? "whole",
+          partnerHostelSplits: data.partnerHostelSplits ?? {},
         };
         set({ isAuthenticated: true, adminProfile: profile });
         if (typeof window !== "undefined") {

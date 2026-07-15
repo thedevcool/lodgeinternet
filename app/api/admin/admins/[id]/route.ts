@@ -21,6 +21,8 @@ export async function PATCH(
     isActive?: boolean;
     isPartner?: boolean;
     partnerSplitPercent?: number;
+    partnerSplitMode?: string;
+    partnerHostelSplits?: Record<string, number>;
   };
 
   try {
@@ -55,6 +57,24 @@ export async function PATCH(
       );
     }
     updates.partnerSplitPercent = body.partnerSplitPercent;
+  }
+  if (body.partnerSplitMode !== undefined) {
+    updates.partnerSplitMode =
+      body.partnerSplitMode === "perHostel" ? "perHostel" : "whole";
+  }
+  if (body.partnerHostelSplits !== undefined) {
+    const cleaned: Record<string, number> = {};
+    for (const [hostelId, pct] of Object.entries(body.partnerHostelSplits)) {
+      const n = Number(pct);
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        return NextResponse.json(
+          { error: "Each hostel split must be between 0 and 100" },
+          { status: 400 },
+        );
+      }
+      cleaned[hostelId] = n;
+    }
+    updates.partnerHostelSplits = cleaned;
   }
 
   if (body.password) {

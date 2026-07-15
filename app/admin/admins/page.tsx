@@ -32,7 +32,12 @@ import {
   Phone,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
-import type { AdminModule, AdminPermission, ModulePermission } from "@/types";
+import type {
+  AdminModule,
+  AdminPermission,
+  ModulePermission,
+  PartnerSplitMode,
+} from "@/types";
 import type { Hostel } from "@/types";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -133,6 +138,8 @@ interface AdminRow {
   isActive: boolean;
   isPartner: boolean;
   partnerSplitPercent: number;
+  partnerSplitMode: PartnerSplitMode;
+  partnerHostelSplits: Record<string, number>;
   createdBy: string;
   createdAt: string | null;
 }
@@ -148,6 +155,9 @@ interface FormState {
   hostels: string[];
   isPartner: boolean;
   partnerSplitPercent: number | "";
+  partnerSplitMode: PartnerSplitMode;
+  // Per-hostel split %, keyed by hostel ID. "" while an input is being cleared.
+  partnerHostelSplits: Record<string, number | "">;
 }
 
 const EMPTY_MODULE_PERMISSIONS = Object.fromEntries(
@@ -163,6 +173,8 @@ const DEFAULT_FORM: FormState = {
   hostels: [],
   isPartner: false,
   partnerSplitPercent: 0,
+  partnerSplitMode: "whole",
+  partnerHostelSplits: {},
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -274,6 +286,8 @@ export default function AdminManagementPage() {
       hostels: [...admin.hostels],
       isPartner: admin.isPartner,
       partnerSplitPercent: admin.partnerSplitPercent ?? 0,
+      partnerSplitMode: admin.partnerSplitMode ?? "whole",
+      partnerHostelSplits: { ...(admin.partnerHostelSplits ?? {}) },
     });
     setFormError("");
     setFormSuccess("");
@@ -353,15 +367,49 @@ export default function AdminManagementPage() {
       setFormError("Grant at least one module permission.");
       return;
     }
-    if (
-      form.isPartner &&
-      (typeof form.partnerSplitPercent !== "number" ||
+    if (form.isPartner) {
+      if (
+        typeof form.partnerSplitPercent !== "number" ||
         form.partnerSplitPercent < 0 ||
-        form.partnerSplitPercent > 100)
-    ) {
-      setFormError("Partner split must be between 0 and 100.");
-      return;
+        form.partnerSplitPercent > 100
+      ) {
+        setFormError("Partner split must be between 0 and 100.");
+        return;
+      }
+      if (form.partnerSplitMode === "perHostel") {
+        if (form.hostels.length === 0) {
+          setFormError(
+            "Per-hostel splits need specific hostels — select the partner's hostels first.",
+          );
+          return;
+        }
+        for (const hostelId of form.hostels) {
+          // Untouched hostels inherit the whole split % (already validated above).
+          const pct = form.partnerHostelSplits[hostelId] ?? form.partnerSplitPercent;
+          if (typeof pct !== "number" || pct < 0 || pct > 100) {
+            setFormError("Each hostel split must be between 0 and 100.");
+            return;
+          }
+        }
+      }
     }
+
+    // Partner fields shared by create + edit. In per-hostel mode we send one
+    // percentage per selected hostel (untouched ones inherit the whole %);
+    // otherwise the map stays empty.
+    const partnerHostelSplits: Record<string, number> = {};
+    if (form.isPartner && form.partnerSplitMode === "perHostel") {
+      for (const hostelId of form.hostels) {
+        partnerHostelSplits[hostelId] =
+          Number(form.partnerHostelSplits[hostelId] ?? form.partnerSplitPercent) || 0;
+      }
+    }
+    const partnerFields = {
+      isPartner: form.isPartner,
+      partnerSplitPercent: form.isPartner ? form.partnerSplitPercent : 0,
+      partnerSplitMode: form.isPartner ? form.partnerSplitMode : "whole",
+      partnerHostelSplits,
+    };
 
     setSubmitting(true);
 
@@ -371,8 +419,7 @@ export default function AdminManagementPage() {
         whatsappPhone: form.whatsappPhone,
         modulePermissions,
         hostels: form.hostels,
-        isPartner: form.isPartner,
-        partnerSplitPercent: form.isPartner ? form.partnerSplitPercent : 0,
+        ...partnerFields,
       };
       if (form.password) body.password = form.password;
 
@@ -404,8 +451,7 @@ export default function AdminManagementPage() {
             modulePermissions,
             hostels: form.hostels,
             createdBy: adminProfile?.username ?? "super-admin",
-            isPartner: form.isPartner,
-            partnerSplitPercent: form.isPartner ? form.partnerSplitPercent : 0,
+            ...partnerFields,
           }),
         });
         const data = await res.json();
@@ -592,7 +638,10 @@ export default function AdminManagementPage() {
                           )}
                           {admin.isPartner && (
                             <span className='px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700'>
-                              Partner · {admin.partnerSplitPercent ?? 0}% net split
+                              Partner ·{" "}
+                              {admin.partnerSplitMode === "perHostel"
+                                ? "per-hostel split"
+                                : `${admin.partnerSplitPercent ?? 0}% split`}
                             </span>
                           )}
                         </div>
@@ -822,7 +871,8 @@ export default function AdminManagementPage() {
                         Partner Account
                       </label>
                       <p className='text-xs text-apple-gray-400'>
-                        Gives this admin a read-only view of their transaction shares
+                        Gives this admin a read-only view of their transaction
+                        shares
                       </p>
                     </div>
                     <label className='relative inline-flex items-center cursor-pointer shrink-0'>
@@ -846,31 +896,137 @@ export default function AdminManagementPage() {
                     </label>
                   </div>
                   {form.isPartner && (
-                    <div className='mt-4 rounded-xl border border-purple-200 bg-purple-50 p-4'>
-                      <label className='block text-sm font-medium text-purple-900 mb-1.5'>
-                        Partner Split (%)
-                      </label>
-                      <div className='flex items-center gap-3'>
-                        <input
-                          type='number'
-                          min='0'
-                          max='100'
-                          step='0.01'
-                          value={form.partnerSplitPercent}
-                          onChange={(e) =>
-                            setForm((p) => ({
-                              ...p,
-                              partnerSplitPercent:
-                                e.target.value === "" ? "" : Number(e.target.value),
-                            }))
-                          }
-                          className='w-28 px-3 py-2 rounded-lg border border-purple-200 bg-white text-sm font-semibold text-purple-900 focus:outline-none focus:ring-2 focus:ring-purple-300'
-                          aria-label='Partner split percentage'
-                        />
-                        <p className='text-xs text-purple-700'>
-                          Applied after the 10% maintenance and 1.5% Paystack deductions.
-                        </p>
+                    <div className='mt-4 rounded-xl border border-purple-200 bg-purple-50 p-4 space-y-4'>
+                      {/* Split mode: one % for all hostels, or a % per hostel */}
+                      <div>
+                        <label className='block text-sm font-medium text-purple-900 mb-1.5'>
+                          Split Setup
+                        </label>
+                        <div className='inline-flex rounded-lg border border-purple-200 bg-white p-0.5 text-xs font-semibold'>
+                          <button
+                            type='button'
+                            onClick={() =>
+                              setForm((p) => ({ ...p, partnerSplitMode: "whole" }))
+                            }
+                            className={`px-3 py-1.5 rounded-md transition-colors ${
+                              form.partnerSplitMode === "whole"
+                                ? "bg-purple-500 text-white"
+                                : "text-purple-700"
+                            }`}>
+                            Same for all hostels
+                          </button>
+                          <button
+                            type='button'
+                            onClick={() =>
+                              setForm((p) => ({
+                                ...p,
+                                partnerSplitMode: "perHostel",
+                              }))
+                            }
+                            className={`px-3 py-1.5 rounded-md transition-colors ${
+                              form.partnerSplitMode === "perHostel"
+                                ? "bg-purple-500 text-white"
+                                : "text-purple-700"
+                            }`}>
+                            Different per hostel
+                          </button>
+                        </div>
                       </div>
+
+                      {form.partnerSplitMode === "whole" ? (
+                        <div>
+                          <label className='block text-sm font-medium text-purple-900 mb-1.5'>
+                            Partner Split (%)
+                          </label>
+                          <div className='flex items-center gap-3'>
+                            <input
+                              type='number'
+                              min='0'
+                              max='100'
+                              step='0.01'
+                              value={form.partnerSplitPercent}
+                              onChange={(e) =>
+                                setForm((p) => ({
+                                  ...p,
+                                  partnerSplitPercent:
+                                    e.target.value === ""
+                                      ? ""
+                                      : Number(e.target.value),
+                                }))
+                              }
+                              className='w-28 px-3 py-2 rounded-lg border border-purple-200 bg-white text-sm font-semibold text-purple-900 focus:outline-none focus:ring-2 focus:ring-purple-300'
+                              aria-label='Partner split percentage'
+                            />
+                            <p className='text-xs text-purple-700'>
+                              % of each transaction (from the full 100%)
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <label className='block text-sm font-medium text-purple-900 mb-1.5'>
+                            Split per hostel (%)
+                          </label>
+                          {form.hostels.length === 0 ? (
+                            <p className='text-xs text-purple-700'>
+                              Select the partner&apos;s hostels below, then set a
+                              % for each here.
+                            </p>
+                          ) : (
+                            <div className='space-y-2'>
+                              {form.hostels.map((hostelId) => {
+                                const hostel = availableHostels.find(
+                                  (h) => h.id === hostelId,
+                                );
+                                const value =
+                                  form.partnerHostelSplits[hostelId] ??
+                                  form.partnerSplitPercent;
+                                return (
+                                  <div
+                                    key={hostelId}
+                                    className='flex items-center justify-between gap-3'>
+                                    <span className='text-sm text-purple-900 truncate'>
+                                      {hostel?.name ?? hostelId}
+                                    </span>
+                                    <div className='flex items-center gap-1.5 shrink-0'>
+                                      <input
+                                        type='number'
+                                        min='0'
+                                        max='100'
+                                        step='0.01'
+                                        value={value}
+                                        onChange={(e) =>
+                                          setForm((p) => ({
+                                            ...p,
+                                            partnerHostelSplits: {
+                                              ...p.partnerHostelSplits,
+                                              [hostelId]:
+                                                e.target.value === ""
+                                                  ? ""
+                                                  : Number(e.target.value),
+                                            },
+                                          }))
+                                        }
+                                        className='w-24 px-3 py-2 rounded-lg border border-purple-200 bg-white text-sm font-semibold text-purple-900 focus:outline-none focus:ring-2 focus:ring-purple-300'
+                                        aria-label={`Split percentage for ${
+                                          hostel?.name ?? hostelId
+                                        }`}
+                                      />
+                                      <span className='text-xs text-purple-700'>
+                                        %
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                          <p className='mt-2 text-xs text-purple-700'>
+                            Each hostel&apos;s % is taken from that hostel&apos;s
+                            full transaction amount.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
