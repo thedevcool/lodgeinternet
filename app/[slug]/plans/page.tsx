@@ -62,6 +62,8 @@ export default function HostelPlansPage({
   // Drives the post-payment modal's "loading" state. Flipped on the moment
   // Paystack returns success so the modal appears before any API work runs.
   const [processingClaim, setProcessingClaim] = useState(false);
+  // True while the recovery poll is running (claim didn't return the code yet).
+  const [recovering, setRecovering] = useState(false);
   const [error, setError] = useState("");
   const [paystackLoaded, setPaystackLoaded] = useState(false);
   const [planView, setPlanView] = useState<PlanView>("device");
@@ -678,87 +680,141 @@ export default function HostelPlansPage({
     }
   };
 
+  // Persist the code to the buyer's device (encrypted), then reveal it on
+  // screen. Shared by the direct claim path and the recovery poll so both
+  // surface the code identically.
+  const revealCode = async (code: string) => {
+    if (code && selectedPlan && currentUser?.uid) {
+      await saveCodeToLocalStorage(code, selectedPlan.name, currentUser.uid);
+    }
+    // Small settle delay so the "Processing…" state hands off cleanly.
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    setRevealedCode(code);
+    setActiveReservationId("");
+    if (selectedPlan?.planType === "device") {
+      fetchPlanAvailability(selectedPlan.id);
+    }
+  };
+
+  // Recovery: if the direct /claim didn't hand back the code (timeout, network
+  // blip, browser closed too early), poll /claim-status until the code is issued
+  // — by us, the webhook, or this poll itself — or we learn it's genuinely
+  // unfulfilled. The payment is already safe on the server throughout.
+  const recoverCode = async (reference: string) => {
+    setRecovering(true);
+    const MAX_ATTEMPTS = 18; // ~75s total at 4s spacing
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      await new Promise((r) => setTimeout(r, attempt === 0 ? 2000 : 4000));
+      try {
+        const idToken = currentUser
+          ? await currentUser.getIdToken().catch(() => "")
+          : "";
+        const res = await apiFetch("/api/data-codes/claim-status", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+          },
+          body: JSON.stringify({
+            paymentRef: reference,
+            planId: selectedPlanId,
+            hostel: selectedHostel,
+            reservationId: activeReservationId || undefined,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.status === "ready" && data.code) {
+          await revealCode(data.code);
+          return;
+        }
+        if (res.ok && data.status === "unfulfilled") {
+          setError(
+            "Your payment was received but a code couldn't be issued (it may be out of stock). Our team has been notified — please keep your payment reference: " +
+              reference,
+          );
+          return;
+        }
+        // pending / transient — keep polling.
+      } catch {
+        // Network blip — keep polling.
+      }
+    }
+    // Still not issued after the window — payment is safe; the code will be
+    // emailed and is recoverable from the dashboard.
+    setError(
+      "Your payment was confirmed and your code is being issued. It will be emailed to you and saved to your dashboard shortly — please keep your payment reference: " +
+        reference,
+    );
+  };
+
   const handlePaymentSuccess = async (
     reference: string,
     overrideToken?: string,
   ) => {
     try {
-      // Get a fresh ID token to send with the claim request
+      // Get a fresh ID token to send with the claim request.
       let idToken = overrideToken || "";
       if (!idToken && currentUser) {
         try {
           idToken = await currentUser.getIdToken();
         } catch {
-          // Token fetch failed — server will reject
+          // Token fetch failed — recovery still covers us.
         }
       }
 
-      const response = await apiFetch("/api/data-codes/claim", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
-        },
-        body: JSON.stringify({
-          planId: selectedPlanId,
-          email: email,
-          paymentRef: reference,
-          hostel: selectedHostel,
-          reservationId: activeReservationId || undefined,
-        }),
-      });
+      try {
+        // Abort a hung claim after 15s so we fall through to recovery rather
+        // than spin forever on a bad connection.
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 15000);
+        let response: Response;
+        try {
+          response = await apiFetch("/api/data-codes/claim", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+            },
+            body: JSON.stringify({
+              planId: selectedPlanId,
+              email: email,
+              paymentRef: reference,
+              hostel: selectedHostel,
+              reservationId: activeReservationId || undefined,
+            }),
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
 
-      const result = await response.json();
+        const result = await response.json();
 
-      // Handle session expired — show re-auth modal, retry after
-      if (result.code === "SESSION_EXPIRED") {
-        setPendingAction(() => (freshToken: string) => {
-          handlePaymentSuccess(reference, freshToken);
-        });
-        setShowReAuth(true);
-        return;
+        // Session too old — re-auth, then retry the claim (unchanged flow).
+        if (result.code === "SESSION_EXPIRED") {
+          setPendingAction(() => (freshToken: string) => {
+            handlePaymentSuccess(reference, freshToken);
+          });
+          setShowReAuth(true);
+          return;
+        }
+
+        if (response.ok && result.code) {
+          await revealCode(result.code);
+          return;
+        }
+        // Any other non-success (out of stock, delivery error, 5xx) → recover.
+      } catch (claimErr) {
+        // Timeout / network / abort → recover.
+        console.error("Claim failed, entering recovery:", claimErr);
       }
 
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to retrieve code");
-      }
-
-      // 1) Persist the code to the user's own device FIRST (encrypted, 6hr
-      //    dashboard access). Once it's here it can never be "swept away" — it
-      //    lives on their localhost independent of the screen, the email, and
-      //    the server record.
-      if (result.code && selectedPlan && currentUser?.uid) {
-        await saveCodeToLocalStorage(result.code, selectedPlan.name, currentUser.uid);
-      }
-
-      // 2) Small settle delay so the "Processing your code…" state stays up
-      //    briefly and the reveal mounts cleanly — the code is already saved,
-      //    so this is purely a smooth, race-free hand-off to the reveal view.
-      await new Promise((resolve) => setTimeout(resolve, 700));
-
-      // 3) Now reveal it on screen.
-      setRevealedCode(result.code);
-      // Reservation has been consumed by the claim transaction; clear it.
-      setActiveReservationId("");
-      // Refresh the stock badge for the plan that was just purchased so the
-      // page reflects the new inventory without requiring a reload.
-      if (selectedPlan?.planType === "device") {
-        fetchPlanAvailability(selectedPlan.id);
-      }
-    } catch (err: any) {
-      console.error("Error claiming code:", err);
-      setError(
-        err?.message ||
-          "Failed to retrieve your access code. Please contact support with your payment reference: " +
-            reference,
-      );
-      // Dismiss the processing modal so the inline error is visible.
-      setProcessingClaim(false);
+      await recoverCode(reference);
     } finally {
       setPurchasing(false);
-      // Processing state is also cleared on success (the modal flips to the
-      // code-reveal view via revealedCode). Idempotent setState is fine.
+      // Cleared on success too (the modal flips to reveal via revealedCode).
       setProcessingClaim(false);
+      setRecovering(false);
     }
   };
 
@@ -1341,7 +1397,9 @@ export default function HostelPlansPage({
               <p className="text-sm text-apple-gray-600">
                 {revealedCode
                   ? "Here's your access code — copy it to connect."
-                  : "Preparing your access code…"}
+                  : recovering
+                    ? "Payment confirmed — securing your code…"
+                    : "Preparing your access code…"}
               </p>
             </div>
 
