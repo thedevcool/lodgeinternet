@@ -66,6 +66,30 @@ export default function CollageHostelPlansPage({
   const [recovering, setRecovering] = useState(false);
   const [error, setError] = useState("");
   const [paystackLoaded, setPaystackLoaded] = useState(false);
+
+  // The Paystack <Script> onLoad only fires the FIRST time the script loads.
+  // On a client-side navigation (or right after login) where it's already
+  // cached, onLoad never re-fires — leaving the button stuck on "Loading
+  // payment…" until a hard reload. So don't rely on onLoad alone: detect the
+  // global directly, polling briefly in case it's still mid-load.
+  useEffect(() => {
+    if (paystackLoaded) return;
+    if (typeof window !== "undefined" && window.PaystackPop) {
+      setPaystackLoaded(true);
+      return;
+    }
+    const interval = setInterval(() => {
+      if (typeof window !== "undefined" && window.PaystackPop) {
+        setPaystackLoaded(true);
+        clearInterval(interval);
+      }
+    }, 300);
+    const timeout = setTimeout(() => clearInterval(interval), 10000);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [paystackLoaded]);
   const [planView, setPlanView] = useState<PlanView>("device");
   const [selectedDeviceCount, setSelectedDeviceCount] = useState<number>(3);
   const [email, setEmail] = useState<string>("");
