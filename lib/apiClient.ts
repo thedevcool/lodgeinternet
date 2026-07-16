@@ -46,6 +46,14 @@ const ADMIN_AUTH_EXACT = new Set<string>([
   "/api/tv/update-plan",
   "/api/tv/check-expiry",
   "/api/cron/cleanup-email-images",
+  // Hostel/collage GET is public, but create/update/delete are admin-guarded.
+  // Attaching the token is harmless on the public GET (it's ignored), and
+  // required for the write methods on the same path.
+  "/api/hostels",
+  "/api/hostel-collages",
+  // Feedback POST is a public customer submission; the GET (admin list) is
+  // guarded. Same story — token attaches only when an admin has one.
+  "/api/data-codes/feedback",
 ]);
 
 function isMigrated(path: string): boolean {
