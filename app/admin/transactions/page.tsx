@@ -315,8 +315,14 @@ export default function AdminTransactionsPage() {
         (a, b) => b.purchasedAt.getTime() - a.purchasedAt.getTime(),
       );
       const VALID_PLAN_TYPES = new Set(["device", "tv", "unlimited"]);
+      // Partner responses omit customerEmail (PII) by design, so only the admin
+      // view requires it — otherwise every partner row is dropped here and the
+      // ledger shows blank.
+      const partnerView = data.partnerView === true;
       const valid = all.filter(
-        (t) => !!t.customerEmail?.trim() && VALID_PLAN_TYPES.has(t.planType),
+        (t) =>
+          VALID_PLAN_TYPES.has(t.planType) &&
+          (partnerView || !!t.customerEmail?.trim()),
       );
       setTransactions(valid);
     } catch (err) {
