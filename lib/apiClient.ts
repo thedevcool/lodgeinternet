@@ -9,14 +9,14 @@
  * - Set `NEXT_PUBLIC_API_BASE_URL` to the FastAPI origin (e.g.
  *   `https://api.lodge-internet.com`). When set, migrated paths are sent there;
  *   when empty, calls stay same-origin (byte-for-byte today's behaviour), so
- *   this file is inert until you point it at the backend.
- * - `MIGRATED_PREFIXES` is the allowlist of paths served by the backend. Every
+ *   this file is inert until you point it at the
+ * - `MIGRATED_PREFIXES` is the allowlist of paths served by the  Every
  *   route is ported, so it's simply `/api`. To roll back to the old same-origin
  *   route for a group during the switch, remove/narrow the prefix here.
  *
  * Admin auth (the server-side security fix):
  * - `/api/admin/*` and the admin-only actions listed in `ADMIN_AUTH_EXACT` are
- *   protected by `require_admin` on the backend. `apiFetch` reads the admin JWT
+ *   protected by `require_admin` on the  `apiFetch` reads the admin JWT
  *   that `authStore` saved on login and attaches it as `Authorization: Bearer`.
  * - It never overwrites an `Authorization` header the caller already set (e.g.
  *   customer calls that pass a Firebase ID token), and only touches admin paths.
@@ -83,7 +83,10 @@ export function apiUrl(path: string): string {
  * Attach the admin JWT for admin paths, without clobbering an Authorization
  * header the caller already provided. Returns the (possibly unchanged) init.
  */
-function withAdminAuth(path: string, init?: RequestInit): RequestInit | undefined {
+function withAdminAuth(
+  path: string,
+  init?: RequestInit,
+): RequestInit | undefined {
   if (!needsAdminAuth(path)) return init;
   const token = getAdminToken();
   if (!token) return init;
