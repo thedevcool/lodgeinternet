@@ -10,6 +10,7 @@ import Logo from "@/components/Logo";
 import {
   ArrowLeft,
   BarChart3,
+  Bot,
   Building2,
   ChevronDown,
   ChevronUp,
@@ -42,6 +43,7 @@ interface DataPurchaseRow {
   customerEmail?: string;
   paymentRef?: string;
   hostel?: string;
+  paymentSource?: string;
   purchasedAt: Date;
 }
 
@@ -94,6 +96,19 @@ interface PartnerRow {
   partnerHostelSplits: Record<string, number>;
 }
 
+/** A completed WhatsApp-bot transaction from /api/admin/bot-transactions. */
+interface BotTxn {
+  id: string;
+  planName: string;
+  planType: string;
+  hostel: string;
+  gross: number; // total charged, ₦
+  fee: number; // platform 5% service fee, ₦
+  paymentMethod: string;
+  paymentRef: string;
+  completedAt: string | null; // ISO
+}
+
 const PLAN_TYPE_LABELS: Record<string, string> = {
   device: "Device Plan",
   tv: "TV Plan",
@@ -142,7 +157,7 @@ export default function AdminTransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<
-    "transactions" | "splits" | "payouts"
+    "transactions" | "splits" | "payouts" | "bot"
   >("transactions");
 
   // ── Partner Payouts view (admin-only) ──────────────────────────────────────
@@ -154,11 +169,32 @@ export default function AdminTransactionsPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   });
 
+  // ── Bot Transactions view (admin-only) ─────────────────────────────────────
+  const [botTxns, setBotTxns] = useState<BotTxn[]>([]);
+  // Period filter: all-time, a specific day, month, or year — plus a hostel.
+  const [botPeriodMode, setBotPeriodMode] = useState<
+    "all" | "day" | "month" | "year"
+  >("all");
+  const [botDay, setBotDay] = useState<string>(() =>
+    new Date().toISOString().slice(0, 10),
+  );
+  const [botMonth, setBotMonth] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [botYear, setBotYear] = useState<string>(() =>
+    String(new Date().getFullYear()),
+  );
+  const [botHostel, setBotHostel] = useState("all");
+
   // Transaction filters
   const [searchTerm, setSearchTerm] = useState("");
   const [filterHostel, setFilterHostel] = useState("all");
   const [filterPlanType, setFilterPlanType] = useState<
     "all" | "device" | "tv" | "unlimited"
+  >("all");
+  const [filterPaymentSource, setFilterPaymentSource] = useState<
+    "all" | "bot" | "site"
   >("all");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
@@ -207,6 +243,7 @@ export default function AdminTransactionsPage() {
     if (!isPartner) {
       fetchSplits();
       fetchPartners();
+      fetchBotTransactions();
     }
   }, []);
 
@@ -241,6 +278,19 @@ export default function AdminTransactionsPage() {
           setFilterHostel(allowed[0].name);
         }
       }
+    } catch {
+      // non-critical
+    }
+  };
+
+  // Completed WhatsApp-bot transactions drive the admin-only bot audit view.
+  // Non-critical: on any failure the view just stays empty.
+  const fetchBotTransactions = async () => {
+    try {
+      const res = await apiFetch("/api/admin/bot-transactions");
+      const data = await res.json();
+      if (!res.ok) return;
+      setBotTxns(data.transactions ?? []);
     } catch {
       // non-critical
     }
@@ -292,6 +342,7 @@ export default function AdminTransactionsPage() {
           customerEmail: d.customerEmail,
           paymentRef: d.paymentRef,
           hostel: d.hostel,
+          paymentSource: d.paymentSource || "",
           purchasedAt: toDate(d.purchasedAt),
         }),
       );
@@ -370,6 +421,11 @@ export default function AdminTransactionsPage() {
         return false;
       if (filterPlanType !== "all" && t.planType !== filterPlanType)
         return false;
+      if (filterPaymentSource !== "all") {
+        const src = ("paymentSource" in t ? (t as DataPurchaseRow).paymentSource : "") || "";
+        if (filterPaymentSource === "bot" && src !== "bot") return false;
+        if (filterPaymentSource === "site" && src === "bot") return false;
+      }
       if (filterDateFrom) {
         const from = new Date(filterDateFrom);
         from.setHours(0, 0, 0, 0);
@@ -395,6 +451,7 @@ export default function AdminTransactionsPage() {
     transactions,
     filterHostel,
     filterPlanType,
+    filterPaymentSource,
     filterDateFrom,
     filterDateTo,
     searchTerm,
@@ -501,6 +558,88 @@ export default function AdminTransactionsPage() {
     return { partnerTotal, adminTotal };
   }, [partnerPayouts]);
 
+  // ── Bot Transactions (admin-only) ──────────────────────────────────────────
+  // Filter completed bot transactions by the selected period + hostel (and the
+  // admin's hostel scope), then total the 5% and group by hostel + by month.
+  const botFiltered = useMemo(() => {
+    return botTxns.filter((t) => {
+      const h = t.hostel || "Unknown";
+      // Hostel-level access for restricted admins.
+      if (
+        adminProfile?.hostels?.length &&
+        !adminProfile.isSuperAdmin &&
+        !allowedHostelNames.has(t.hostel || "")
+      )
+        return false;
+      if (botHostel !== "all" && h !== botHostel) return false;
+      // Period narrowing (local dates, matching the payouts view).
+      if (botPeriodMode !== "all") {
+        if (!t.completedAt) return false;
+        const d = new Date(t.completedAt);
+        const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        if (botPeriodMode === "day" && ymd !== botDay) return false;
+        if (botPeriodMode === "month" && ymd.slice(0, 7) !== botMonth) return false;
+        if (botPeriodMode === "year" && ymd.slice(0, 4) !== botYear) return false;
+      }
+      return true;
+    });
+  }, [
+    botTxns,
+    botPeriodMode,
+    botDay,
+    botMonth,
+    botYear,
+    botHostel,
+    adminProfile,
+    allowedHostelNames,
+  ]);
+
+  const botTotals = useMemo(() => {
+    let gross = 0;
+    let fee = 0;
+    for (const t of botFiltered) {
+      gross += t.gross || 0;
+      fee += t.fee || 0;
+    }
+    return { count: botFiltered.length, gross, fee };
+  }, [botFiltered]);
+
+  const botByHostel = useMemo(() => {
+    const m: Record<string, { count: number; gross: number; fee: number }> = {};
+    for (const t of botFiltered) {
+      const h = t.hostel || "Unknown";
+      if (!m[h]) m[h] = { count: 0, gross: 0, fee: 0 };
+      m[h].count += 1;
+      m[h].gross += t.gross || 0;
+      m[h].fee += t.fee || 0;
+    }
+    return Object.entries(m).sort((a, b) => b[1].fee - a[1].fee);
+  }, [botFiltered]);
+
+  const botByMonth = useMemo(() => {
+    const m: Record<string, { count: number; gross: number; fee: number }> = {};
+    for (const t of botFiltered) {
+      const d = t.completedAt ? new Date(t.completedAt) : null;
+      const key = d
+        ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+        : "Unknown";
+      if (!m[key]) m[key] = { count: 0, gross: 0, fee: 0 };
+      m[key].count += 1;
+      m[key].gross += t.gross || 0;
+      m[key].fee += t.fee || 0;
+    }
+    return Object.entries(m).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [botFiltered]);
+
+  const botPeriodLabel =
+    botPeriodMode === "all"
+      ? "All time"
+      : botPeriodMode === "day"
+        ? botDay
+        : botPeriodMode === "month"
+          ? botMonth
+          : botYear;
+
   const byHostel = useMemo(() => {
     const map: Record<string, { count: number; revenue: number }> = {};
     for (const t of filtered) {
@@ -538,6 +677,7 @@ export default function AdminTransactionsPage() {
             "Plan Name": t.planName,
             "Plan Type": PLAN_TYPE_LABELS[t.planType] ?? t.planType,
             Hostel: t.hostel ?? "Unknown",
+            Source: "paymentSource" in t ? ((t as DataPurchaseRow).paymentSource === "bot" ? "Bot" : "Site") : "Site",
             "Customer Email": t.customerEmail ?? "N/A",
             "Payment Ref": t.paymentRef ?? "N/A",
             "Price (₦)": t.price,
@@ -1078,6 +1218,21 @@ export default function AdminTransactionsPage() {
                       </span>
                     )}
                   </button>
+                  <button
+                    onClick={() => setActiveTab("bot")}
+                    className={`flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                      activeTab === "bot"
+                        ? "bg-white text-apple-gray-900 shadow-sm"
+                        : "text-apple-gray-600 hover:text-apple-gray-900"
+                    }`}>
+                    <Bot className='w-4 h-4' />
+                    Bot Transactions
+                    {botTxns.length > 0 && (
+                      <span className='ml-1 px-1.5 py-0.5 text-xs rounded-full bg-green-100 text-green-700'>
+                        {botTxns.length}
+                      </span>
+                    )}
+                  </button>
                 </>
               )}
             </div>
@@ -1188,7 +1343,7 @@ export default function AdminTransactionsPage() {
               {/* Filters + Export */}
               <div className='bg-white rounded-3xl shadow-sm p-6'>
                 <div className='flex flex-col gap-4'>
-                  <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3'>
+                  <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3'>
                     <div className='relative'>
                       <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-apple-gray-400' />
                       <input
@@ -1222,6 +1377,18 @@ export default function AdminTransactionsPage() {
                       <option value='device'>Device Plan</option>
                       <option value='tv'>TV Plan</option>
                       <option value='unlimited'>Unlimited</option>
+                    </select>
+                    <select
+                      value={filterPaymentSource}
+                      onChange={(e) =>
+                        setFilterPaymentSource(
+                          e.target.value as typeof filterPaymentSource,
+                        )
+                      }
+                      className='px-3 py-2.5 border border-apple-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-apple-gray-700'>
+                      <option value='all'>All Sources</option>
+                      <option value='bot'>Paid with Bot</option>
+                      <option value='site'>Paid on Site</option>
                     </select>
                     <div className='flex gap-2'>
                       <input
@@ -1287,6 +1454,9 @@ export default function AdminTransactionsPage() {
                           {!isPartner && (
                             <>
                               <th className='px-5 py-3 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
+                                Source
+                              </th>
+                              <th className='px-5 py-3 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
                                 Email
                               </th>
                               <th className='px-5 py-3 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
@@ -1333,6 +1503,18 @@ export default function AdminTransactionsPage() {
                             </td>
                             {!isPartner && (
                               <>
+                                <td className='px-5 py-3.5'>
+                                  {"paymentSource" in t && (t as DataPurchaseRow).paymentSource === "bot" ? (
+                                    <span className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700'>
+                                      <Smartphone className='w-3 h-3' />
+                                      Bot
+                                    </span>
+                                  ) : (
+                                    <span className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600'>
+                                      Site
+                                    </span>
+                                  )}
+                                </td>
                                 <td className='px-5 py-3.5 text-sm text-apple-gray-600 max-w-[180px] truncate'>
                                   {t.customerEmail ?? (
                                     <span className='text-apple-gray-400'>
@@ -1539,6 +1721,263 @@ export default function AdminTransactionsPage() {
                     </div>
                   ))}
                 </div>
+              )}
+            </>
+          )}
+
+          {/* ── BOT TRANSACTIONS TAB ─────────────────────────────────────── */}
+          {!isPartner && activeTab === "bot" && (
+            <>
+              {/* Filters: period + hostel */}
+              <div className='flex flex-wrap items-center gap-3'>
+                <div className='inline-flex rounded-xl border border-apple-gray-200 bg-white p-0.5 text-sm font-semibold'>
+                  {(["all", "day", "month", "year"] as const).map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setBotPeriodMode(m)}
+                      className={`px-3.5 py-1.5 rounded-lg capitalize transition-colors ${
+                        botPeriodMode === m
+                          ? "bg-apple-gray-900 text-white"
+                          : "text-apple-gray-600 hover:text-apple-gray-900"
+                      }`}>
+                      {m === "all" ? "All time" : m}
+                    </button>
+                  ))}
+                </div>
+                {botPeriodMode === "day" && (
+                  <input
+                    type='date'
+                    value={botDay}
+                    onChange={(e) => setBotDay(e.target.value)}
+                    className='px-3 py-2 rounded-xl border border-apple-gray-200 bg-white text-sm text-apple-gray-900 focus:outline-none focus:ring-2 focus:ring-apple-gray-300'
+                    aria-label='Day'
+                  />
+                )}
+                {botPeriodMode === "month" && (
+                  <input
+                    type='month'
+                    value={botMonth}
+                    onChange={(e) => setBotMonth(e.target.value)}
+                    className='px-3 py-2 rounded-xl border border-apple-gray-200 bg-white text-sm text-apple-gray-900 focus:outline-none focus:ring-2 focus:ring-apple-gray-300'
+                    aria-label='Month'
+                  />
+                )}
+                {botPeriodMode === "year" && (
+                  <input
+                    type='number'
+                    value={botYear}
+                    onChange={(e) => setBotYear(e.target.value)}
+                    min='2020'
+                    max='2100'
+                    className='w-28 px-3 py-2 rounded-xl border border-apple-gray-200 bg-white text-sm text-apple-gray-900 focus:outline-none focus:ring-2 focus:ring-apple-gray-300'
+                    aria-label='Year'
+                  />
+                )}
+                <select
+                  value={botHostel}
+                  onChange={(e) => setBotHostel(e.target.value)}
+                  className='px-3 py-2 rounded-xl border border-apple-gray-200 bg-white text-sm text-apple-gray-900 focus:outline-none focus:ring-2 focus:ring-apple-gray-300'
+                  aria-label='Hostel'>
+                  <option value='all'>All hostels</option>
+                  {knownHostels.map((h) => (
+                    <option key={h} value={h}>
+                      {h}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Headline cards */}
+              <div className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
+                <div className='bg-white rounded-2xl shadow-sm p-5'>
+                  <p className='text-sm text-apple-gray-500 mb-1'>Live 5% total</p>
+                  <p className='text-3xl font-bold text-green-600'>
+                    {loading ? "—" : `₦${botTotals.fee.toLocaleString()}`}
+                  </p>
+                  <p className='text-xs text-apple-gray-400 mt-1'>
+                    {botPeriodLabel}
+                  </p>
+                </div>
+                <div className='bg-white rounded-2xl shadow-sm p-5'>
+                  <p className='text-sm text-apple-gray-500 mb-1'>
+                    Gross collected
+                  </p>
+                  <p className='text-3xl font-bold text-apple-gray-900'>
+                    {loading ? "—" : `₦${botTotals.gross.toLocaleString()}`}
+                  </p>
+                </div>
+                <div className='bg-white rounded-2xl shadow-sm p-5'>
+                  <p className='text-sm text-apple-gray-500 mb-1'>Transactions</p>
+                  <p className='text-3xl font-bold text-apple-gray-900'>
+                    {loading ? "—" : botTotals.count.toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
+              {botFiltered.length === 0 ? (
+                <div className='bg-white rounded-2xl shadow-sm p-10 text-center text-apple-gray-500'>
+                  No completed bot transactions for this filter yet.
+                </div>
+              ) : (
+                <>
+                  {/* Summaries: by hostel + by month */}
+                  <div className='grid grid-cols-1 lg:grid-cols-2 gap-4'>
+                    <div className='bg-white rounded-2xl shadow-sm overflow-hidden'>
+                      <div className='px-5 py-3 border-b border-apple-gray-100 font-semibold text-apple-gray-900'>
+                        By hostel
+                      </div>
+                      <div className='overflow-x-auto'>
+                        <table className='w-full text-sm'>
+                          <thead>
+                            <tr className='text-left text-xs text-apple-gray-500 border-b border-apple-gray-100'>
+                              <th className='px-5 py-2 font-medium'>Hostel</th>
+                              <th className='px-5 py-2 font-medium text-right'>
+                                Txns
+                              </th>
+                              <th className='px-5 py-2 font-medium text-right'>
+                                Gross
+                              </th>
+                              <th className='px-5 py-2 font-medium text-right'>
+                                5% total
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {botByHostel.map(([name, v]) => (
+                              <tr
+                                key={name}
+                                className='border-b border-apple-gray-50 last:border-0'>
+                                <td className='px-5 py-2.5 text-apple-gray-900'>
+                                  {name}
+                                </td>
+                                <td className='px-5 py-2.5 text-right text-apple-gray-700'>
+                                  {v.count}
+                                </td>
+                                <td className='px-5 py-2.5 text-right text-apple-gray-700'>
+                                  ₦{v.gross.toLocaleString()}
+                                </td>
+                                <td className='px-5 py-2.5 text-right font-semibold text-green-600'>
+                                  ₦{v.fee.toLocaleString()}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className='border-t border-apple-gray-100 font-semibold text-apple-gray-900'>
+                              <td className='px-5 py-2.5'>Total</td>
+                              <td className='px-5 py-2.5 text-right'>
+                                {botTotals.count}
+                              </td>
+                              <td className='px-5 py-2.5 text-right'>
+                                ₦{botTotals.gross.toLocaleString()}
+                              </td>
+                              <td className='px-5 py-2.5 text-right text-green-600'>
+                                ₦{botTotals.fee.toLocaleString()}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className='bg-white rounded-2xl shadow-sm overflow-hidden'>
+                      <div className='px-5 py-3 border-b border-apple-gray-100 font-semibold text-apple-gray-900'>
+                        By month
+                      </div>
+                      <div className='overflow-x-auto'>
+                        <table className='w-full text-sm'>
+                          <thead>
+                            <tr className='text-left text-xs text-apple-gray-500 border-b border-apple-gray-100'>
+                              <th className='px-5 py-2 font-medium'>Month</th>
+                              <th className='px-5 py-2 font-medium text-right'>
+                                Txns
+                              </th>
+                              <th className='px-5 py-2 font-medium text-right'>
+                                Gross
+                              </th>
+                              <th className='px-5 py-2 font-medium text-right'>
+                                5% total
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {botByMonth.map(([month, v]) => (
+                              <tr
+                                key={month}
+                                className='border-b border-apple-gray-50 last:border-0'>
+                                <td className='px-5 py-2.5 text-apple-gray-900'>
+                                  {month}
+                                </td>
+                                <td className='px-5 py-2.5 text-right text-apple-gray-700'>
+                                  {v.count}
+                                </td>
+                                <td className='px-5 py-2.5 text-right text-apple-gray-700'>
+                                  ₦{v.gross.toLocaleString()}
+                                </td>
+                                <td className='px-5 py-2.5 text-right font-semibold text-green-600'>
+                                  ₦{v.fee.toLocaleString()}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Transaction list */}
+                  <div className='bg-white rounded-2xl shadow-sm overflow-hidden'>
+                    <div className='px-5 py-3 border-b border-apple-gray-100 font-semibold text-apple-gray-900'>
+                      Transactions
+                    </div>
+                    <div className='overflow-x-auto'>
+                      <table className='w-full text-sm'>
+                        <thead>
+                          <tr className='text-left text-xs text-apple-gray-500 border-b border-apple-gray-100'>
+                            <th className='px-5 py-2 font-medium'>Date</th>
+                            <th className='px-5 py-2 font-medium'>Plan</th>
+                            <th className='px-5 py-2 font-medium'>Hostel</th>
+                            <th className='px-5 py-2 font-medium'>Method</th>
+                            <th className='px-5 py-2 font-medium text-right'>
+                              Gross
+                            </th>
+                            <th className='px-5 py-2 font-medium text-right'>
+                              5% charge
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {botFiltered.map((t) => (
+                            <tr
+                              key={t.id}
+                              className='border-b border-apple-gray-50 last:border-0'>
+                              <td className='px-5 py-2.5 text-apple-gray-700 whitespace-nowrap'>
+                                {t.completedAt
+                                  ? new Date(t.completedAt).toLocaleString()
+                                  : "—"}
+                              </td>
+                              <td className='px-5 py-2.5 text-apple-gray-900'>
+                                {t.planName}
+                              </td>
+                              <td className='px-5 py-2.5 text-apple-gray-700'>
+                                {t.hostel || "—"}
+                              </td>
+                              <td className='px-5 py-2.5 text-apple-gray-500 uppercase text-xs'>
+                                {t.paymentMethod || "—"}
+                              </td>
+                              <td className='px-5 py-2.5 text-right text-apple-gray-700'>
+                                ₦{t.gross.toLocaleString()}
+                              </td>
+                              <td className='px-5 py-2.5 text-right font-semibold text-green-600'>
+                                ₦{t.fee.toLocaleString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
               )}
             </>
           )}
