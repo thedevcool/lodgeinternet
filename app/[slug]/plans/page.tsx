@@ -10,6 +10,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { KeyRound, Wifi, Smartphone, Tv, LogIn, Copy } from "lucide-react";
 import { useToast } from "@/components/Toast";
 import ReAuthModal from "@/components/ReAuthModal";
+import WhatsAppBotCTA from "@/components/WhatsAppBotCTA";
 import { generatePaymentRef } from "@/lib/generateRef";
 import { toHostelSlug } from "@/lib/hostelSlug";
 import { encryptForStorage } from "@/lib/localStorageCrypto";
@@ -1342,6 +1343,15 @@ export default function HostelPlansPage({
           </div>
         </div>
       </section>
+
+      {/* Alternative to the on-site flow — buy this plan on the WhatsApp bot.
+          Hides itself until a WhatsApp number is configured. */}
+      <div className="flex justify-center bg-white pt-4">
+        <WhatsAppBotCTA
+          label="Or buy on the WhatsApp bot"
+          prefill={`Hi Lodge Internet${selectedHostel ? ` — ${selectedHostel}` : ""}`}
+        />
+      </div>
 
       {/* One-time reminder before the user is sent to Paystack. */}
       {showPaymentWarning && (

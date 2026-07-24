@@ -15,6 +15,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { toHostelSlug } from "@/lib/hostelSlug";
+import WhatsAppBotCTA from "@/components/WhatsAppBotCTA";
 import type { HostelCollage } from "@/types";
 
 interface Hostel {
@@ -179,6 +180,13 @@ export default function LandingPage() {
                 ? "You\u2019re locked in \u2014 tap to view your plans"
                 : "Choose your hostel or collage to see available plans"}
             </p>
+            <div className='mt-5 flex items-center justify-center gap-3'>
+              <span className='text-sm text-apple-gray-500'>Prefer chat?</span>
+              <WhatsAppBotCTA
+                label='Buy on the WhatsApp bot'
+                prefill='Hi Lodge Internet'
+              />
+            </div>
           </div>
 
           {loading ? (

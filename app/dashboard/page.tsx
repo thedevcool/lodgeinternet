@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { toHostelSlug } from "@/lib/hostelSlug";
 import UpdateMacModal from "@/components/UpdateMacModal";
+import WhatsAppBotCTA from "@/components/WhatsAppBotCTA";
 import ReAuthModal from "@/components/ReAuthModal";
 import { useToast } from "@/components/Toast";
 
@@ -392,6 +393,9 @@ export default function DashboardPage() {
 
       {/* Main Content */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {/* Promote the WhatsApp bot (hidden until a number is configured) */}
+        <WhatsAppBotCTA variant="banner" prefill="Hi Lodge Internet" />
+
         {/* Hostel + Quick Buy Card */}
         <div className="bg-white rounded-3xl shadow-lg p-6 sm:p-8 border border-apple-gray-200">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
