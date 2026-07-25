@@ -118,13 +118,19 @@ export async function POST(request: Request) {
       if (reservationId) {
         const reservedRef = db.collection("dataCodes").doc(reservationId);
         const reservedSnap = await transaction.get(reservedRef);
-        if (
-          reservedSnap.exists &&
-          reservedSnap.data()?.planId === planId &&
-          reservedSnap.data()?.hostel === hostel &&
-          reservedSnap.data()?.reservedBy === auth.user.uid
-        ) {
-          codeRef = reservedRef;
+        if (reservedSnap.exists) {
+          const rd = reservedSnap.data()!;
+          const emailMatch =
+            customerEmail &&
+            (rd.reservedEmail || "").toLowerCase() === customerEmail.toLowerCase();
+          const uidMatch = rd.reservedBy === auth.user.uid;
+          if (
+            rd.planId === planId &&
+            rd.hostel === hostel &&
+            (emailMatch || uidMatch)
+          ) {
+            codeRef = reservedRef;
+          }
         }
       }
 

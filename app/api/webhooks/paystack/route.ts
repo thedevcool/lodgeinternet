@@ -252,12 +252,16 @@ async function handleDeviceCodeClaim({
     if (reservationId) {
       const reservedRef = db.collection("dataCodes").doc(reservationId);
       const reservedSnap = await transaction.get(reservedRef);
-      if (
-        reservedSnap.exists &&
-        reservedSnap.data()?.planId === planId &&
-        reservedSnap.data()?.hostel === hostel
-      ) {
-        codeRef = reservedRef;
+      if (reservedSnap.exists) {
+        const rd = reservedSnap.data()!;
+        // Verify ownership by email (set by all reservation paths) or
+        // fall back to plan+hostel match for older reservations.
+        const emailMatch =
+          customerEmail &&
+          (rd.reservedEmail || "").toLowerCase() === customerEmail.toLowerCase();
+        if (rd.planId === planId && rd.hostel === hostel && emailMatch) {
+          codeRef = reservedRef;
+        }
       }
     }
 

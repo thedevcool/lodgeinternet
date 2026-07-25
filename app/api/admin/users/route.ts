@@ -117,6 +117,7 @@ export async function GET(request: Request) {
         id: doc.id,
         email,
         displayName: d.displayName ?? "",
+        phone: d.phone ?? "",
         hostelId: d.hostelId ?? "",
         hostelSlug: d.hostelSlug ?? "",
         emailVerified: d.emailVerified ?? false,
@@ -138,7 +139,8 @@ export async function GET(request: Request) {
         (u) =>
           u.email.includes(search) ||
           u.displayName.toLowerCase().includes(search) ||
-          u.hostelId.toLowerCase().includes(search),
+          u.hostelId.toLowerCase().includes(search) ||
+          u.phone.toLowerCase().includes(search),
       );
     }
 

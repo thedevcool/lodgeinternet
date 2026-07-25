@@ -102,6 +102,7 @@ export async function POST(request: Request) {
       transaction.update(candidate.ref, {
         reservedUntil: expiresAt,
         reservedBy: auth.user.uid,
+        reservedEmail: auth.user.email ?? "",
         reservedAt: FieldValue.serverTimestamp(),
       });
 

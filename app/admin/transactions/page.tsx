@@ -139,6 +139,7 @@ const SPLITTABLE_PCT = 100 - MAINTENANCE_PCT - PAYSTACK_PCT; // 88.5
 export default function AdminTransactionsPage() {
   const { logout, canWrite, adminProfile } = useAuthStore();
   const isPartner = adminProfile?.isPartner ?? false;
+  const isSuperAdmin = adminProfile?.isSuperAdmin ?? false;
   const canEdit = canWrite("transactions");
   const router = useRouter();
   const [transactions, setTransactions] = useState<TransactionRow[]>([]);
@@ -243,6 +244,8 @@ export default function AdminTransactionsPage() {
     if (!isPartner) {
       fetchSplits();
       fetchPartners();
+    }
+    if (isSuperAdmin) {
       fetchBotTransactions();
     }
   }, []);
@@ -1218,21 +1221,23 @@ export default function AdminTransactionsPage() {
                       </span>
                     )}
                   </button>
-                  <button
-                    onClick={() => setActiveTab("bot")}
-                    className={`flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                      activeTab === "bot"
-                        ? "bg-white text-apple-gray-900 shadow-sm"
-                        : "text-apple-gray-600 hover:text-apple-gray-900"
-                    }`}>
-                    <Bot className='w-4 h-4' />
-                    Bot Transactions
-                    {botTxns.length > 0 && (
-                      <span className='ml-1 px-1.5 py-0.5 text-xs rounded-full bg-green-100 text-green-700'>
-                        {botTxns.length}
-                      </span>
-                    )}
-                  </button>
+                  {isSuperAdmin && (
+                    <button
+                      onClick={() => setActiveTab("bot")}
+                      className={`flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                        activeTab === "bot"
+                          ? "bg-white text-apple-gray-900 shadow-sm"
+                          : "text-apple-gray-600 hover:text-apple-gray-900"
+                      }`}>
+                      <Bot className='w-4 h-4' />
+                      Bot Transactions
+                      {botTxns.length > 0 && (
+                        <span className='ml-1 px-1.5 py-0.5 text-xs rounded-full bg-green-100 text-green-700'>
+                          {botTxns.length}
+                        </span>
+                      )}
+                    </button>
+                  )}
                 </>
               )}
             </div>
@@ -1726,7 +1731,7 @@ export default function AdminTransactionsPage() {
           )}
 
           {/* ── BOT TRANSACTIONS TAB ─────────────────────────────────────── */}
-          {!isPartner && activeTab === "bot" && (
+          {isSuperAdmin && activeTab === "bot" && (
             <>
               {/* Filters: period + hostel */}
               <div className='flex flex-wrap items-center gap-3'>
