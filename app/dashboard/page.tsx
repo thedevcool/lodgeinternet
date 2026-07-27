@@ -850,6 +850,12 @@ export default function DashboardPage() {
           onCancel={() => setReAuthRetry(null)}
         />
       )}
+
+      {/* Floating WhatsApp Action Button */}
+      <WhatsAppBotCTA
+        variant="floating-fab"
+        prefill={`Hi Lodge Internet — Dashboard user ${profile?.hostelId ? `(${profile.hostelId})` : ""}`}
+      />
     </div>
   );
 }

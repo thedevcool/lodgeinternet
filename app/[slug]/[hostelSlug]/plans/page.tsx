@@ -1355,11 +1355,10 @@ export default function CollageHostelPlansPage({
         </div>
       </section>
 
-      {/* Alternative to the on-site flow — buy this plan on the WhatsApp bot.
-          Hides itself until a WhatsApp number is configured. */}
-      <div className="flex justify-center bg-white pt-4">
+      {/* Alternative to the on-site flow — buy this plan on the WhatsApp bot. */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         <WhatsAppBotCTA
-          label="Or buy on the WhatsApp bot"
+          variant="banner"
           prefill={`Hi Lodge Internet${selectedHostel ? ` — ${selectedHostel}` : ""}`}
         />
       </div>
@@ -2063,6 +2062,13 @@ export default function CollageHostelPlansPage({
                           : "Continue to Purchase"}
                     </button>
                   )}
+
+                  {/* Dedicated WhatsApp Fast-Track Checkout option in the Payment box */}
+                  <WhatsAppBotCTA
+                    variant="payment-option"
+                    prefill={`Hi Lodge Internet, I want to buy ${selectedPlan.name}${selectedHostel ? ` for ${selectedHostel}` : ""}`}
+                    label={`Buy ${selectedPlan.name} on WhatsApp Bot`}
+                  />
                 </div>
               )}
             </>
@@ -2639,6 +2645,12 @@ export default function CollageHostelPlansPage({
           }}
         />
       )}
+
+      {/* Floating WhatsApp Action Button */}
+      <WhatsAppBotCTA
+        variant="floating-fab"
+        prefill={`Hi Lodge Internet${selectedHostel ? ` — ${selectedHostel}` : ""}`}
+      />
     </>
   );
 }

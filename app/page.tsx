@@ -171,22 +171,20 @@ export default function LandingPage() {
       {/* Hostel & Collage Selection Section */}
       <section className='py-10 sm:py-16 bg-white'>
         <div className='max-w-5xl mx-auto px-4 sm:px-6 lg:px-8'>
+          {/* Showcase WhatsApp Promo Banner */}
+          <div className="mb-10 sm:mb-12">
+            <WhatsAppBotCTA variant="banner" prefill="Hi Lodge Internet, I'd like to check available plans" />
+          </div>
+
           <div className='text-center mb-8 sm:mb-12'>
             <h2 className='text-3xl sm:text-4xl lg:text-5xl font-semibold text-apple-gray-900 mb-3 sm:mb-4'>
               {userProfile ? "Your Hostel" : "Select Your Hostel"}
             </h2>
             <p className='text-base sm:text-lg lg:text-xl text-apple-gray-600 max-w-2xl mx-auto'>
               {userProfile
-                ? "You\u2019re locked in \u2014 tap to view your plans"
+                ? "You’re locked in — tap to view your plans"
                 : "Choose your hostel or collage to see available plans"}
             </p>
-            <div className='mt-5 flex items-center justify-center gap-3'>
-              <span className='text-sm text-apple-gray-500'>Prefer chat?</span>
-              <WhatsAppBotCTA
-                label='Buy on the WhatsApp bot'
-                prefill='Hi Lodge Internet'
-              />
-            </div>
           </div>
 
           {loading ? (
@@ -364,6 +362,9 @@ export default function LandingPage() {
           </p>
         </div>
       </footer>
+
+      {/* Floating WhatsApp Action Button */}
+      <WhatsAppBotCTA variant="floating-fab" prefill="Hi Lodge Internet" />
     </>
   );
 }

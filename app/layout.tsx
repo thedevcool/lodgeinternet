@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ToastProvider } from "@/components/Toast";
+import WhatsAppBotCTA from "@/components/WhatsAppBotCTA";
 
 export const metadata: Metadata = {
   title: "Lodge Internet - Fast and Reliable Hostel Internet",
@@ -16,7 +17,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          <WhatsAppBotCTA variant="top-banner" prefill="Hi Lodge Internet" />
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );

@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 import { toHostelSlug } from "@/lib/hostelSlug";
+import WhatsAppBotCTA from "@/components/WhatsAppBotCTA";
 import type { Hostel, HostelCollage } from "@/types";
 
 export default function CollagePage({
@@ -170,6 +171,14 @@ export default function CollagePage({
       {/* Hostels Section */}
       <section className="py-10 sm:py-16 bg-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Showcase WhatsApp Promo Banner */}
+          <div className="mb-10 sm:mb-12">
+            <WhatsAppBotCTA
+              variant="banner"
+              prefill={`Hi Lodge Internet — ${collage.name}`}
+            />
+          </div>
+
           <div className="text-center mb-8 sm:mb-12">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-apple-gray-900 mb-3 sm:mb-4">
               {collage.name}
@@ -263,6 +272,12 @@ export default function CollagePage({
           </div>
         </div>
       </section>
+
+      {/* Floating WhatsApp Action Button */}
+      <WhatsAppBotCTA
+        variant="floating-fab"
+        prefill={`Hi Lodge Internet — ${collage.name}`}
+      />
     </>
   );
 }
