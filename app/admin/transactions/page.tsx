@@ -109,6 +109,19 @@ interface BotTxn {
   completedAt: string | null; // ISO
 }
 
+interface BotScenario {
+  id: string;
+  status: string;
+  planName: string;
+  hostel: string;
+  paymentMethod: string;
+  amount: number;
+  amountPaid: number;
+  amountRemaining: number;
+  fallbackReason: string;
+  createdAt: string | null;
+}
+
 const PLAN_TYPE_LABELS: Record<string, string> = {
   device: "Device Plan",
   tv: "TV Plan",
@@ -172,6 +185,7 @@ export default function AdminTransactionsPage() {
 
   // ── Bot Transactions view (admin-only) ─────────────────────────────────────
   const [botTxns, setBotTxns] = useState<BotTxn[]>([]);
+  const [botScenarios, setBotScenarios] = useState<BotScenario[]>([]);
   // Period filter: all-time, a specific day, month, or year — plus a hostel.
   const [botPeriodMode, setBotPeriodMode] = useState<
     "all" | "day" | "month" | "year"
@@ -294,6 +308,7 @@ export default function AdminTransactionsPage() {
       const data = await res.json();
       if (!res.ok) return;
       setBotTxns(data.transactions ?? []);
+      setBotScenarios(data.scenarios ?? []);
     } catch {
       // non-critical
     }
@@ -1817,6 +1832,32 @@ export default function AdminTransactionsPage() {
                     {loading ? "—" : botTotals.count.toLocaleString()}
                   </p>
                 </div>
+              </div>
+
+              <div className='bg-white rounded-2xl shadow-sm overflow-hidden'>
+                <div className='px-5 py-3 border-b border-apple-gray-100'>
+                  <h3 className='font-semibold text-apple-gray-900'>Payment scenarios</h3>
+                  <p className='text-xs text-apple-gray-500 mt-1'>Partial payments, cancelled checkouts, and DVA/card fallback cases.</p>
+                </div>
+                {botScenarios.length === 0 ? (
+                  <p className='p-5 text-sm text-apple-gray-500'>No unresolved bot payment scenarios recorded.</p>
+                ) : (
+                  <div className='overflow-x-auto'>
+                    <table className='w-full text-sm'>
+                      <thead><tr className='text-left text-xs text-apple-gray-500 border-b border-apple-gray-100'>
+                        <th className='px-5 py-3'>Plan / Hostel</th><th className='px-5 py-3'>Status</th><th className='px-5 py-3 text-right'>Paid / Required</th><th className='px-5 py-3'>Reason</th>
+                      </tr></thead>
+                      <tbody>{botScenarios.slice(0, 100).map((s) => (
+                        <tr key={s.id} className='border-b border-apple-gray-50'>
+                          <td className='px-5 py-3 text-apple-gray-900'>{s.planName}<span className='block text-xs text-apple-gray-500'>{s.hostel}</span></td>
+                          <td className='px-5 py-3'><span className='px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-xs'>{s.status}</span></td>
+                          <td className='px-5 py-3 text-right'>₦{s.amountPaid.toLocaleString()} / ₦{s.amount.toLocaleString()}</td>
+                          <td className='px-5 py-3 text-apple-gray-600'>{s.fallbackReason || (s.amountRemaining ? `Remaining ₦${s.amountRemaining.toLocaleString()}` : "—")}</td>
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                )}
               </div>
 
               {botFiltered.length === 0 ? (

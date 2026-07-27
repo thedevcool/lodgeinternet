@@ -18,6 +18,7 @@ import {
   Settings,
   Users,
   ListChecks,
+  Activity,
 } from "lucide-react";
 
 const NAV_CARDS = [
@@ -101,6 +102,15 @@ const NAV_CARDS = [
     icon: <ListChecks className="w-6 h-6 text-white" />,
     gradient: "from-pink-400 to-rose-500",
     hover: "hover:border-pink-200",
+  },
+  {
+    module: "bot-analytics",
+    href: "/admin/bot-analytics",
+    label: "Bot Analytics",
+    description: "Monitor bot payment reliability",
+    icon: <Activity className="w-6 h-6 text-white" />,
+    gradient: "from-cyan-500 to-blue-600",
+    hover: "hover:border-cyan-200",
   },
 ] as const;
 
