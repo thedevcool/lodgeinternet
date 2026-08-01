@@ -25,6 +25,13 @@ import {
 } from "lucide-react";
 import type { DataPlan, DataCode, Hostel } from "@/types";
 
+interface LowStockPlan {
+  id: string;
+  name: string;
+  hostel: string;
+  remaining: number;
+}
+
 interface DataPurchase {
   id: string;
   planId: string;
@@ -103,6 +110,11 @@ export default function AdminDataCodesPage() {
   const [editUnlimitedPeriod, setEditUnlimitedPeriod] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
+  // Plans that are about to sell out — surfaced as a banner so a superadmin
+  // sees it on the dashboard, not only in the alert email.
+  const [lowStock, setLowStock] = useState<LowStockPlan[]>([]);
+  const [lowStockThreshold, setLowStockThreshold] = useState(5);
+
   // Duplicate modal state
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [dupFrom, setDupFrom] = useState<string>("");
@@ -114,7 +126,20 @@ export default function AdminDataCodesPage() {
     fetchPlans();
     fetchPendingTVSubscriptions();
     fetchHostels();
+    fetchLowStock();
   }, []);
+
+  const fetchLowStock = async () => {
+    try {
+      const res = await apiFetch("/api/data-codes/low-stock");
+      if (!res.ok) return;
+      const data = await res.json();
+      setLowStock(data.plans ?? []);
+      if (typeof data.threshold === "number") setLowStockThreshold(data.threshold);
+    } catch (err) {
+      console.error("Error fetching low stock:", err);
+    }
+  };
 
   const fetchPlans = async () => {
     try {
@@ -393,6 +418,7 @@ export default function AdminDataCodesPage() {
 
       setCodeInput("");
       await fetchPlans();
+      await fetchLowStock();
 
       setSuccessMessage("Code added successfully!");
       setTimeout(() => setSuccessMessage(""), 5000);
@@ -499,6 +525,7 @@ export default function AdminDataCodesPage() {
       }
 
       setCodes((prev) => prev.filter((code) => code.id !== codeId));
+      await fetchLowStock();
     } catch (err: any) {
       console.error("Error deleting code:", err);
       setError(err?.message || "Failed to delete code");
@@ -938,6 +965,50 @@ export default function AdminDataCodesPage() {
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
                   {error}
+                </div>
+              )}
+
+              {/* Plans about to sell out. Sorted emptiest-first by the API, so
+                  the most urgent is always the one read first. */}
+              {lowStock.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                  <div className="flex items-start gap-3">
+                    <span className="text-lg leading-none mt-0.5">⚠️</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-amber-900">
+                        {lowStock.length} plan{lowStock.length !== 1 ? "s" : ""} running
+                        low on codes
+                      </p>
+                      <p className="text-xs text-amber-700 mt-0.5">
+                        Fewer than {lowStockThreshold} codes left. The superadmin has
+                        also been emailed.
+                      </p>
+                      <ul className="mt-2 space-y-1">
+                        {lowStock.map((plan) => (
+                          <li
+                            key={`${plan.id}-${plan.hostel}`}
+                            className="flex items-center justify-between gap-3 text-sm"
+                          >
+                            <span className="text-amber-900 truncate">
+                              {plan.name}
+                              <span className="text-amber-700"> · {plan.hostel}</span>
+                            </span>
+                            <span
+                              className={`font-semibold whitespace-nowrap ${
+                                plan.remaining === 0
+                                  ? "text-red-700"
+                                  : "text-amber-900"
+                              }`}
+                            >
+                              {plan.remaining === 0
+                                ? "Out of stock"
+                                : `${plan.remaining} left`}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
                 </div>
               )}
 

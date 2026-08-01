@@ -240,7 +240,7 @@ export default function HostelPlansPage({
 
   // Clear selected plan if it becomes unavailable
   useEffect(() => {
-    if (selectedPlanId && selectedPlan?.planType === "device") {
+    if (selectedPlanId && selectedPlan?.planType !== "tv") {
       const availability = planAvailability[selectedPlanId];
       if (availability && !availability.available) {
         setSelectedPlanId("");
@@ -297,12 +297,15 @@ export default function HostelPlansPage({
       );
       setPlans(hostelPlans);
 
-      // Check availability only for this hostel's device plans
-      const devicePlans = hostelPlans.filter(
-        (plan) => plan.planType === "device",
+      // Check availability for every code-backed plan in this hostel. Device
+      // and unlimited both draw codes from the same pool; TV issues none. Miss
+      // the unlimited plans here and the sold-out gate below has no data to
+      // judge them by.
+      const codeBackedPlans = hostelPlans.filter(
+        (plan) => plan.planType !== "tv",
       );
-      if (devicePlans.length > 0) {
-        checkPlanAvailability(devicePlans);
+      if (codeBackedPlans.length > 0) {
+        checkPlanAvailability(codeBackedPlans);
       }
     } catch (err) {
       console.error("Error fetching plans:", err);
@@ -311,7 +314,7 @@ export default function HostelPlansPage({
     }
   };
 
-  const checkPlanAvailability = async (devicePlans: DataPlan[]) => {
+  const checkPlanAvailability = async (codeBackedPlans: DataPlan[]) => {
     setCheckingAvailability(true);
 
     try {
@@ -319,7 +322,7 @@ export default function HostelPlansPage({
       // mark the card as sold out — the reserve API is the source of truth
       // and will catch a real stockout. Treating "unknown" as "sold out" on
       // a flaky connection scared customers off perfectly buyable plans.
-      const availabilityPromises = devicePlans.map(async (plan) => {
+      const availabilityPromises = codeBackedPlans.map(async (plan) => {
         try {
           const response = await apiFetch("/api/data-codes/check-availability", {
             method: "POST",
@@ -546,8 +549,9 @@ export default function HostelPlansPage({
     // Hostel / verification gate
     if (!checkHostelGate("device")) return;
 
-    // Check availability for device plans
-    if (selectedPlan.planType === "device") {
+    // Unlimited plans draw from the same code pool as device plans, so both
+    // have to be checked — only TV issues no code.
+    if (selectedPlan.planType !== "tv") {
       const availability = planAvailability[selectedPlan.id];
       if (!availability?.available) {
         addToast({
@@ -622,7 +626,7 @@ export default function HostelPlansPage({
         );
         setPurchasing(false);
         // Refresh availability so the UI updates with the latest count.
-        if (selectedPlan.planType === "device") {
+        if (selectedPlan.planType !== "tv") {
           fetchPlanAvailability(selectedPlan.id);
         }
         return;
@@ -633,7 +637,7 @@ export default function HostelPlansPage({
 
       // Refresh availability so the stock badge reflects the held code
       // immediately (count drops by 1 because the reserved code is filtered out).
-      if (selectedPlan.planType === "device") {
+      if (selectedPlan.planType !== "tv") {
         fetchPlanAvailability(selectedPlan.id);
       }
 
@@ -697,7 +701,7 @@ export default function HostelPlansPage({
         body: JSON.stringify({ reservationId }),
       });
       // Refresh inventory count after release so the UI shows it's free again
-      if (selectedPlan?.planType === "device") {
+      if (selectedPlan && selectedPlan.planType !== "tv") {
         fetchPlanAvailability(selectedPlan.id);
       }
     } catch {
@@ -716,7 +720,7 @@ export default function HostelPlansPage({
     await new Promise((resolve) => setTimeout(resolve, 700));
     setRevealedCode(code);
     setActiveReservationId("");
-    if (selectedPlan?.planType === "device") {
+    if (selectedPlan && selectedPlan.planType !== "tv") {
       fetchPlanAvailability(selectedPlan.id);
     }
   };
@@ -1784,18 +1788,20 @@ export default function HostelPlansPage({
               <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto mb-8 sm:mb-12">
                 {displayPlans.map((plan) => {
                   const availability = planAvailability[plan.id];
-                  const isDevicePlan = plan.planType === "device";
+                  // Device and unlimited both consume codes and can sell out;
+                  // only TV has nothing to run out of.
+                  const isCodeBackedPlan = plan.planType !== "tv";
                   // Optimistic: only treat the plan as unavailable when we
                   // explicitly know (server told us available === false).
                   // Missing/unknown availability → assume available; the
                   // reserve API is the real gate.
                   const knownUnavailable =
-                    isDevicePlan &&
+                    isCodeBackedPlan &&
                     availability !== undefined &&
                     availability.available === false;
                   const isAvailable = !knownUnavailable;
                   const hasAvailabilityData =
-                    isDevicePlan && availability !== undefined;
+                    isCodeBackedPlan && availability !== undefined;
                   const codeCount = availability?.count ?? 0;
 
                   return (
@@ -1985,9 +1991,10 @@ export default function HostelPlansPage({
 
                       {(() => {
                         const availability = planAvailability[selectedPlan.id];
-                        const isAvailable = availability?.available !== false;
-                        const isDevicePlan = selectedPlan.planType === "device";
-                        const codesNotAvailable = isDevicePlan && !isAvailable;
+                        // This block only renders for code-backed plans, so
+                        // stock alone decides whether it can be bought.
+                        const codesNotAvailable =
+                          availability?.available === false;
 
                         return (
                           <>
