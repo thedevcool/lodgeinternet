@@ -12,6 +12,7 @@ import { useToast } from "@/components/Toast";
 import ReAuthModal from "@/components/ReAuthModal";
 import WhatsAppBotCTA from "@/components/WhatsAppBotCTA";
 import { generatePaymentRef } from "@/lib/generateRef";
+import { checkoutCharges, checkoutTotal } from "@/lib/pricing";
 import { toHostelSlug } from "@/lib/hostelSlug";
 import { encryptForStorage } from "@/lib/localStorageCrypto";
 import type { DataPlan, Hostel } from "@/types";
@@ -648,8 +649,7 @@ export default function CollageHostelPlansPage({
       }
 
       // Proceed with payment now that the code is held.
-      // Add ₦100 bank charges to the price
-      const totalAmount = selectedPlan.price + 100;
+      const totalAmount = checkoutTotal(selectedPlan.price);
       let paymentSucceeded = false;
       const handler = window.PaystackPop.setup({
         key: paystackKey,
@@ -1034,7 +1034,7 @@ export default function CollageHostelPlansPage({
     setError("");
 
     try {
-      const totalAmount = selectedPlan.price + 100; // Add ₦100 bank charges
+      const totalAmount = checkoutTotal(selectedPlan.price);
       let paymentSucceeded = false;
       const handler = window.PaystackPop.setup({
         key: paystackKey,
@@ -1944,13 +1944,15 @@ export default function CollageHostelPlansPage({
                       </p>
                       <p className="flex justify-between">
                         <span>Bank Charges:</span>
-                        <span className="font-semibold">₦100</span>
+                        <span className="font-semibold">
+                          ₦{checkoutCharges(selectedPlan.price).toLocaleString()}
+                        </span>
                       </p>
                       <div className="border-t border-apple-gray-300 pt-1 mt-1">
                         <p className="flex justify-between text-base font-bold text-apple-gray-900">
                           <span>Total:</span>
                           <span>
-                            ₦{(selectedPlan.price + 100).toLocaleString()}
+                            ₦{checkoutTotal(selectedPlan.price).toLocaleString()}
                           </span>
                         </p>
                       </div>
@@ -2043,7 +2045,7 @@ export default function CollageHostelPlansPage({
                                   ? "Loading payment..."
                                   : purchasing
                                     ? "Processing..."
-                                    : `Pay ₦${(selectedPlan.price + 100).toLocaleString()}`}
+                                    : `Pay ₦${checkoutTotal(selectedPlan.price).toLocaleString()}`}
                             </button>
                           </>
                         );
