@@ -4,8 +4,7 @@ import { apiFetch } from "@/lib/apiClient";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
-import { collection, getDocsFromServer, orderBy, query } from "firebase/firestore";
-import { db, isFirebaseConfigured, getAuthInstance } from "@/lib/firebase";
+import { getAuthInstance } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { KeyRound, Wifi, Smartphone, Tv, LogIn, Copy } from "lucide-react";
 import { useToast } from "@/components/Toast";
@@ -160,6 +159,15 @@ export default function CollageHostelPlansPage({
 
   // Resolve collage + hostel from URL slugs
   useEffect(() => {
+    // The same page instance can be reused while moving between hostels in a
+    // collage. Clear the previous hostel's catalogue immediately; the fetch
+    // effect below will load the catalogue for the newly resolved name.
+    setHostelReady(false);
+    setSelectedHostel("");
+    setHostelObj(null);
+    setPlans([]);
+    setLoading(true);
+
     Promise.all([
       apiFetch("/api/hostel-collages").then((r) => r.json()),
       apiFetch("/api/hostels").then((r) => r.json()),
@@ -196,7 +204,7 @@ export default function CollageHostelPlansPage({
 
   // Fetch plans and set up auth once hostel is resolved
   useEffect(() => {
-    if (!hostelReady) return;
+    if (!hostelReady || !selectedHostel) return;
 
     // Load email from localStorage
     const savedEmail = localStorage.getItem("userEmail");
@@ -245,7 +253,7 @@ export default function CollageHostelPlansPage({
     } catch (error) {
       console.error("Auth initialization error:", error);
     }
-  }, [hostelReady]);
+  }, [hostelReady, selectedHostel]);
 
   const selectedPlan = plans.find((plan) => plan.id === selectedPlanId);
 
@@ -273,38 +281,14 @@ export default function CollageHostelPlansPage({
   };
 
   const fetchPlans = async () => {
-    if (!isFirebaseConfigured() || !db) {
-      setLoading(false);
-      return;
-    }
-
     try {
-      const plansQuery = query(
-        collection(db, "dataPlans"),
-        orderBy("price", "asc"),
+      const response = await apiFetch(
+        `/api/data-plans?hostel=${encodeURIComponent(selectedHostel)}&kind=all`,
       );
-      // Always fetch from server — bypass local Firestore cache so deleted/deactivated
-    // plans disappear immediately without requiring a hard refresh.
-    const snapshot = await getDocsFromServer(plansQuery);
-      const data = snapshot.docs.map((doc) => {
-        const docData = doc.data();
-        // Infer planType for legacy plans that don't have it
-        let planType = docData.planType;
-        if (!planType) {
-          // Legacy plans: if it has usersCount, it's a device plan
-          planType = docData.usersCount ? "device" : "tv";
-        }
-        return {
-          id: doc.id,
-          ...docData,
-          planType,
-          createdAt: docData.createdAt?.toDate(),
-          updatedAt: docData.updatedAt?.toDate(),
-        };
-      }) as DataPlan[];
-      // Only show plans that belong to this hostel (strict — no legacy fallback)
-      const hostelPlans = data.filter(
-        (plan) => plan.isActive && plan.hostelId === selectedHostel,
+      if (!response.ok) throw new Error("Failed to fetch plans");
+      const result = await response.json();
+      const hostelPlans = ((result.plans || []) as DataPlan[]).filter(
+        (plan) => plan.isActive !== false,
       );
       setPlans(hostelPlans);
 

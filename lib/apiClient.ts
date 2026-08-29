@@ -41,10 +41,20 @@ const ADMIN_AUTH_EXACT = new Set<string>([
   "/api/data-codes/delete-plan",
   "/api/data-codes/duplicate",
   "/api/data-codes/update-plan",
+  "/api/data-codes/controller-buckets",
+  "/api/data-codes/controller-codes",
+  "/api/data-codes/controller-buckets/resolve-price",
+  "/api/data-codes/sync-status",
+  "/api/data-codes/summary",
+  "/api/data-codes/low-stock",
+  "/api/data-codes/sync",
   "/api/tv/activate",
   "/api/tv/delete",
   "/api/tv/update-plan",
   "/api/tv/check-expiry",
+  // TV subscription listing doubles as the admin "pending activation" source
+  // (isAdmin=true); attach the admin token so the is_admin branch can verify it.
+  "/api/tv/subscriptions",
   "/api/cron/cleanup-email-images",
   // Hostel/collage GET is public, but create/update/delete are admin-guarded.
   // Attaching the token is harmless on the public GET (it's ignored), and

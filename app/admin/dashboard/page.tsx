@@ -19,6 +19,7 @@ import {
   Users,
   ListChecks,
   Activity,
+  Server,
 } from "lucide-react";
 
 const NAV_CARDS = [
@@ -84,6 +85,15 @@ const NAV_CARDS = [
     icon: <Building2 className="w-6 h-6 text-white" />,
     gradient: "from-amber-400 to-orange-500",
     hover: "hover:border-amber-200",
+  },
+  {
+    module: "controllers",
+    href: "/admin/controllers",
+    label: "Controllers",
+    description: "Manage Omada controller pools",
+    icon: <Server className="w-6 h-6 text-white" />,
+    gradient: "from-cyan-500 to-blue-600",
+    hover: "hover:border-cyan-200",
   },
   {
     module: "users",

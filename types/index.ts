@@ -104,6 +104,19 @@ export interface DataPlan {
   price: number;
   hostelId?: string; // Hostel this plan belongs to (undefined = legacy global plan)
   isActive: boolean;
+  eligible?: boolean;
+  enabled?: boolean;
+  approved?: boolean;
+  approvedForSale?: boolean;
+  disabled?: boolean;
+  status?: "approved_for_sale" | "needs_metadata" | "disabled" | "needs_approval";
+  priceResolved?: boolean;
+  priceSource?: "controller_default" | "hostel_override" | null;
+  needsMetadataResolve?: boolean;
+  source?: "local" | "controller";
+  controllerId?: string;
+  poolKey?: string;
+  entitlementKey?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -126,6 +139,10 @@ export interface Hostel {
   // Which device-plan variants this hostel offers, by device count (3 and/or 5).
   // undefined / empty = both (keeps existing hostels working unchanged).
   deviceUserCounts?: number[];
+  // Server-authoritative controller membership (null when the hostel is
+  // standalone). Populated by the backend from the cached controller mapping.
+  controllerId?: string | null;
+  controllerName?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -198,7 +215,8 @@ export type AdminModule =
   | "hostels"
   | "settings"
   | "users"
-  | "waitlist";
+  | "waitlist"
+  | "controllers";
 
 export type AdminPermission = "read" | "write" | "read-write";
 

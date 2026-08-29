@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/cleanup-email-images",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/omada-replenishment",
+      "schedule": "0 4 * * *"
     }
   ]
 }
