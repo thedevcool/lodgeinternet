@@ -6,6 +6,7 @@ import Link from "next/link";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
 import Logo from "@/components/Logo";
 import { useAuthStore } from "@/store/authStore";
+import ConfirmationModal from "@/components/ConfirmationModal";
 import { useRouter } from "next/navigation";
 import {
   KeyRound,
@@ -195,6 +196,7 @@ export default function AdminDataCodesPage() {
   const [syncResolvePrices, setSyncResolvePrices] = useState<Record<string, string>>({});
   const [syncingResolve, setSyncingResolve] = useState<string | null>(null);
   const [syncingController, setSyncingController] = useState<string | null>(null);
+  const [cleanSyncTarget, setCleanSyncTarget] = useState<{ id: string; name: string } | null>(null);
   const [syncingAllControllers, setSyncingAllControllers] = useState(false);
   const [syncDetailControllerId, setSyncDetailControllerId] = useState<string | null>(null);
   const [syncDetailBuckets, setSyncDetailBuckets] = useState<typeof ctrlBuckets>([]);
@@ -907,6 +909,31 @@ export default function AdminDataCodesPage() {
      }
    };
 
+   const handleCleanSyncController = async () => {
+     if (!cleanSyncTarget) return;
+     const target = cleanSyncTarget;
+     setCleanSyncTarget(null);
+     setSyncingController(target.id);
+     setSuccessMessage("");
+     setError("");
+     try {
+       const res = await apiFetch("/api/data-codes/sync", {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({ controllerId: target.id, clean: true }),
+       });
+       const data = await res.json();
+       if (!res.ok) throw new Error(data.error || "Clean resync failed");
+       setSuccessMessage(`${target.name}: backup created and codes rebuilt.`);
+       setTimeout(() => setSuccessMessage(""), 8000);
+       await Promise.all([fetchSyncStatus(false), fetchPlans(), fetchDataCodesSummary(), fetchLowStock()]);
+     } catch (err: any) {
+       setError(err?.message || "Clean resync failed");
+     } finally {
+       setSyncingController(null);
+     }
+   };
+
    const openSyncController = async (controllerId: string) => {
      setSyncDetailControllerId(controllerId);
      setSyncDetailLoading(true);
@@ -1465,7 +1492,7 @@ export default function AdminDataCodesPage() {
                     const needs = ctrl.needsPriceResolve.length;
                     const last = ctrl.lastSync;
                     return (
-                      <button id={controllerIndex === 0 ? "controller-sync-card" : undefined} key={ctrl.id} type="button" onClick={() => openSyncController(ctrl.id)} className="group rounded-[1.5rem] border border-white/90 bg-white/80 p-4 text-left shadow-[0_12px_35px_rgba(15,23,42,0.07)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-lg">
+                      <div id={controllerIndex === 0 ? "controller-sync-card" : undefined} key={ctrl.id} role="button" tabIndex={0} onClick={() => openSyncController(ctrl.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openSyncController(ctrl.id); }} className="group rounded-[1.5rem] border border-white/90 bg-white/80 p-4 text-left shadow-[0_12px_35px_rgba(15,23,42,0.07)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-lg">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex min-w-0 items-center gap-2"><div className="rounded-xl bg-blue-50 p-2 text-blue-600"><Server className="h-4 w-4" /></div><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900">{ctrl.name}</p><p className="text-xs text-slate-500">{ctrl.memberHostels.length} hostel{ctrl.memberHostels.length === 1 ? "" : "s"} · {last?.groups ?? 0} groups</p></div></div>
                           <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-1" />
@@ -1481,7 +1508,16 @@ export default function AdminDataCodesPage() {
                           <span><b className="block text-sm text-slate-900">{last?.filteredOut ?? 0}</b>Used/expired</span>
                           <span><b className="block text-sm text-slate-900">{last?.entitlements?.updated ?? 0}</b>Updated</span>
                         </div>
-                      </button>
+                        {adminProfile?.isSuperAdmin && <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3" onClick={(event) => event.stopPropagation()}>
+                          <button type="button" onClick={() => handleSyncController(ctrl.id, ctrl.name)} disabled={syncingController !== null || syncingAllControllers} className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 px-3 py-2 text-[11px] font-semibold text-white hover:opacity-90 disabled:opacity-50">
+                            <RefreshCw className={`h-3.5 w-3.5 ${syncingController === ctrl.id ? "animate-spin" : ""}`} />
+                            {syncingController === ctrl.id ? "Syncing…" : "Sync now"}
+                          </button>
+                          <button type="button" onClick={() => setCleanSyncTarget({ id: ctrl.id, name: ctrl.name })} disabled={syncingController !== null || syncingAllControllers} className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50">
+                            <Trash2 className="h-3.5 w-3.5" /> Clean & resync
+                          </button>
+                        </div>}
+                      </div>
                     );
                   })}
                 </div>
@@ -3348,6 +3384,16 @@ export default function AdminDataCodesPage() {
           </div>
         </div>
       )}
+      <ConfirmationModal
+        isOpen={!!cleanSyncTarget}
+        title={`Clean and resync ${cleanSyncTarget?.name ?? "controller"}?`}
+        message="The backend will first create a timestamped backup, then remove this controller's existing code records and rebuild them from current eligible Omada vouchers. This does not affect other controllers, plans, hostels, or payment records. Do this only when no customers are actively claiming codes."
+        confirmText="Backup & clean resync"
+        cancelText="Keep existing codes"
+        type="danger"
+        onConfirm={handleCleanSyncController}
+        onClose={() => setCleanSyncTarget(null)}
+      />
     </ProtectedRoute>
   );
 }

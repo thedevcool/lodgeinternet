@@ -191,7 +191,7 @@ export default function AdminSettingsPage() {
                   Site Lockdown
                 </h2>
                 <p className='text-sm text-apple-gray-500'>
-                  Instantly block all visitors and show a maintenance page
+                  Instantly close the website and the WhatsApp bot together
                 </p>
               </div>
             </div>
@@ -251,7 +251,8 @@ export default function AdminSettingsPage() {
                     Maintenance Message
                   </label>
                   <p className='text-xs text-apple-gray-500 mb-3'>
-                    This message is shown to visitors while the site is locked.
+                    Shown to visitors on the maintenance page, and sent by the
+                    WhatsApp bot to anyone who messages while the site is locked.
                   </p>
                   <textarea
                     value={message}
@@ -285,9 +286,11 @@ export default function AdminSettingsPage() {
                   <div className='mt-5 flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-sm'>
                     <Lock className='w-4 h-4 flex-shrink-0' />
                     <span>
-                      <strong>Lockdown is active.</strong> All visitors are
-                      being redirected to the maintenance page. Admin routes
-                      remain accessible.
+                      <strong>Lockdown is active.</strong> Visitors are being
+                      redirected to the maintenance page and the WhatsApp bot is
+                      replying with the message below instead of serving. Admins,
+                      payment webhooks and scheduled jobs are unaffected, so
+                      purchases already in flight still complete.
                     </span>
                   </div>
                 )}
@@ -295,8 +298,8 @@ export default function AdminSettingsPage() {
                   <div className='mt-5 flex items-center gap-3 px-4 py-3 bg-green-50 border border-green-200 rounded-2xl text-green-700 text-sm'>
                     <Unlock className='w-4 h-4 flex-shrink-0' />
                     <span>
-                      <strong>Site is live.</strong> All visitors have normal
-                      access.
+                      <strong>Site is live.</strong> Visitors and the WhatsApp
+                      bot both have normal access.
                     </span>
                   </div>
                 )}
@@ -319,8 +322,10 @@ export default function AdminSettingsPage() {
               Enable Site Lockdown?
             </h3>
             <p className='text-sm text-apple-gray-600 text-center mb-6'>
-              All visitors will immediately be redirected to the maintenance
-              page. Only admin routes will remain accessible.
+              Visitors will immediately be redirected to the maintenance page,
+              and the WhatsApp bot will stop serving and reply with your message
+              instead. Admin access, payment webhooks and scheduled jobs keep
+              working, so purchases already in flight still complete.
             </p>
             <div className='flex gap-3'>
               <button

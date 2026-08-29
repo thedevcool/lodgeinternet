@@ -11,11 +11,14 @@ export default function MaintenancePage() {
   );
 
   useEffect(() => {
-    // Fetch the admin-set message fresh each load — bypasses any page cache
-    apiFetch("/api/admin/settings")
+    // Fetch the admin-set message fresh each load — bypasses any page cache.
+    // This reads the public status route, not the admin settings one: a
+    // visitor here has no admin token, so that call returned 401 and the
+    // message an admin had written never actually reached anybody.
+    apiFetch("/api/service-status")
       .then((r) => r.json())
       .then((data) => {
-        if (data.lockdownMessage) setMessage(data.lockdownMessage);
+        if (data.message) setMessage(data.message);
       })
       .catch(() => {});
   }, []);

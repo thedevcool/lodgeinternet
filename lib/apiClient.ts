@@ -48,6 +48,10 @@ const ADMIN_AUTH_EXACT = new Set<string>([
   "/api/data-codes/summary",
   "/api/data-codes/low-stock",
   "/api/data-codes/sync",
+  // Guarded by require_admin("data-codes") on the backend, so without the
+  // token this returns 401 — and it also needs the token to pass the
+  // lockdown gate while the site is closed.
+  "/api/data-codes/sync-filters",
   "/api/tv/activate",
   "/api/tv/delete",
   "/api/tv/update-plan",
@@ -55,6 +59,9 @@ const ADMIN_AUTH_EXACT = new Set<string>([
   // TV subscription listing doubles as the admin "pending activation" source
   // (isAdmin=true); attach the admin token so the is_admin branch can verify it.
   "/api/tv/subscriptions",
+  // Public GET, but the TV admin screens read it too. The token is ignored by
+  // the route and is what carries those screens through a site lockdown.
+  "/api/tv/plans",
   "/api/cron/cleanup-email-images",
   // Hostel/collage GET is public, but create/update/delete are admin-guarded.
   // Attaching the token is harmless on the public GET (it's ignored), and
