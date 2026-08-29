@@ -1,7 +1,7 @@
 "use client";
 import { apiFetch } from "@/lib/apiClient";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
 import Logo from "@/components/Logo";
@@ -54,6 +54,53 @@ interface FeedbackItem {
 }
 
 const USER_OPTIONS = [3, 5];
+
+/** How often the sync report is re-read while a run is in progress. */
+const SYNC_POLL_MS = 1500;
+
+/**
+ * Progress bar for a running Omada sync.
+ *
+ * The backend publishes a percent every so often — once per voucher group
+ * through the long middle stretch — and this page polls for it. Two things
+ * make that read as smooth rather than as a series of jerks:
+ *
+ * 1. The fill transitions over slightly longer than the poll interval, in a
+ *    straight line, so it is still travelling toward the last sample when the
+ *    next one arrives. A short ease (the Tailwind default) instead snaps into
+ *    place and then sits still until the next poll.
+ * 2. A shimmer rides on top, so a stage that genuinely takes a while to report
+ *    still looks alive instead of stalled.
+ */
+function SyncProgressBar({ percent, label }: { percent?: number; label: string }) {
+  const [shown, setShown] = useState(0);
+
+  useEffect(() => {
+    const target = Math.max(0, Math.min(100, Math.round(percent ?? 0)));
+    // Only ever forward. This component unmounts when the run ends, so a fresh
+    // run starts from zero on its own and there is nothing to reset — but a
+    // retried stage reporting an earlier percent must not drag the bar back,
+    // which reads as a fault rather than as progress.
+    setShown((previous) => Math.max(previous, target));
+  }, [percent]);
+
+  return (
+    <div className="mt-3">
+      <div className="sync-track">
+        <div
+          className="sync-fill"
+          style={{ width: `${shown}%` }}
+          role="progressbar"
+          aria-valuenow={shown}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Sync progress"
+        />
+      </div>
+      <p className="mt-1 text-[10px] text-slate-500">{label}</p>
+    </div>
+  );
+}
 
 export default function AdminDataCodesPage() {
   const { logout, canWrite, adminProfile } = useAuthStore();
@@ -849,15 +896,38 @@ export default function AdminDataCodesPage() {
      }
    };
 
+  // Keep polling for the full duration of manual and clean sync requests. The
+  // POST is awaited by the API, so the local button state is the only reliable
+  // signal that a run is active before this browser observes the first
+  // progress write.
+  //
+  // This is deliberately reduced to a boolean before it reaches the effect
+  // below. Depending on `syncStatus` itself meant a new array every poll, so
+  // the interval was torn down and rebuilt on every response — the samples
+  // then arrived every (interval + request time) instead of on a steady beat,
+  // and the bar's transition had no consistent gap to glide across.
+  const syncInProgress =
+    Boolean(syncingController) ||
+    syncingAllControllers ||
+    syncStatus.some((controller) => controller.syncProgress?.status === "running");
+
+  // One poll at a time: a slow response must not let the next tick stack a
+  // second request on top of it.
+  const syncPollInFlight = useRef(false);
+
   useEffect(() => {
-    // Keep polling for the full duration of manual and clean sync requests.
-    // The POST is awaited by the API, so the local button state is the only
-    // reliable signal that a run is active before the first progress write is
-    // observed by this browser.
-    if (!showSync || (!syncingController && !syncingAllControllers && !syncStatus.some((controller) => controller.syncProgress?.status === "running"))) return;
-    const timer = window.setInterval(() => fetchSyncStatus(false), 1500);
+    if (!showSync || !syncInProgress) return;
+    const timer = window.setInterval(async () => {
+      if (syncPollInFlight.current) return;
+      syncPollInFlight.current = true;
+      try {
+        await fetchSyncStatus(false);
+      } finally {
+        syncPollInFlight.current = false;
+      }
+    }, SYNC_POLL_MS);
     return () => window.clearInterval(timer);
-  }, [showSync, syncStatus, syncingController, syncingAllControllers]);
+  }, [showSync, syncInProgress]);
 
    // Trigger an on-demand Omada -> controller refresh for a single controller.
    const handleSyncController = async (controllerId: string, controllerName: string) => {
@@ -1505,7 +1575,13 @@ export default function AdminDataCodesPage() {
                           <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${ctrl.syncProgress?.status === "running" ? "bg-blue-100 text-blue-700" : last?.ranAt ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{ctrl.syncProgress?.status === "running" ? `Syncing ${ctrl.syncProgress.percent ?? 0}%` : last?.ranAt ? "Synced" : "Never synced"}</span>
                           {needs > 0 ? <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-semibold text-amber-700"><AlertTriangle className="h-3 w-3" /> {needs} plan{needs === 1 ? "" : "s"} need price</span> : <span className="rounded-full bg-blue-100 px-2 py-1 text-[10px] font-semibold text-blue-700">Metadata complete</span>}
                         </div>
-                        {ctrl.syncProgress?.status === "running" && <div className="mt-3"><div className="h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all" style={{ width: `${ctrl.syncProgress.percent ?? 0}%` }} /></div><p className="mt-1 text-[10px] text-slate-500">{ctrl.syncProgress.detail || ctrl.syncProgress.stage || "Working…"}</p></div>}
+                        {ctrl.syncProgress?.status === "running" && (
+                          <SyncProgressBar
+                            key={ctrl.id}
+                            percent={ctrl.syncProgress.percent}
+                            label={ctrl.syncProgress.detail || ctrl.syncProgress.stage || "Working…"}
+                          />
+                        )}
                         <div className="mt-3 grid grid-cols-4 gap-1.5 border-t border-slate-100 pt-3 text-[10px] text-slate-500">
                           <span><b className="block text-sm text-slate-900">{last?.added ?? 0}</b>Added</span>
                           <span><b className="block text-sm text-slate-900">{last?.skipped ?? 0}</b>Skipped</span>

@@ -77,6 +77,20 @@
   .status-chip { @apply rounded-full bg-emerald-100 px-2.5 py-1 font-semibold text-emerald-700; } .warning-chip { @apply rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-700; } .slate-chip { @apply rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-600; }
   .glass-drawer { @apply flex flex-col overflow-y-auto rounded-[32px] border border-white/90 shadow-[0_24px_80px_rgba(15,23,42,.2)] backdrop-blur-[32px]; background: rgba(255,255,255,.72); }
   .drawer-link { @apply flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-slate-700 transition hover:bg-white hover:text-blue-600; } .drawer-link.active { @apply bg-blue-50 text-blue-700; }
+  /* ── Omada sync progress ───────────────────────────────────────────────
+     The fill transition is deliberately a hair longer than the 1.5s poll and
+     linear, so each sample glides into the next instead of snapping and then
+     waiting. The shimmer keeps a slow stage looking alive rather than stuck. */
+  .sync-track { @apply h-1.5 w-full overflow-hidden rounded-full bg-slate-100; }
+  /* `overflow-hidden` keeps the shimmer inside the filled part — without it the
+     highlight sweeps the whole track and reads as motion that isn't progress. */
+  .sync-fill { @apply relative h-full overflow-hidden rounded-full bg-gradient-to-r from-blue-500 to-purple-500; transition: width 1800ms linear; }
+  .sync-fill::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent); animation: sync-shimmer 1.5s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) {
+    .sync-fill { transition: none; }
+    .sync-fill::after { animation: none; }
+  }
+
   .drawer-badge { @apply min-w-[22px] rounded-full bg-orange-100 px-2 py-0.5 text-center text-xs font-semibold text-orange-700; }
   .btn-primary {
     @apply inline-flex items-center justify-center px-5 py-2 text-base font-medium rounded-full bg-apple-blue text-white hover:bg-apple-blue-dark transition-colors duration-200;
@@ -130,4 +144,9 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+}
+
+@keyframes sync-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
