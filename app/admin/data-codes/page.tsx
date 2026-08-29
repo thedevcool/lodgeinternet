@@ -850,10 +850,14 @@ export default function AdminDataCodesPage() {
    };
 
   useEffect(() => {
-    if (!showSync || !syncStatus.some((controller) => controller.syncProgress?.status === "running")) return;
+    // Keep polling for the full duration of manual and clean sync requests.
+    // The POST is awaited by the API, so the local button state is the only
+    // reliable signal that a run is active before the first progress write is
+    // observed by this browser.
+    if (!showSync || (!syncingController && !syncingAllControllers && !syncStatus.some((controller) => controller.syncProgress?.status === "running"))) return;
     const timer = window.setInterval(() => fetchSyncStatus(false), 1500);
     return () => window.clearInterval(timer);
-  }, [showSync, syncStatus]);
+  }, [showSync, syncStatus, syncingController, syncingAllControllers]);
 
    // Trigger an on-demand Omada -> controller refresh for a single controller.
    const handleSyncController = async (controllerId: string, controllerName: string) => {
