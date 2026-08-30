@@ -241,9 +241,16 @@ export default function AdminDataCodesPage() {
   const [syncStatus, setSyncStatus] = useState<SyncControllerStatus[]>([]);
   const [loadingSync, setLoadingSync] = useState(false);
   const [syncResolvePrices, setSyncResolvePrices] = useState<Record<string, string>>({});
+  // Per pool: "" means the controller-wide default, otherwise a hostel name to
+  // override for that hostel alone.
+  const [syncResolveScope, setSyncResolveScope] = useState<Record<string, string>>({});
   const [syncingResolve, setSyncingResolve] = useState<string | null>(null);
   const [syncingController, setSyncingController] = useState<string | null>(null);
   const [cleanSyncTarget, setCleanSyncTarget] = useState<{ id: string; name: string } | null>(null);
+  // A clean rebuild replaces the controller's pool metadata, which is where
+  // admin-set prices live. Default to keeping them: re-pricing every pool by
+  // hand is the expensive mistake, not keeping a price a moment too long.
+  const [cleanSyncKeepPrices, setCleanSyncKeepPrices] = useState(true);
   const [syncingAllControllers, setSyncingAllControllers] = useState(false);
   const [syncDetailControllerId, setSyncDetailControllerId] = useState<string | null>(null);
   const [syncDetailBuckets, setSyncDetailBuckets] = useState<typeof ctrlBuckets>([]);
@@ -839,8 +846,13 @@ export default function AdminDataCodesPage() {
     if (selectedControllerId) fetchControllerCodes(selectedControllerId, bucket.poolKey);
   };
 
-  // Resolve a price for a pool from the Sync panel (same endpoint the bucket
-  // list uses): stamps it onto every code in the pool and clears the flag.
+  // Resolve a price for a pool from the Sync panel.
+  //
+  // `scope` decides where the price becomes authoritative: controller-wide (the
+  // default for every member hostel) or an override for one hostel. The
+  // backend writes it to the pool metadata or the hostel override accordingly
+  // and regenerates the affected entitlements, so the change reaches the web
+  // and bot catalogues immediately rather than at the next sync.
   const handleSyncResolvePrice = async (
     controllerId: string,
     poolKey: string,
@@ -852,6 +864,7 @@ export default function AdminDataCodesPage() {
       setError(`Enter a valid price for ${planName} before saving.`);
       return;
     }
+    const hostel = syncResolveScope[poolKey] ?? "";
     setSyncingResolve(poolKey);
     setError("");
     try {
@@ -860,13 +873,21 @@ export default function AdminDataCodesPage() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ controllerId, poolKey, price }),
+          body: JSON.stringify({
+            controllerId,
+            poolKey,
+            price,
+            scope: hostel ? "hostel" : "controller",
+            ...(hostel ? { hostel } : {}),
+          }),
         },
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to set price");
       setSuccessMessage(
-        `Price set on ${planName} (${data.updated} code${data.updated !== 1 ? "s" : ""}).`,
+        hostel
+          ? `₦${price.toLocaleString()} set on ${planName} for ${hostel} only.`
+          : `₦${price.toLocaleString()} set on ${planName} for every hostel on this controller.`,
       );
       setTimeout(() => setSuccessMessage(""), 5000);
       setSyncResolvePrices((prev) => ({ ...prev, [poolKey]: "" }));
@@ -994,11 +1015,21 @@ export default function AdminDataCodesPage() {
        const res = await apiFetch("/api/data-codes/sync", {
          method: "POST",
          headers: { "Content-Type": "application/json" },
-         body: JSON.stringify({ controllerId: target.id, clean: true }),
+         body: JSON.stringify({
+           controllerId: target.id,
+           clean: true,
+           preservePrices: cleanSyncKeepPrices,
+         }),
        });
        const data = await res.json();
        if (!res.ok) throw new Error(data.error || "Clean resync failed");
-       setSuccessMessage(`${target.name}: backup created and codes rebuilt.`);
+       setSuccessMessage(
+         `${target.name}: backup created and codes rebuilt. ${
+           cleanSyncKeepPrices
+             ? "Existing prices were kept."
+             : "Prices were reset — set them again before these pools can sell."
+         }`,
+       );
        setTimeout(() => setSuccessMessage(""), 8000);
        await Promise.all([fetchSyncStatus(false), fetchPlans(), fetchDataCodesSummary(), fetchLowStock()]);
      } catch (err: any) {
@@ -1789,6 +1820,24 @@ export default function AdminDataCodesPage() {
                                         }
                                         className="w-28 px-3 py-2 border border-apple-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                       />
+                                      <select
+                                        aria-label="Apply this price to"
+                                        value={syncResolveScope[pool.poolKey] ?? ""}
+                                        onChange={(e) =>
+                                          setSyncResolveScope((prev) => ({
+                                            ...prev,
+                                            [pool.poolKey]: e.target.value,
+                                          }))
+                                        }
+                                        className="max-w-[190px] rounded-lg border border-apple-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      >
+                                        <option value="">All hostels on this controller</option>
+                                        {ctrl.memberHostels.map((hostel) => (
+                                          <option key={hostel} value={hostel}>
+                                            Only {hostel}
+                                          </option>
+                                        ))}
+                                      </select>
                                       <button
                                         type="button"
                                         onClick={() =>
@@ -3473,7 +3522,25 @@ export default function AdminDataCodesPage() {
         type="danger"
         onConfirm={handleCleanSyncController}
         onClose={() => setCleanSyncTarget(null)}
-      />
+      >
+        <label className="flex items-start gap-3 rounded-xl border border-apple-gray-200 bg-apple-gray-50 p-3 text-left">
+          <input
+            type="checkbox"
+            checked={cleanSyncKeepPrices}
+            onChange={(e) => setCleanSyncKeepPrices(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-apple-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+          <span className="text-sm text-gray-700">
+            <b>Keep the prices I have set.</b>
+            <span className="mt-1 block text-xs text-gray-500">
+              A rebuild reads prices from the Omada group names, which usually
+              carry none. Unchecking this clears every price on this controller
+              and its pools stop selling until you set them again. Per-hostel
+              overrides are stored on the hostel and are never touched.
+            </span>
+          </span>
+        </label>
+      </ConfirmationModal>
     </ProtectedRoute>
   );
 }

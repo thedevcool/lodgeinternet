@@ -11,6 +11,8 @@ interface ConfirmationModalProps {
   confirmText?: string;
   cancelText?: string;
   type?: "danger" | "warning" | "info";
+  /** Extra controls shown under the message — an option the confirm depends on. */
+  children?: React.ReactNode;
 }
 
 export default function ConfirmationModal({
@@ -22,6 +24,7 @@ export default function ConfirmationModal({
   confirmText = "Confirm",
   cancelText = "Cancel",
   type = "warning",
+  children,
 }: ConfirmationModalProps) {
   if (!isOpen) return null;
 
@@ -68,6 +71,7 @@ export default function ConfirmationModal({
                 {title}
               </h3>
               <p className="text-gray-600 text-sm leading-relaxed">{message}</p>
+              {children && <div className="mt-4">{children}</div>}
             </div>
 
             <button
