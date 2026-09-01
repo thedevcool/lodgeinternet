@@ -37,6 +37,19 @@
   .kpi-note { @apply mt-2 text-xs text-slate-500; }
   .kpi-grid { @apply grid gap-3 grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8; }
 
+  /* Each KPI carries its own tint, not just a coloured rail. At eight cards
+     abreast a white row reads as one block and the eye has to search; a
+     distinct ground per metric makes each findable at a glance. Tints stay
+     pale so the figure keeps the contrast. */
+  .kpi-blue   { background: linear-gradient(160deg, rgba(219,234,254,.85), rgba(255,255,255,.75)); }
+  .kpi-green  { background: linear-gradient(160deg, rgba(209,250,229,.85), rgba(255,255,255,.75)); }
+  .kpi-orange { background: linear-gradient(160deg, rgba(254,243,199,.9),  rgba(255,255,255,.75)); }
+  .kpi-red    { background: linear-gradient(160deg, rgba(254,226,226,.85), rgba(255,255,255,.75)); }
+  .kpi-violet { background: linear-gradient(160deg, rgba(237,233,254,.85), rgba(255,255,255,.75)); }
+  .kpi-purple { background: linear-gradient(160deg, rgba(243,232,255,.85), rgba(255,255,255,.75)); }
+  .kpi-slate  { background: linear-gradient(160deg, rgba(226,232,240,.85), rgba(255,255,255,.75)); }
+  .kpi-teal   { background: linear-gradient(160deg, rgba(204,251,241,.85), rgba(255,255,255,.75)); }
+
   /* Row of small label/value pairs inside a panel. */
   .stat-row { @apply grid gap-3 grid-cols-2 sm:grid-cols-4; }
   .stat { @apply rounded-2xl bg-white/60 px-3 py-3; }

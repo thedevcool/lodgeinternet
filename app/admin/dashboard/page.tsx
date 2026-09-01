@@ -111,7 +111,28 @@ const FRESHNESS_LABEL: Record<string, string> = {
   stale: "Stale",
 };
 
+/**
+ * Tone → class name, written out in full on purpose.
+ *
+ * Tailwind finds classes by scanning source text, so a name built at runtime
+ * (`kpi-${tone}`) is never seen and the rule is purged from the stylesheet —
+ * which is exactly why these tints did not render. Spelling each one out here
+ * is what keeps them in the build.
+ */
+const TONE_BG: Record<string, string> = {
+  blue: "kpi-blue",
+  green: "kpi-green",
+  orange: "kpi-orange",
+  red: "kpi-red",
+  violet: "kpi-violet",
+  purple: "kpi-purple",
+  slate: "kpi-slate",
+  teal: "kpi-teal",
+};
+
+/** Rail colours, paired with the grounds above. */
 const TONE_RAIL: Record<string, string> = {
+  teal: "bg-teal-500",
   blue: "bg-blue-500",
   green: "bg-emerald-500",
   orange: "bg-amber-500",
@@ -138,7 +159,7 @@ function Kpi({
   tone?: string;
 }) {
   return (
-    <div className="kpi-card">
+    <div className={`kpi-card ${TONE_BG[tone] || TONE_BG.blue}`}>
       <span className={`kpi-rail ${TONE_RAIL[tone] || TONE_RAIL.blue}`} />
       <p className="kpi-label">{label}</p>
       <p className="kpi-value">{value}</p>
@@ -451,12 +472,12 @@ export default function AdminDashboardPage() {
               <section className="kpi-grid">
                 <Kpi label="Revenue · all time" value={money(sales.revenue)} tone="green"
                      note={`${fmt(sales.dataPurchases)} data · ${fmt(sales.tvSubscriptions)} TV`} />
-                <Kpi label="Revenue · 30 days" value={money(sales.revenueLast30Days)} tone="green"
+                <Kpi label="Revenue · 30 days" value={money(sales.revenueLast30Days)} tone="teal"
                      note={`7d ${money(sales.revenueLast7Days)}`} />
-                <Kpi label="Revenue · today" value={money(sales.revenueToday)} tone="green" />
+                <Kpi label="Revenue · today" value={money(sales.revenueToday)} tone="blue" />
                 <Kpi label="Available codes" value={fmt(inventory.available)} tone="violet"
                      note={`${pct(inventory.available, inventory.total)}% of ${fmt(inventory.total)} vouchers`} />
-                <Kpi label="Sellable pools" value={fmt(pools.sellable)} tone="blue"
+                <Kpi label="Sellable pools" value={fmt(pools.sellable)} tone="slate"
                      note={`of ${fmt(pools.total)} controller pools`} />
                 <Kpi label="Pools needing a price" value={fmt(catalogue?.needsPrice)} tone="orange"
                      note={pools.needsSetup ? `${fmt(pools.needsSetup)} need setup in total` : "All priced"} />

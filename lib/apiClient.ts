@@ -27,7 +27,14 @@ const BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/+$/, "");
 /** localStorage key holding the admin JWT — must match `store/authStore.ts`. */
 const ADMIN_TOKEN_KEY = "Davo-Nexus Limited-admin-token";
 
-/** Path prefixes served by the FastAPI backend (all routes are ported). */
+/** Path prefixes served by the FastAPI backend (all routes are ported).
+ *
+ * The Next `app/api/*` routes these replaced have been deleted — every one was
+ * dead code that only looked authoritative. If `NEXT_PUBLIC_API_BASE_URL` is
+ * ever unset, requests now fall through to a same-origin `/api/*` that returns
+ * 404 rather than silently running a stale copy of the logic. That is the
+ * intended failure: loud, not quiet.
+ */
 export const MIGRATED_PREFIXES: string[] = ["/api"];
 
 /**

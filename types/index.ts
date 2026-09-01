@@ -143,6 +143,10 @@ export interface Hostel {
   // standalone). Populated by the backend from the cached controller mapping.
   controllerId?: string | null;
   controllerName?: string | null;
+  // Absent/true = trading normally. false = the installation has been pulled:
+  // nothing sells here and any running TV access has been revoked. Written by
+  // POST /api/admin/hostels/status, never by this record's own create/update.
+  isActive?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

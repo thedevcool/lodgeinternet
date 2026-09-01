@@ -61,7 +61,12 @@ interface TVSubscription {
   duration: number;
   price: number;
   hostel?: string;
-  subscriptionStatus: "pending_activation" | "active" | "expired";
+  subscriptionStatus:
+    | "pending_activation"
+    | "active"
+    | "expired"
+    | "extension"
+    | "blocked";
   expiresAt: string | null;
   activatedAt: string | null;
   paidAt: string | null;
@@ -439,18 +444,23 @@ export default function DashboardPage() {
 
             <div className="space-y-3">
               {tvSubscriptions.map((sub) => {
-                const statusBadge =
-                  sub.subscriptionStatus === "active"
-                    ? "bg-green-100 text-green-700"
-                    : sub.subscriptionStatus === "pending_activation"
-                      ? "bg-orange-100 text-orange-700"
-                      : "bg-red-100 text-red-700";
-                const statusLabel =
-                  sub.subscriptionStatus === "active"
-                    ? "Active"
-                    : sub.subscriptionStatus === "pending_activation"
-                      ? "Pending Activation"
-                      : "Expired";
+                // `extension` is a top-up row: the subscription it extended
+                // is the one that runs, so it reads as active here.
+                const STATUS: Record<string, { badge: string; label: string }> = {
+                  active: { badge: "bg-green-100 text-green-700", label: "Active" },
+                  extension: { badge: "bg-green-100 text-green-700", label: "Extended" },
+                  pending_activation: {
+                    badge: "bg-orange-100 text-orange-700",
+                    label: "Pending Activation",
+                  },
+                  blocked: { badge: "bg-red-100 text-red-700", label: "Needs Attention" },
+                  expired: { badge: "bg-red-100 text-red-700", label: "Expired" },
+                };
+                const { badge: statusBadge, label: statusLabel } =
+                  STATUS[sub.subscriptionStatus] ?? STATUS.expired;
+                const running =
+                  sub.subscriptionStatus === "active" ||
+                  sub.subscriptionStatus === "extension";
                 const expires = sub.expiresAt
                   ? new Date(sub.expiresAt).toLocaleDateString("en-US", {
                       month: "short",
@@ -458,6 +468,15 @@ export default function DashboardPage() {
                       year: "numeric",
                     })
                   : null;
+                // Days left matters more than the date: "3 days" prompts a
+                // renewal in a way "Expires Sep 30" does not.
+                const daysLeft = sub.expiresAt
+                  ? Math.ceil(
+                      (new Date(sub.expiresAt).getTime() - Date.now()) / 86_400_000,
+                    )
+                  : null;
+                const expiringSoon =
+                  running && daysLeft !== null && daysLeft >= 0 && daysLeft <= 3;
                 const needsMac = !sub.hasMacAddress;
 
                 return (
@@ -476,9 +495,24 @@ export default function DashboardPage() {
                           >
                             {statusLabel}
                           </span>
-                          {expires && sub.subscriptionStatus === "active" && (
-                            <span className="text-xs text-apple-gray-500">
-                              Expires {expires}
+                          {expires && running && (
+                            <span
+                              className={`text-xs ${
+                                expiringSoon
+                                  ? "font-semibold text-orange-600"
+                                  : "text-apple-gray-500"
+                              }`}
+                            >
+                              {daysLeft !== null && daysLeft >= 0
+                                ? daysLeft === 0
+                                  ? "Expires today"
+                                  : `${daysLeft} day${daysLeft === 1 ? "" : "s"} left · ${expires}`
+                                : `Expires ${expires}`}
+                            </span>
+                          )}
+                          {sub.subscriptionStatus === "blocked" && (
+                            <span className="text-xs text-red-600">
+                              We could not activate this device — support has been notified.
                             </span>
                           )}
                           {sub.hostel && sub.hostel !== "N/A" && (

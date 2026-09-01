@@ -145,11 +145,36 @@ function PlanTypeBadge({ type }: { type: string }) {
   );
 }
 
-const MAINTENANCE_PCT = 10;
-const PAYSTACK_PCT = 1.5;
-const SPLITTABLE_PCT = 100 - MAINTENANCE_PCT - PAYSTACK_PCT; // 88.5
+/**
+ * Fallbacks only. The backend owns these rates (`settings/splitConfig`, served
+ * by `/api/admin/split-config`) and recomputes every stored figure itself, so
+ * what the browser calculates here is a preview — never what gets paid out.
+ * These values are what ships if the config request has not landed yet.
+ */
+const FALLBACK_MAINTENANCE_PCT = 10;
+const FALLBACK_PAYSTACK_PCT = 1.5;
 
 export default function AdminTransactionsPage() {
+  // Deduction rates, fetched rather than hardcoded. The backend recomputes
+  // every stored split from these, so this is only what the preview shows.
+  const [maintenancePct, setMaintenancePct] = useState(FALLBACK_MAINTENANCE_PCT);
+  const [paystackPct, setPaystackPct] = useState(FALLBACK_PAYSTACK_PCT);
+  const splittablePct = 100 - maintenancePct - paystackPct;
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await apiFetch("/api/admin/split-config");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (typeof data.maintenancePct === "number") setMaintenancePct(data.maintenancePct);
+        if (typeof data.paystackPct === "number") setPaystackPct(data.paystackPct);
+      } catch {
+        /* the shipped fallbacks stand in; the backend still computes the real split */
+      }
+    })();
+  }, []);
+
   const { logout, canWrite, adminProfile } = useAuthStore();
   const isPartner = adminProfile?.isPartner ?? false;
   const isSuperAdmin = adminProfile?.isSuperAdmin ?? false;
@@ -247,7 +272,7 @@ export default function AdminTransactionsPage() {
 
   // Per-split email settings & editable maintenance %
   const [splitMaintenancePct, setSplitMaintenancePct] = useState<number | "">(
-    MAINTENANCE_PCT,
+    maintenancePct,
   );
   const [splitAdminEmail, setSplitAdminEmail] = useState("");
   const [splitPartnerEmail, setSplitPartnerEmail] = useState("");
@@ -752,10 +777,10 @@ export default function AdminTransactionsPage() {
     const mPct =
       typeof splitMaintenancePct === "number"
         ? splitMaintenancePct
-        : MAINTENANCE_PCT;
+        : maintenancePct;
     const grossRev = relevant.reduce((s, t) => s + t.price, 0);
     const mainDed = Math.round((grossRev * mPct) / 100);
-    const paystackDed = Math.round((grossRev * PAYSTACK_PCT) / 100);
+    const paystackDed = Math.round((grossRev * paystackPct) / 100);
     const splittableRev = grossRev - mainDed - paystackDed;
     const aPct = typeof splitAdminPct === "number" ? splitAdminPct : 0;
     const pPct = typeof splitPartnerPct === "number" ? splitPartnerPct : 0;
@@ -814,7 +839,7 @@ export default function AdminTransactionsPage() {
           maintenancePct:
             typeof splitMaintenancePct === "number"
               ? splitMaintenancePct
-              : MAINTENANCE_PCT,
+              : maintenancePct,
           adminEmail: splitAdminEmail.trim(),
           partnerEmail: splitPartnerEmail.trim(),
           sendMonthlyEmail: splitSendMonthlyEmail,
@@ -837,7 +862,7 @@ export default function AdminTransactionsPage() {
       setSplitAdminPct(50);
       setSplitPartnerPct(50);
       setSplitNotes("");
-      setSplitMaintenancePct(MAINTENANCE_PCT);
+      setSplitMaintenancePct(maintenancePct);
       setSplitAdminEmail("");
       setSplitPartnerEmail("");
       setSplitSendMonthlyEmail(false);
@@ -886,10 +911,10 @@ export default function AdminTransactionsPage() {
     }
     setSendingEmail(true);
     setSplitsError("");
-    const mPct = s.maintenancePct ?? MAINTENANCE_PCT;
+    const mPct = s.maintenancePct ?? maintenancePct;
     const grossRev = txns.reduce((a, t) => a + t.price, 0);
     const mainDed = Math.round((grossRev * mPct) / 100);
-    const paystackDed = Math.round((grossRev * PAYSTACK_PCT) / 100);
+    const paystackDed = Math.round((grossRev * paystackPct) / 100);
     const splittableRev = grossRev - mainDed - paystackDed;
     const aShr = Math.round((splittableRev * s.adminPercent) / 100);
     const pShr = Math.round((splittableRev * s.partnerPercent) / 100);
@@ -902,7 +927,7 @@ export default function AdminTransactionsPage() {
       partnerPercent: s.partnerPercent,
       totalRevenue: grossRev,
       maintenancePct: mPct,
-      paystackPct: PAYSTACK_PCT,
+      paystackPct: paystackPct,
       maintenanceDeduction: mainDed,
       paystackDeduction: paystackDed,
       splittableRevenue: splittableRev,
@@ -1041,11 +1066,11 @@ export default function AdminTransactionsPage() {
     periodLabel?: string,
   ) => {
     if (txns.length === 0) return;
-    const mPct = s.maintenancePct ?? MAINTENANCE_PCT;
-    const splittablePctExport = 100 - mPct - PAYSTACK_PCT;
+    const mPct = s.maintenancePct ?? maintenancePct;
+    const splittablePctExport = 100 - mPct - paystackPct;
     const grossRev = txns.reduce((a, t) => a + t.price, 0);
     const mainDed = Math.round((grossRev * mPct) / 100);
-    const paystackDed = Math.round((grossRev * PAYSTACK_PCT) / 100);
+    const paystackDed = Math.round((grossRev * paystackPct) / 100);
     const splittableRev = grossRev - mainDed - paystackDed;
     const rows = txns.map((t) => ({
       Date: t.purchasedAt.toLocaleString(),
@@ -1072,7 +1097,7 @@ export default function AdminTransactionsPage() {
       { Label: "Total Transactions", Value: txns.length },
       { Label: "Gross Revenue (₦)", Value: grossRev },
       { Label: `Maintenance Deduction ${mPct}% (₦)`, Value: mainDed },
-      { Label: `Paystack Deduction ${PAYSTACK_PCT}% (₦)`, Value: paystackDed },
+      { Label: `Paystack Deduction ${paystackPct}% (₦)`, Value: paystackDed },
       {
         Label: `Splittable Revenue ${splittablePctExport.toFixed(1)}% (₦)`,
         Value: splittableRev,
@@ -2070,14 +2095,14 @@ export default function AdminTransactionsPage() {
                     <span className='text-amber-400'>|</span>
                     <span>
                       💳 Paystack:{" "}
-                      <span className='font-bold'>{PAYSTACK_PCT}%</span>
+                      <span className='font-bold'>{paystackPct}%</span>
                     </span>
                     <span className='text-amber-400'>|</span>
                     <span className='text-green-700'>
                       ✓ Available:{" "}
                       <span className='font-bold'>
                         {typeof splitMaintenancePct === "number"
-                          ? (100 - splitMaintenancePct - PAYSTACK_PCT).toFixed(
+                          ? (100 - splitMaintenancePct - paystackPct).toFixed(
                               1,
                             )
                           : "—"}
@@ -2455,12 +2480,12 @@ export default function AdminTransactionsPage() {
                             ? getSplitTransactions(s, splitFilterMonth)
                             : getSplitTransactions(s);
                           const gr = txns.reduce((a, t) => a + t.price, 0);
-                          const mPct = s.maintenancePct ?? MAINTENANCE_PCT;
+                          const mPct = s.maintenancePct ?? maintenancePct;
                           const splittable = Math.max(
                             0,
                             gr -
                               Math.round((gr * mPct) / 100) -
-                              Math.round((gr * PAYSTACK_PCT) / 100),
+                              Math.round((gr * paystackPct) / 100),
                           );
                           return {
                             revenue: acc.revenue + gr,
@@ -2589,7 +2614,7 @@ export default function AdminTransactionsPage() {
                                 })
                               : allSplitTxns;
                             const sMaintPct =
-                              s.maintenancePct ?? MAINTENANCE_PCT;
+                              s.maintenancePct ?? maintenancePct;
                             // Row revenue: use month-filtered transactions when list filter is active
                             const rowTxns = splitFilterMonth
                               ? getSplitTransactions(s, splitFilterMonth)
@@ -2602,12 +2627,12 @@ export default function AdminTransactionsPage() {
                               (grossRev * sMaintPct) / 100,
                             );
                             const paystackDed = Math.round(
-                              (grossRev * PAYSTACK_PCT) / 100,
+                              (grossRev * paystackPct) / 100,
                             );
                             const splittableRev =
                               grossRev - mainDed - paystackDed;
                             const splittablePctRow =
-                              100 - sMaintPct - PAYSTACK_PCT;
+                              100 - sMaintPct - paystackPct;
                             const adminShr = Math.round(
                               (splittableRev * s.adminPercent) / 100,
                             );
@@ -2755,7 +2780,7 @@ export default function AdminTransactionsPage() {
                                             |
                                           </span>
                                           <span className='font-semibold text-orange-500'>
-                                            −Paystack {PAYSTACK_PCT}%: −₦
+                                            −Paystack {paystackPct}%: −₦
                                             {paystackDed.toLocaleString()}
                                           </span>
                                           <span className='text-apple-gray-400'>
@@ -2821,7 +2846,7 @@ export default function AdminTransactionsPage() {
                                               (mGross * sMaintPct) / 100,
                                             );
                                             const mPayDed = Math.round(
-                                              (mGross * PAYSTACK_PCT) / 100,
+                                              (mGross * paystackPct) / 100,
                                             );
                                             const mSplittable = Math.max(
                                               0,
@@ -2864,7 +2889,7 @@ export default function AdminTransactionsPage() {
                                                 </div>
                                                 <div className='bg-orange-50 rounded-2xl px-3 py-2.5 border border-orange-100 shadow-sm'>
                                                   <p className='text-xs text-orange-400 mb-0.5'>
-                                                    −Paystack {PAYSTACK_PCT}%
+                                                    −Paystack {paystackPct}%
                                                   </p>
                                                   <p className='text-lg font-bold text-orange-600'>
                                                     −₦{mPayDed.toLocaleString()}

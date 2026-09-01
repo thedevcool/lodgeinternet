@@ -20,6 +20,8 @@ import {
   Smartphone,
   Tv,
   Wifi,
+  Power,
+  PowerOff,
 } from "lucide-react";
 import type { Hostel, HostelCollage } from "@/types";
 
@@ -71,7 +73,10 @@ export default function AdminHostelsPage() {
   const fetchHostels = async () => {
     setLoading(true);
     try {
-      const res = await apiFetch("/api/hostels");
+      // Without this, a deactivated hostel is invisible to the public listing
+      // and would vanish from this page too — the only way back on would be
+      // gone along with it.
+      const res = await apiFetch("/api/hostels?includeInactive=true");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to fetch hostels");
       setHostels(data.hostels ?? []);
@@ -174,12 +179,65 @@ export default function AdminHostelsPage() {
     }
   };
 
+  // The installation is being pulled: nothing sells here from this moment on,
+  // and any TV device already granted access is revoked immediately. Off is a
+  // hard stop, not a delisting — the backend owns that behavior end to end;
+  // this only flips the switch and shows what it reports.
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const handleToggleActive = async (hostel: Hostel) => {
+    const nextActive = hostel.isActive === false;
+    if (
+      !nextActive &&
+      !window.confirm(
+        `Turn off "${hostel.name}"?\n\nNothing will sell here from now on, and any TV device already ` +
+          `granted access at this hostel will be revoked immediately. This can be undone later.`,
+      )
+    ) {
+      return;
+    }
+
+    setTogglingId(hostel.id);
+    setError("");
+    try {
+      const res = await apiFetch("/api/admin/hostels/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hostel: hostel.name, isActive: nextActive }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not change hostel status");
+
+      const failures: string[] = data.failures || [];
+      if (failures.length > 0) {
+        setError(
+          `"${hostel.name}" is now ${nextActive ? "active" : "inactive"}, but ` +
+            `${failures.length} TV device(s) could not be updated — check the TV Users page.`,
+        );
+      } else {
+        showSuccess(
+          nextActive
+            ? `"${hostel.name}" is active again.`
+            : `"${hostel.name}" is now inactive — ${data.devicesRevoked ?? 0} device(s) revoked.`,
+        );
+      }
+      await fetchHostels();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not change hostel status");
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
     setError("");
     try {
-      const res = await fetch(
+      // apiFetch, not a bare fetch: DELETE /api/hostels is admin-guarded and
+      // needs the bearer token, and the backend now lives on its own origin —
+      // neither of which a same-origin fetch() gets for free.
+      const res = await apiFetch(
         `/api/hostels?id=${encodeURIComponent(deleteTarget.id)}`,
         {
           method: "DELETE",
@@ -541,9 +599,15 @@ export default function AdminHostelsPage() {
                     ) : (
                       <>
                         <div className="flex-1 min-w-0">
-                          <span className="text-apple-gray-900 font-medium block">
+                          <span className="text-apple-gray-900 font-medium">
                             {hostel.name}
                           </span>
+                          {hostel.isActive === false && (
+                            <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                              <PowerOff className="w-3 h-3" />
+                              Inactive
+                            </span>
+                          )}
                           {hostel.collageId && (
                             <span className="inline-block mt-1 px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-md text-xs font-medium">
                               {collages.find((c) => c.id === hostel.collageId)?.name || "Unknown Collage"}
@@ -592,6 +656,26 @@ export default function AdminHostelsPage() {
                         </span>
                         {canEdit && (
                           <>
+                            <button
+                              onClick={() => handleToggleActive(hostel)}
+                              disabled={togglingId === hostel.id}
+                              className={`p-2 rounded-xl transition-colors disabled:opacity-50 ${
+                                hostel.isActive === false
+                                  ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                                  : "bg-apple-gray-100 text-apple-gray-600 hover:bg-red-100 hover:text-red-600"
+                              }`}
+                              title={
+                                hostel.isActive === false
+                                  ? "Turn back on — restores sales and any TV access still in date"
+                                  : "Turn off — stops all sales here and revokes TV access immediately"
+                              }
+                            >
+                              {hostel.isActive === false ? (
+                                <Power className="w-4 h-4" />
+                              ) : (
+                                <PowerOff className="w-4 h-4" />
+                              )}
+                            </button>
                             <button
                               onClick={() => startEdit(hostel)}
                               className="p-2 rounded-xl bg-apple-gray-100 text-apple-gray-600 hover:bg-blue-100 hover:text-blue-600 transition-colors"

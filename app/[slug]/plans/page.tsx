@@ -1011,6 +1011,39 @@ export default function HostelPlansPage({
     setError("");
 
     try {
+      // Ask the backend before opening Paystack. It owns the deny list and
+      // knows whether this TV already has a subscription running, so a blocked
+      // device is turned away while the customer still has their money.
+      if (tvMacAddress.trim()) {
+        try {
+          const checkRes = await apiFetch("/api/tv/check-device", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              macAddress: tvMacAddress.trim(),
+              hostel: selectedHostel,
+              email,
+            }),
+          });
+          const check = await checkRes.json();
+          if (checkRes.ok && check.allowed === false) {
+            setError(check.message || "This device cannot be used for a TV plan right now.");
+            setPurchasing(false);
+            return;
+          }
+          if (checkRes.ok && check.reason === "already_active") {
+            // A warning, not a refusal — buying again tops this TV up rather
+            // than starting a second subscription, so say so before charging.
+            if (!window.confirm(`${check.message}\n\nContinue and extend it?`)) {
+              setPurchasing(false);
+              return;
+            }
+          }
+        } catch {
+          // A failed check is not a refusal; the purchase path checks again.
+        }
+      }
+
       const totalAmount = checkoutTotal(selectedPlan.price);
       let paymentSucceeded = false;
       const handler = window.PaystackPop.setup({
