@@ -1,14 +1,14 @@
 "use client";
 import { apiFetch } from "@/lib/apiClient";
 
-import React, { useEffect, useState, useMemo } from "react";
-import Link from "next/link";
+import React, { useCallback, useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
+import ConfirmationModal from "@/components/ConfirmationModal";
 import Logo from "@/components/Logo";
 import {
-  ArrowLeft,
+  AlertTriangle,
   BarChart3,
   Bot,
   Building2,
@@ -171,6 +171,134 @@ function PlanTypeBadge({ type }: { type: string }) {
 const FALLBACK_MAINTENANCE_PCT = 10;
 const FALLBACK_PAYSTACK_PCT = 1.5;
 
+// ── Shared glass-style building blocks (this page only — see app/globals.css
+// for the page-shell/panel/badge classes these are built to sit alongside) ──
+
+/**
+ * Headline number tile, copied from the dashboard's `Kpi` pattern. Tone maps
+ * are spelled out in full on purpose: Tailwind scans source text for class
+ * names, so a name assembled at runtime (`kpi-${tone}`) is invisible to it
+ * and gets purged from the build — this bit the dashboard once already.
+ */
+const KPI_TONE_BG: Record<string, string> = {
+  blue: "kpi-blue",
+  green: "kpi-green",
+  orange: "kpi-orange",
+  red: "kpi-red",
+  violet: "kpi-violet",
+  purple: "kpi-purple",
+  slate: "kpi-slate",
+  teal: "kpi-teal",
+};
+const KPI_TONE_RAIL: Record<string, string> = {
+  blue: "bg-blue-500",
+  green: "bg-emerald-500",
+  orange: "bg-amber-500",
+  red: "bg-rose-500",
+  violet: "bg-violet-500",
+  purple: "bg-purple-500",
+  slate: "bg-slate-400",
+  teal: "bg-teal-500",
+};
+
+function Kpi({
+  label,
+  value,
+  note,
+  tone = "blue",
+}: {
+  label: string;
+  value: string | number;
+  note?: string;
+  tone?: string;
+}) {
+  return (
+    <div className={`kpi-card ${KPI_TONE_BG[tone] || KPI_TONE_BG.blue}`}>
+      <span className={`kpi-rail ${KPI_TONE_RAIL[tone] || KPI_TONE_RAIL.blue}`} />
+      <p className="kpi-label">{label}</p>
+      <p className="kpi-value">{value}</p>
+      {note && <p className="kpi-note">{note}</p>}
+    </div>
+  );
+}
+
+/**
+ * Table header/body cells shared by every tab's tables. Header type matches
+ * `.kpi-label` exactly, so table headers and KPI labels read as one language.
+ * No zebra striping — every existing glass list (dashboard, tv-users) marks
+ * rows with hover-only emphasis on a flat ground, not alternating stripes.
+ */
+const ALIGN_CLASS: Record<"left" | "right" | "center", string> = {
+  left: "text-left",
+  right: "text-right",
+  center: "text-center",
+};
+
+function Th({ children, align = "left" }: { children: React.ReactNode; align?: "left" | "right" | "center" }) {
+  return (
+    <th className={`px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.13em] text-slate-500 ${ALIGN_CLASS[align]}`}>
+      {children}
+    </th>
+  );
+}
+
+function Td({
+  children,
+  align = "left",
+  className = "",
+}: {
+  children: React.ReactNode;
+  align?: "left" | "right" | "center";
+  className?: string;
+}) {
+  return <td className={`px-5 py-3 text-sm text-slate-700 ${ALIGN_CLASS[align]} ${className}`}>{children}</td>;
+}
+
+/**
+ * Glass input/select convention — no dedicated CSS class exists for this yet
+ * (every other still-legacy admin page builds its own inline), so it's kept
+ * as one string here rather than added to globals.css ahead of adoption
+ * elsewhere. Icon-prefixed fields add `pl-11` and position the icon with
+ * `GLASS_INPUT_ICON` (mirrors tv-users' one existing icon-in-input field).
+ */
+const GLASS_INPUT =
+  "w-full rounded-2xl border border-white/80 bg-white/70 px-4 py-2.5 text-sm text-slate-700 backdrop-blur-xl placeholder:text-slate-400 focus:border-blue-400 focus:outline-none";
+const GLASS_INPUT_ICON = "absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400";
+
+/**
+ * Labeled multi-way toggle (all/month, all/day/month/year, Fixed/Ongoing,
+ * etc). Distinct from globals.css's `.segmented`/`.segmented-item`, which is
+ * icon-only with no room for text labels. `activeClass` lets a specific
+ * instance keep meaningful color (e.g. Splits' Fixed/Ongoing toggle uses
+ * green for "ongoing" since that's informative, not just decorative).
+ */
+function SegToggle<T extends string>({
+  value,
+  onChange,
+  options,
+  activeClass = "bg-slate-900 text-white shadow-sm",
+}: {
+  value: T;
+  onChange: (next: T) => void;
+  options: { value: T; label: string }[];
+  activeClass?: string;
+}) {
+  return (
+    <div className="inline-flex rounded-full border border-white/80 bg-white/70 p-1 backdrop-blur-xl">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          onClick={() => onChange(opt.value)}
+          className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+            value === opt.value ? activeClass : "text-slate-600 hover:bg-white"
+          }`}>
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function AdminTransactionsPage() {
   // Deduction rates, fetched rather than hardcoded. The backend recomputes
   // every stored split from these, so this is only what the preview shows.
@@ -199,6 +327,11 @@ export default function AdminTransactionsPage() {
   const router = useRouter();
   const [transactions, setTransactions] = useState<TransactionRow[]>([]);
   const [byController, setByController] = useState<ControllerSalesRow[]>([]);
+  // Both revenue breakdowns default collapsed — their card grids can get
+  // large, and collapsed panels skip rendering that grid entirely (not just
+  // hide it), which is what actually keeps the initial paint light.
+  const [showControllerRevenue, setShowControllerRevenue] = useState(false);
+  const [showHostelRevenue, setShowHostelRevenue] = useState(false);
   const [hostels, setHostels] = useState<Hostel[]>([]);
   const allowedHostels = useMemo(
     () =>
@@ -273,6 +406,14 @@ export default function AdminTransactionsPage() {
   const [creatingSplit, setCreatingSplit] = useState(false);
   const [deletingSplit, setDeletingSplit] = useState<string | null>(null);
   const [expandedSplitId, setExpandedSplitId] = useState<string | null>(null);
+  // Confirms before a split is permanently deleted — same shared modal
+  // tv-users/page.tsx already uses for its own delete button.
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: "", message: "", onConfirm: () => {} });
 
   // Split list filters
   const [splitFilterHostel, setSplitFilterHostel] = useState("all");
@@ -1054,32 +1195,68 @@ export default function AdminTransactionsPage() {
     allowedHostelNames,
   ]);
 
-  const getSplitTransactions = (
-    s: SplitRecord,
-    monthFilter?: string,
-  ): TransactionRow[] => {
-    const from = new Date(s.dateFrom);
-    from.setHours(0, 0, 0, 0);
-    const to = s.dateTo ? new Date(s.dateTo) : new Date();
-    to.setHours(23, 59, 59, 999);
-    let txns = transactions.filter(
-      (t) =>
-        (t.hostel ?? "Unknown") === s.hostel &&
-        t.purchasedAt >= from &&
-        t.purchasedAt <= to,
-    );
-    if (monthFilter) {
-      const [y, m] = monthFilter.split("-").map(Number);
-      txns = txns.filter(
-        (t) =>
-          t.purchasedAt.getFullYear() === y &&
-          t.purchasedAt.getMonth() + 1 === m,
-      );
+  // Grouped once per data refresh so `getSplitTransactions` below never scans
+  // the full ledger — it was doing a full `transactions.filter()` per split,
+  // per render (the Splits History table calls it 2-3x per row), which meant
+  // O(splits × transactions) work on every re-render, including ones that
+  // have nothing to do with the data (e.g. toggling a row open). Grouping by
+  // hostel up front turns each call into an O(that hostel's own transactions)
+  // lookup instead.
+  const transactionsByHostel = useMemo(() => {
+    const map = new Map<string, TransactionRow[]>();
+    for (const t of transactions) {
+      const key = t.hostel ?? "Unknown";
+      const bucket = map.get(key);
+      if (bucket) bucket.push(t);
+      else map.set(key, [t]);
     }
-    return txns.sort(
-      (a, b) => b.purchasedAt.getTime() - a.purchasedAt.getTime(),
+    return map;
+  }, [transactions]);
+
+  const getSplitTransactions = useCallback(
+    (s: SplitRecord, monthFilter?: string): TransactionRow[] => {
+      const from = new Date(s.dateFrom);
+      from.setHours(0, 0, 0, 0);
+      const to = s.dateTo ? new Date(s.dateTo) : new Date();
+      to.setHours(23, 59, 59, 999);
+      let txns = (transactionsByHostel.get(s.hostel) ?? []).filter(
+        (t) => t.purchasedAt >= from && t.purchasedAt <= to,
+      );
+      if (monthFilter) {
+        const [y, m] = monthFilter.split("-").map(Number);
+        txns = txns.filter(
+          (t) =>
+            t.purchasedAt.getFullYear() === y &&
+            t.purchasedAt.getMonth() + 1 === m,
+        );
+      }
+      return txns.sort(
+        (a, b) => b.purchasedAt.getTime() - a.purchasedAt.getTime(),
+      );
+    },
+    [transactionsByHostel],
+  );
+
+  // Was an inline IIFE in the render body — recomputed on every render of the
+  // Splits tab (e.g. just toggling a row's expand state), each pass doing a
+  // `.reduce()` over every visible split. Memoized so it only reruns when the
+  // inputs it actually depends on change.
+  const splitsTotals = useMemo(() => {
+    return filteredSplits.reduce(
+      (acc, s) => {
+        const txns = splitFilterMonth ? getSplitTransactions(s, splitFilterMonth) : getSplitTransactions(s);
+        const gr = txns.reduce((a, t) => a + t.price, 0);
+        const mPct = s.maintenancePct ?? maintenancePct;
+        const splittable = Math.max(0, gr - Math.round((gr * mPct) / 100) - Math.round((gr * paystackPct) / 100));
+        return {
+          revenue: acc.revenue + gr,
+          admin: acc.admin + Math.round((splittable * s.adminPercent) / 100),
+          partner: acc.partner + Math.round((splittable * s.partnerPercent) / 100),
+        };
+      },
+      { revenue: 0, admin: 0, partner: 0 },
     );
-  };
+  }, [filteredSplits, splitFilterMonth, maintenancePct, paystackPct, getSplitTransactions]);
 
   const exportSplitLog = (
     s: SplitRecord,
@@ -1193,91 +1370,76 @@ export default function AdminTransactionsPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <ProtectedRoute module='transactions'>
-      <div className='min-h-screen bg-apple-gray-50'>
-        <header className='bg-white shadow-sm border-b border-apple-gray-200 sticky top-0 z-10'>
-          <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4'>
-            <div className='flex items-center justify-between'>
-              <div className='flex items-center gap-3'>
-                <Logo variant='dark' />
-                <h1 className='text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-400 via-blue-500 to-black-400 bg-clip-text text-transparent'>
-                  Transaction Audit
-                </h1>
-              </div>
-              <div className='flex items-center gap-3'>
-                <Link
-                  href='/admin/dashboard'
-                  className='flex items-center gap-2 px-4 py-2 text-sm font-medium text-apple-gray-700 hover:bg-apple-gray-100 rounded-lg transition-colors'>
-                  <ArrowLeft className='w-4 h-4' />
-                  <span className='hidden sm:inline'>Dashboard</span>
-                </Link>
-                <button
-                  onClick={() => fetchAll()}
-                  disabled={loading}
-                  title='Refresh transactions'
-                  className='p-2 text-apple-gray-500 hover:text-apple-gray-700 hover:bg-apple-gray-100 rounded-lg transition-colors disabled:opacity-40'>
-                  <RefreshCw
-                    className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
-                  />
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className='flex items-center gap-2 px-4 py-2 text-sm font-medium text-apple-gray-700 hover:bg-apple-gray-100 rounded-lg transition-colors'>
-                  <LogOut className='w-4 h-4' />
-                  <span className='hidden sm:inline'>Logout</span>
-                </button>
-              </div>
+      <div className="min-h-screen analytics-shell">
+        <header className="glass-header">
+          <div className="flex items-center gap-3">
+            <Logo variant="dark" />
+            <div>
+              <p className="eyebrow">TRANSACTIONS &amp; PAYOUTS</p>
+              <h1 className="text-xl font-semibold sm:text-2xl">Transaction audit</h1>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => fetchAll()} disabled={loading} title="Refresh transactions" className="glass-button">
+              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+            <button onClick={handleLogout} className="glass-button hidden sm:inline-flex">
+              <LogOut size={16} />
+              Logout
+            </button>
           </div>
         </header>
 
-        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6'>
+        <main className="mx-auto max-w-[1600px] space-y-5 px-4 py-6 sm:px-8">
           {error && (
-            <div className='px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-sm'>
+            <div className="glass-alert">
+              <AlertTriangle size={18} />
               {error}
             </div>
           )}
 
           {/* Tabs */}
-          <div className='overflow-x-auto'>
-            <div className='inline-flex items-center bg-apple-gray-100 rounded-2xl p-1.5 shadow-inner min-w-max'>
+          <div className="overflow-x-auto">
+            <div className="inline-flex items-center gap-1 rounded-full border border-white/80 bg-white/70 p-1 backdrop-blur-xl min-w-max">
               <button
                 onClick={() => setActiveTab("transactions")}
-                className={`flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  activeTab === "transactions"
-                    ? "bg-white text-apple-gray-900 shadow-sm"
-                    : "text-apple-gray-600 hover:text-apple-gray-900"
+                className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition sm:px-6 ${
+                  activeTab === "transactions" ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:bg-white"
                 }`}>
-                <BarChart3 className='w-4 h-4' />
+                <BarChart3 size={16} />
                 {isPartner ? "My Transactions" : "Transactions"}
               </button>
               {!isPartner && (
                 <>
                   <button
                     onClick={() => setActiveTab("payouts")}
-                    className={`flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                      activeTab === "payouts"
-                        ? "bg-white text-apple-gray-900 shadow-sm"
-                        : "text-apple-gray-600 hover:text-apple-gray-900"
+                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition sm:px-6 ${
+                      activeTab === "payouts" ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:bg-white"
                     }`}>
-                    <Wallet className='w-4 h-4' />
+                    <Wallet size={16} />
                     Partner Payouts
                     {partners.length > 0 && (
-                      <span className='ml-1 px-1.5 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700'>
+                      <span
+                        className={`rounded-full px-1.5 py-0.5 text-xs font-semibold ${
+                          activeTab === "payouts" ? "bg-white/20 text-white" : "slate-chip"
+                        }`}>
                         {partners.length}
                       </span>
                     )}
                   </button>
                   <button
                     onClick={() => setActiveTab("splits")}
-                    className={`flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                      activeTab === "splits"
-                        ? "bg-white text-apple-gray-900 shadow-sm"
-                        : "text-apple-gray-600 hover:text-apple-gray-900"
+                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition sm:px-6 ${
+                      activeTab === "splits" ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:bg-white"
                     }`}>
-                    <Scissors className='w-4 h-4' />
+                    <Scissors size={16} />
                     Split Counter
                     {splitRecords.length > 0 && (
-                      <span className='ml-1 px-1.5 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700'>
+                      <span
+                        className={`rounded-full px-1.5 py-0.5 text-xs font-semibold ${
+                          activeTab === "splits" ? "bg-white/20 text-white" : "slate-chip"
+                        }`}>
                         {splitRecords.length}
                       </span>
                     )}
@@ -1285,15 +1447,16 @@ export default function AdminTransactionsPage() {
                   {isSuperAdmin && (
                     <button
                       onClick={() => setActiveTab("bot")}
-                      className={`flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                        activeTab === "bot"
-                          ? "bg-white text-apple-gray-900 shadow-sm"
-                          : "text-apple-gray-600 hover:text-apple-gray-900"
+                      className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition sm:px-6 ${
+                        activeTab === "bot" ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:bg-white"
                       }`}>
-                      <Bot className='w-4 h-4' />
+                      <Bot size={16} />
                       Bot Transactions
                       {botTxns.length > 0 && (
-                        <span className='ml-1 px-1.5 py-0.5 text-xs rounded-full bg-green-100 text-green-700'>
+                        <span
+                          className={`rounded-full px-1.5 py-0.5 text-xs font-semibold ${
+                            activeTab === "bot" ? "bg-white/20 text-white" : "slate-chip"
+                          }`}>
                           {botTxns.length}
                         </span>
                       )}
@@ -1308,154 +1471,137 @@ export default function AdminTransactionsPage() {
           {activeTab === "transactions" && (
             <>
               {/* Summary cards */}
-              <div
-                className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${isPartner ? "" : "lg:grid-cols-4"}`}>
+              <div className="kpi-grid lg:grid-cols-4">
                 {isPartner ? (
                   <>
-                    <div className='bg-white rounded-2xl shadow-sm p-5'>
-                      <p className='text-sm text-apple-gray-500 mb-1'>
-                        Transactions
-                      </p>
-                      <p className='text-3xl font-bold text-apple-gray-900'>
-                        {loading ? "—" : filtered.length.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className='bg-white rounded-2xl shadow-sm p-5'>
-                      <p className='text-sm text-apple-gray-500 mb-1'>Profit</p>
-                      <p className='text-3xl font-bold text-purple-600'>
-                        {loading
-                          ? "—"
-                          : `₦${totalPartnerShare.toLocaleString()}`}
-                      </p>
-                      {/* <p className="text-xs text-apple-gray-400 mt-1">
-                        {partnerSplitPercent}% of revenue
-                      </p> */}
-                    </div>
+                    <Kpi label="Transactions" tone="slate" value={loading ? "—" : filtered.length.toLocaleString()} />
+                    <Kpi
+                      label="Profit"
+                      tone="purple"
+                      value={loading ? "—" : `₦${totalPartnerShare.toLocaleString()}`}
+                    />
                   </>
                 ) : (
                   <>
-                    <div className='bg-white rounded-2xl shadow-sm p-5'>
-                      <p className='text-sm text-apple-gray-500 mb-1'>
-                        Total Transactions
-                      </p>
-                      <p className='text-3xl font-bold text-apple-gray-900'>
-                        {loading ? "—" : filtered.length.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className='bg-white rounded-2xl shadow-sm p-5'>
-                      <p className='text-sm text-apple-gray-500 mb-1'>
-                        Total Revenue
-                      </p>
-                      <p className='text-3xl font-bold text-green-600'>
-                        {loading ? "—" : `₦${totalRevenue.toLocaleString()}`}
-                      </p>
-                    </div>
-                    <div className='bg-white rounded-2xl shadow-sm p-5'>
-                      <p className='text-sm text-apple-gray-500 mb-1'>
-                        Device Plans
-                      </p>
-                      <p className='text-3xl font-bold text-blue-600'>
-                        {loading
-                          ? "—"
-                          : filtered
-                              .filter((t) => t.planType === "device")
-                              .length.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className='bg-white rounded-2xl shadow-sm p-5'>
-                      <p className='text-sm text-apple-gray-500 mb-1'>
-                        TV Plans
-                      </p>
-                      <p className='text-3xl font-bold text-purple-600'>
-                        {loading
-                          ? "—"
-                          : filtered
-                              .filter((t) => t.planType === "tv")
-                              .length.toLocaleString()}
-                      </p>
-                    </div>
+                    <Kpi label="Total Transactions" tone="slate" value={loading ? "—" : filtered.length.toLocaleString()} />
+                    <Kpi label="Total Revenue" tone="green" value={loading ? "—" : `₦${totalRevenue.toLocaleString()}`} />
+                    <Kpi
+                      label="Device Plans"
+                      tone="blue"
+                      value={loading ? "—" : filtered.filter((t) => t.planType === "device").length.toLocaleString()}
+                    />
+                    <Kpi
+                      label="TV Plans"
+                      tone="violet"
+                      value={loading ? "—" : filtered.filter((t) => t.planType === "tv").length.toLocaleString()}
+                    />
                   </>
                 )}
               </div>
 
-              {/* Per-hostel breakdown */}
-              {!isPartner && !loading && byHostel.length > 0 && (
-                <div className='bg-white rounded-3xl shadow-sm p-6'>
-                  <h2 className='text-base font-semibold text-apple-gray-900 mb-4 flex items-center gap-2'>
-                    <Building2 className='w-4 h-4 text-blue-500' />
-                    Revenue by Hostel
-                  </h2>
-                  <div className='grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3'>
-                    {byHostel.map(([hostel, stats]) => (
-                      <div
-                        key={hostel}
-                        className='bg-apple-gray-50 rounded-2xl px-4 py-3'>
-                        <p className='text-sm font-medium text-apple-gray-700 truncate'>
-                          {hostel}
+              {/* Per-controller breakdown — server-computed, unaffected by the
+                  filters below (it reflects the whole ledger, not `filtered`).
+                  Shown before Revenue by Hostel — the controller rollup is
+                  the primary view. Collapsed by default: the grid below is
+                  only rendered once expanded, not just hidden, so a long
+                  controller list costs nothing until someone opens it. */}
+              {!isPartner && !loading && byController.length > 0 && (
+                <section className="glass-panel">
+                  <div className="panel-heading">
+                    <div>
+                      <p className="eyebrow">TRANSACTIONS</p>
+                      <h3 className="flex items-center gap-2">
+                        <Router size={18} className="text-blue-500" />
+                        Revenue by controller
+                      </h3>
+                      {!showControllerRevenue && (
+                        <p className="mt-1 text-xs text-slate-500">
+                          ₦{byController.reduce((sum, row) => sum + row.revenue, 0).toLocaleString()} across {byController.length}{" "}
+                          controller{byController.length !== 1 ? "s" : ""}
                         </p>
-                        <p className='text-lg font-bold text-apple-gray-900'>
-                          ₦{stats.revenue.toLocaleString()}
-                        </p>
-                        <p className='text-xs text-apple-gray-500'>
-                          {stats.count} transaction
-                          {stats.count !== 1 ? "s" : ""}
-                        </p>
-                      </div>
-                    ))}
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setShowControllerRevenue((v) => !v)}
+                      className="glass-icon !h-9 !w-9"
+                      aria-expanded={showControllerRevenue}
+                      title={showControllerRevenue ? "Collapse" : "Expand"}>
+                      {showControllerRevenue ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </button>
                   </div>
-                </div>
+                  {showControllerRevenue && (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                      {byController.map((row) => (
+                        <div key={row.controllerId} className="glass-controller">
+                          <p className="truncate text-sm font-medium text-slate-700">{row.controllerName}</p>
+                          <p className="mt-1 text-lg font-bold text-slate-900">₦{row.revenue.toLocaleString()}</p>
+                          <p className="text-xs text-slate-500">
+                            {row.transactions} transaction{row.transactions !== 1 ? "s" : ""} ·{" "}
+                            {row.hostelCount} hostel{row.hostelCount !== 1 ? "s" : ""}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
               )}
 
-              {/* Per-controller breakdown — server-computed, unaffected by the
-                  filters below (it reflects the whole ledger, not `filtered`) */}
-              {!isPartner && !loading && byController.length > 0 && (
-                <div className='bg-white rounded-3xl shadow-sm p-6'>
-                  <h2 className='text-base font-semibold text-apple-gray-900 mb-4 flex items-center gap-2'>
-                    <Router className='w-4 h-4 text-blue-500' />
-                    Revenue by Controller
-                  </h2>
-                  <div className='grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3'>
-                    {byController.map((row) => (
-                      <div
-                        key={row.controllerId}
-                        className='bg-apple-gray-50 rounded-2xl px-4 py-3'>
-                        <p className='text-sm font-medium text-apple-gray-700 truncate'>
-                          {row.controllerName}
+              {/* Per-hostel breakdown — same collapse-by-default treatment. */}
+              {!isPartner && !loading && byHostel.length > 0 && (
+                <section className="glass-panel">
+                  <div className="panel-heading">
+                    <div>
+                      <p className="eyebrow">TRANSACTIONS</p>
+                      <h3 className="flex items-center gap-2">
+                        <Building2 size={18} className="text-blue-500" />
+                        Revenue by hostel
+                      </h3>
+                      {!showHostelRevenue && (
+                        <p className="mt-1 text-xs text-slate-500">
+                          ₦{totalRevenue.toLocaleString()} across {byHostel.length} hostel{byHostel.length !== 1 ? "s" : ""}
                         </p>
-                        <p className='text-lg font-bold text-apple-gray-900'>
-                          ₦{row.revenue.toLocaleString()}
-                        </p>
-                        <p className='text-xs text-apple-gray-500'>
-                          {row.transactions} transaction
-                          {row.transactions !== 1 ? "s" : ""} ·{" "}
-                          {row.hostelCount} hostel
-                          {row.hostelCount !== 1 ? "s" : ""}
-                        </p>
-                      </div>
-                    ))}
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setShowHostelRevenue((v) => !v)}
+                      className="glass-icon !h-9 !w-9"
+                      aria-expanded={showHostelRevenue}
+                      title={showHostelRevenue ? "Collapse" : "Expand"}>
+                      {showHostelRevenue ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </button>
                   </div>
-                </div>
+                  {showHostelRevenue && (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                      {byHostel.map(([hostel, stats]) => (
+                        <div key={hostel} className="glass-controller">
+                          <p className="truncate text-sm font-medium text-slate-700">{hostel}</p>
+                          <p className="mt-1 text-lg font-bold text-slate-900">₦{stats.revenue.toLocaleString()}</p>
+                          <p className="text-xs text-slate-500">
+                            {stats.count} transaction{stats.count !== 1 ? "s" : ""}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
               )}
 
               {/* Filters + Export */}
-              <div className='bg-white rounded-3xl shadow-sm p-6'>
-                <div className='flex flex-col gap-4'>
-                  <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3'>
-                    <div className='relative'>
-                      <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-apple-gray-400' />
+              <section className="glass-panel">
+                <div className="flex flex-col gap-4">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                    <div className="relative">
+                      <Search className={GLASS_INPUT_ICON} />
                       <input
-                        type='text'
-                        placeholder='Search email, plan, ref…'
+                        type="text"
+                        placeholder="Search email, plan, ref…"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className='w-full pl-10 pr-4 py-2.5 border border-apple-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300'
+                        className={`${GLASS_INPUT} pl-11`}
                       />
                     </div>
-                    <select
-                      value={filterHostel}
-                      onChange={(e) => setFilterHostel(e.target.value)}
-                      className='px-3 py-2.5 border border-apple-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-apple-gray-700'>
-                      <option value='all'>All Hostels</option>
+                    <select value={filterHostel} onChange={(e) => setFilterHostel(e.target.value)} className={GLASS_INPUT}>
+                      <option value="all">All Hostels</option>
                       {knownHostels.map((h) => (
                         <option key={h} value={h}>
                           {h}
@@ -1464,48 +1610,40 @@ export default function AdminTransactionsPage() {
                     </select>
                     <select
                       value={filterPlanType}
-                      onChange={(e) =>
-                        setFilterPlanType(
-                          e.target.value as typeof filterPlanType,
-                        )
-                      }
-                      className='px-3 py-2.5 border border-apple-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-apple-gray-700'>
-                      <option value='all'>All Plan Types</option>
-                      <option value='device'>Device Plan</option>
-                      <option value='tv'>TV Plan</option>
-                      <option value='unlimited'>Unlimited</option>
+                      onChange={(e) => setFilterPlanType(e.target.value as typeof filterPlanType)}
+                      className={GLASS_INPUT}>
+                      <option value="all">All Plan Types</option>
+                      <option value="device">Device Plan</option>
+                      <option value="tv">TV Plan</option>
+                      <option value="unlimited">Unlimited</option>
                     </select>
                     <select
                       value={filterPaymentSource}
-                      onChange={(e) =>
-                        setFilterPaymentSource(
-                          e.target.value as typeof filterPaymentSource,
-                        )
-                      }
-                      className='px-3 py-2.5 border border-apple-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-apple-gray-700'>
-                      <option value='all'>All Sources</option>
-                      <option value='bot'>Paid with Bot</option>
-                      <option value='site'>Paid on Site</option>
+                      onChange={(e) => setFilterPaymentSource(e.target.value as typeof filterPaymentSource)}
+                      className={GLASS_INPUT}>
+                      <option value="all">All Sources</option>
+                      <option value="bot">Paid with Bot</option>
+                      <option value="site">Paid on Site</option>
                     </select>
-                    <div className='flex gap-2'>
+                    <div className="flex gap-2">
                       <input
-                        type='date'
+                        type="date"
                         value={filterDateFrom}
                         onChange={(e) => setFilterDateFrom(e.target.value)}
-                        className='flex-1 px-3 py-2.5 border border-apple-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-apple-gray-700'
-                        title='Date from'
+                        className={`${GLASS_INPUT} flex-1`}
+                        title="Date from"
                       />
                       <input
-                        type='date'
+                        type="date"
                         value={filterDateTo}
                         onChange={(e) => setFilterDateTo(e.target.value)}
-                        className='flex-1 px-3 py-2.5 border border-apple-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-apple-gray-700'
-                        title='Date to'
+                        className={`${GLASS_INPUT} flex-1`}
+                        title="Date to"
                       />
                     </div>
                   </div>
-                  <div className='flex items-center justify-between'>
-                    <p className='text-sm text-apple-gray-500'>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-slate-500">
                       {isPartner
                         ? `${filtered.length} transaction${filtered.length !== 1 ? "s" : ""} • ₦${totalPartnerShare.toLocaleString()} your share`
                         : `${filtered.length} transaction${filtered.length !== 1 ? "s" : ""} • ₦${totalRevenue.toLocaleString()} total`}
@@ -1513,141 +1651,94 @@ export default function AdminTransactionsPage() {
                     <button
                       onClick={exportToExcel}
                       disabled={filtered.length === 0}
-                      className='flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white text-sm font-semibold rounded-xl shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all'>
-                      <Download className='w-4 h-4' />
+                      className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50">
+                      <Download size={16} />
                       Export Excel
                     </button>
                   </div>
                 </div>
-              </div>
+              </section>
 
               {/* Transactions table */}
-              <div className='bg-white rounded-3xl shadow-sm overflow-hidden'>
+              <section className="glass-panel !p-0">
                 {loading ? (
-                  <div className='py-16 text-center text-apple-gray-400'>
-                    Loading transactions…
-                  </div>
+                  <div className="py-16 text-center text-sm text-slate-400">Loading transactions…</div>
                 ) : filtered.length === 0 ? (
-                  <div className='py-16 text-center text-apple-gray-400'>
-                    No transactions match your filters.
-                  </div>
+                  <div className="py-16 text-center text-sm text-slate-400">No transactions match your filters.</div>
                 ) : (
-                  <div className='overflow-x-auto'>
-                    <table className='w-full'>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
                       <thead>
-                        <tr className='border-b border-apple-gray-100 bg-apple-gray-50'>
-                          <th className='px-5 py-3 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
-                            Date
-                          </th>
-                          <th className='px-5 py-3 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
-                            Plan
-                          </th>
-                          <th className='px-5 py-3 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
-                            Type
-                          </th>
-                          <th className='px-5 py-3 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
-                            Hostel
-                          </th>
+                        <tr className="border-b border-white/70">
+                          <Th>Date</Th>
+                          <Th>Plan</Th>
+                          <Th>Type</Th>
+                          <Th>Hostel</Th>
                           {!isPartner && (
                             <>
-                              <th className='px-5 py-3 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
-                                Source
-                              </th>
-                              <th className='px-5 py-3 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
-                                Email
-                              </th>
-                              <th className='px-5 py-3 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
-                                Ref
-                              </th>
+                              <Th>Source</Th>
+                              <Th>Email</Th>
+                              <Th>Ref</Th>
                             </>
                           )}
-                          <th className='px-5 py-3 text-right text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
-                            {isPartner ? "Your Share" : "Amount"}
-                          </th>
+                          <Th align="right">{isPartner ? "Your Share" : "Amount"}</Th>
                         </tr>
                       </thead>
-                      <tbody className='divide-y divide-apple-gray-50'>
+                      <tbody className="divide-y divide-white/60">
                         {filtered.map((t) => (
-                          <tr
-                            key={t.id}
-                            className='hover:bg-apple-gray-50 transition-colors'>
-                            <td className='px-5 py-3.5 text-sm text-apple-gray-600 whitespace-nowrap'>
+                          <tr key={t.id} className="transition hover:bg-white/70">
+                            <Td className="whitespace-nowrap">
                               {t.purchasedAt.toLocaleDateString("en-NG", {
                                 day: "2-digit",
                                 month: "short",
                                 year: "numeric",
                               })}
                               <br />
-                              <span className='text-xs text-apple-gray-400'>
-                                {t.purchasedAt.toLocaleTimeString("en-NG", {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })}
+                              <span className="text-xs text-slate-400">
+                                {t.purchasedAt.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}
                               </span>
-                            </td>
-                            <td className='px-5 py-3.5 text-sm font-medium text-apple-gray-900'>
-                              {t.planName}
-                            </td>
-                            <td className='px-5 py-3.5'>
+                            </Td>
+                            <Td className="font-medium text-slate-900">{t.planName}</Td>
+                            <Td>
                               <PlanTypeBadge type={t.planType} />
-                            </td>
-                            <td className='px-5 py-3.5 text-sm text-apple-gray-600'>
-                              {t.hostel ?? (
-                                <span className='text-apple-gray-400'>
-                                  Unknown
-                                </span>
-                              )}
-                            </td>
+                            </Td>
+                            <Td>{t.hostel ?? <span className="text-slate-400">Unknown</span>}</Td>
                             {!isPartner && (
                               <>
-                                <td className='px-5 py-3.5'>
+                                <Td>
                                   {"paymentSource" in t && (t as DataPurchaseRow).paymentSource === "bot" ? (
-                                    <span className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700'>
-                                      <Smartphone className='w-3 h-3' />
+                                    <span className="status-chip inline-flex items-center gap-1">
+                                      <Smartphone size={12} />
                                       Bot
                                     </span>
                                   ) : (
-                                    <span className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600'>
-                                      Site
-                                    </span>
+                                    <span className="slate-chip">Site</span>
                                   )}
-                                </td>
-                                <td className='px-5 py-3.5 text-sm text-apple-gray-600 max-w-[180px] truncate'>
-                                  {t.customerEmail ?? (
-                                    <span className='text-apple-gray-400'>
-                                      N/A
-                                    </span>
-                                  )}
-                                </td>
-                                <td className='px-5 py-3.5 text-xs text-apple-gray-500 font-mono'>
+                                </Td>
+                                <Td className="max-w-[180px] truncate">
+                                  {t.customerEmail ?? <span className="text-slate-400">N/A</span>}
+                                </Td>
+                                <Td className="font-mono text-xs text-slate-500">
                                   {t.paymentRef ? (
                                     <span title={t.paymentRef}>
-                                      {t.paymentRef.length > 14
-                                        ? t.paymentRef.slice(0, 14) + "…"
-                                        : t.paymentRef}
+                                      {t.paymentRef.length > 14 ? t.paymentRef.slice(0, 14) + "…" : t.paymentRef}
                                     </span>
                                   ) : (
-                                    <span className='text-apple-gray-400'>
-                                      —
-                                    </span>
+                                    <span className="text-slate-400">—</span>
                                   )}
-                                </td>
+                                </Td>
                               </>
                             )}
-                            <td className='px-5 py-3.5 text-sm font-semibold text-apple-gray-900 text-right whitespace-nowrap'>
-                              ₦
-                              {(isPartner
-                                ? partnerShareFor(t)
-                                : t.price
-                              ).toLocaleString()}
-                            </td>
+                            <Td align="right" className="whitespace-nowrap font-semibold text-slate-900">
+                              ₦{(isPartner ? partnerShareFor(t) : t.price).toLocaleString()}
+                            </Td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
                 )}
-              </div>
+              </section>
             </>
           )}
 
@@ -1655,167 +1746,112 @@ export default function AdminTransactionsPage() {
           {!isPartner && activeTab === "payouts" && (
             <>
               {/* Period control */}
-              <div className='flex flex-wrap items-center gap-3'>
-                <div className='inline-flex rounded-xl border border-apple-gray-200 bg-white p-0.5 text-sm font-semibold'>
-                  <button
-                    onClick={() => setPayoutMode("all")}
-                    className={`px-4 py-1.5 rounded-lg transition-colors ${
-                      payoutMode === "all"
-                        ? "bg-apple-gray-900 text-white"
-                        : "text-apple-gray-600 hover:text-apple-gray-900"
-                    }`}>
-                    All time
-                  </button>
-                  <button
-                    onClick={() => setPayoutMode("month")}
-                    className={`px-4 py-1.5 rounded-lg transition-colors ${
-                      payoutMode === "month"
-                        ? "bg-apple-gray-900 text-white"
-                        : "text-apple-gray-600 hover:text-apple-gray-900"
-                    }`}>
-                    By month
-                  </button>
-                </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <SegToggle
+                  value={payoutMode}
+                  onChange={setPayoutMode}
+                  options={[
+                    { value: "all", label: "All time" },
+                    { value: "month", label: "By month" },
+                  ]}
+                />
                 {payoutMode === "month" && (
                   <input
-                    type='month'
+                    type="month"
                     value={payoutMonth}
                     onChange={(e) => setPayoutMonth(e.target.value)}
-                    className='px-3 py-2 rounded-xl border border-apple-gray-200 bg-white text-sm text-apple-gray-900 focus:outline-none focus:ring-2 focus:ring-apple-gray-300'
-                    aria-label='Payout month'
+                    className={`${GLASS_INPUT} w-auto`}
+                    aria-label="Payout month"
                   />
                 )}
               </div>
 
               {/* Grand totals */}
-              <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-                <div className='bg-white rounded-2xl shadow-sm p-5'>
-                  <p className='text-sm text-apple-gray-500 mb-1'>
-                    Total to pay partners
-                  </p>
-                  <p className='text-3xl font-bold text-purple-600'>
-                    {loading
-                      ? "—"
-                      : `₦${payoutTotals.partnerTotal.toLocaleString()}`}
-                  </p>
-                  <p className='text-xs text-apple-gray-400 mt-1'>
-                    {payoutMode === "all" ? "All time" : payoutMonth}
-                  </p>
-                </div>
-                <div className='bg-white rounded-2xl shadow-sm p-5'>
-                  <p className='text-sm text-apple-gray-500 mb-1'>
-                    Your share from partnered hostels
-                  </p>
-                  <p className='text-3xl font-bold text-apple-gray-900'>
-                    {loading
-                      ? "—"
-                      : `₦${payoutTotals.adminTotal.toLocaleString()}`}
-                  </p>
-                </div>
+              <div className="kpi-grid lg:grid-cols-4">
+                <Kpi
+                  label="Total to pay partners"
+                  tone="purple"
+                  value={loading ? "—" : `₦${payoutTotals.partnerTotal.toLocaleString()}`}
+                  note={payoutMode === "all" ? "All time" : payoutMonth}
+                />
+                <Kpi
+                  label="Your share from partnered hostels"
+                  tone="slate"
+                  value={loading ? "—" : `₦${payoutTotals.adminTotal.toLocaleString()}`}
+                />
               </div>
 
               {/* Per-partner breakdown */}
               {partners.length === 0 ? (
-                <div className='bg-white rounded-2xl shadow-sm p-10 text-center text-apple-gray-500'>
-                  No partner accounts yet. Mark an admin as a partner (in Admin
-                  Management) to see their payouts here.
-                </div>
+                <section className="glass-panel text-center text-sm text-slate-500">
+                  No partner accounts yet. Mark an admin as a partner (in Admin Management) to see their payouts here.
+                </section>
               ) : (
-                <div className='space-y-4'>
+                <div className="space-y-4">
                   {partnerPayouts.map((p) => (
-                    <div
-                      key={p.id}
-                      className='bg-white rounded-2xl shadow-sm overflow-hidden'>
-                      <div className='flex items-center justify-between gap-4 p-5 border-b border-apple-gray-100'>
-                        <div className='flex items-center gap-3'>
-                          <div className='w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center shrink-0'>
-                            <Wallet className='w-5 h-5 text-purple-600' />
+                    <section key={p.id} className="glass-panel !p-0">
+                      <div className="flex items-center justify-between gap-4 border-b border-white/70 p-5">
+                        <div className="flex items-center gap-3">
+                          <div className="controller-icon shrink-0 !bg-purple-100 !text-purple-600">
+                            <Wallet size={18} />
                           </div>
                           <div>
-                            <p className='font-semibold text-apple-gray-900'>
-                              {p.username}
-                            </p>
-                            <p className='text-xs text-apple-gray-500'>
-                              {p.mode === "perHostel"
-                                ? "Per-hostel split"
-                                : "Same split for all hostels"}
+                            <p className="font-semibold text-slate-900">{p.username}</p>
+                            <p className="text-xs text-slate-500">
+                              {p.mode === "perHostel" ? "Per-hostel split" : "Same split for all hostels"}
                             </p>
                           </div>
                         </div>
-                        <div className='text-right shrink-0'>
-                          <p className='text-xs text-apple-gray-500'>You pay</p>
-                          <p className='text-xl font-bold text-purple-600'>
-                            ₦{p.totalCut.toLocaleString()}
-                          </p>
+                        <div className="shrink-0 text-right">
+                          <p className="text-xs text-slate-500">You pay</p>
+                          <p className="text-xl font-bold text-purple-600">₦{p.totalCut.toLocaleString()}</p>
                         </div>
                       </div>
 
                       {p.rows.length === 0 ? (
-                        <div className='p-5 text-sm text-apple-gray-500'>
-                          No revenue in this period.
-                        </div>
+                        <div className="p-5 text-sm text-slate-500">No revenue in this period.</div>
                       ) : (
-                        <div className='overflow-x-auto'>
-                          <table className='w-full text-sm'>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
                             <thead>
-                              <tr className='text-left text-xs text-apple-gray-500 border-b border-apple-gray-100'>
-                                <th className='px-5 py-2 font-medium'>Hostel</th>
-                                <th className='px-5 py-2 font-medium text-right'>
-                                  Revenue
-                                </th>
-                                <th className='px-5 py-2 font-medium text-right'>
-                                  Split
-                                </th>
-                                <th className='px-5 py-2 font-medium text-right'>
-                                  Partner cut
-                                </th>
-                                <th className='px-5 py-2 font-medium text-right'>
-                                  Your share
-                                </th>
+                              <tr className="border-b border-white/70">
+                                <Th>Hostel</Th>
+                                <Th align="right">Revenue</Th>
+                                <Th align="right">Split</Th>
+                                <Th align="right">Partner cut</Th>
+                                <Th align="right">Your share</Th>
                               </tr>
                             </thead>
-                            <tbody>
+                            <tbody className="divide-y divide-white/60">
                               {p.rows.map((r) => (
-                                <tr
-                                  key={r.hostelId}
-                                  className='border-b border-apple-gray-50 last:border-0'>
-                                  <td className='px-5 py-2.5 text-apple-gray-900'>
-                                    {r.name}
-                                  </td>
-                                  <td className='px-5 py-2.5 text-right text-apple-gray-700'>
-                                    ₦{r.gross.toLocaleString()}
-                                  </td>
-                                  <td className='px-5 py-2.5 text-right text-apple-gray-500'>
+                                <tr key={r.hostelId}>
+                                  <Td className="text-slate-900">{r.name}</Td>
+                                  <Td align="right">₦{r.gross.toLocaleString()}</Td>
+                                  <Td align="right" className="text-slate-500">
                                     {r.pct}%
-                                  </td>
-                                  <td className='px-5 py-2.5 text-right font-semibold text-purple-600'>
+                                  </Td>
+                                  <Td align="right" className="font-semibold text-purple-600">
                                     ₦{r.cut.toLocaleString()}
-                                  </td>
-                                  <td className='px-5 py-2.5 text-right text-apple-gray-700'>
-                                    ₦{r.adminGain.toLocaleString()}
-                                  </td>
+                                  </Td>
+                                  <Td align="right">₦{r.adminGain.toLocaleString()}</Td>
                                 </tr>
                               ))}
                             </tbody>
                             <tfoot>
-                              <tr className='border-t border-apple-gray-100 font-semibold text-apple-gray-900'>
-                                <td className='px-5 py-2.5'>Total</td>
-                                <td className='px-5 py-2.5 text-right'>
-                                  ₦{p.totalGross.toLocaleString()}
-                                </td>
-                                <td></td>
-                                <td className='px-5 py-2.5 text-right text-purple-600'>
+                              <tr className="border-t border-white/70 font-semibold text-slate-900">
+                                <Td>Total</Td>
+                                <Td align="right">₦{p.totalGross.toLocaleString()}</Td>
+                                <Td>{""}</Td>
+                                <Td align="right" className="text-purple-600">
                                   ₦{p.totalCut.toLocaleString()}
-                                </td>
-                                <td className='px-5 py-2.5 text-right'>
-                                  ₦{p.adminGain.toLocaleString()}
-                                </td>
+                                </Td>
+                                <Td align="right">₦{p.adminGain.toLocaleString()}</Td>
                               </tr>
                             </tfoot>
                           </table>
                         </div>
                       )}
-                    </div>
+                    </section>
                   ))}
                 </div>
               )}
@@ -1826,56 +1862,46 @@ export default function AdminTransactionsPage() {
           {isSuperAdmin && activeTab === "bot" && (
             <>
               {/* Filters: period + hostel */}
-              <div className='flex flex-wrap items-center gap-3'>
-                <div className='inline-flex rounded-xl border border-apple-gray-200 bg-white p-0.5 text-sm font-semibold'>
-                  {(["all", "day", "month", "year"] as const).map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => setBotPeriodMode(m)}
-                      className={`px-3.5 py-1.5 rounded-lg capitalize transition-colors ${
-                        botPeriodMode === m
-                          ? "bg-apple-gray-900 text-white"
-                          : "text-apple-gray-600 hover:text-apple-gray-900"
-                      }`}>
-                      {m === "all" ? "All time" : m}
-                    </button>
-                  ))}
-                </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <SegToggle
+                  value={botPeriodMode}
+                  onChange={setBotPeriodMode}
+                  options={(["all", "day", "month", "year"] as const).map((m) => ({
+                    value: m,
+                    label: m === "all" ? "All time" : m[0].toUpperCase() + m.slice(1),
+                  }))}
+                />
                 {botPeriodMode === "day" && (
                   <input
-                    type='date'
+                    type="date"
                     value={botDay}
                     onChange={(e) => setBotDay(e.target.value)}
-                    className='px-3 py-2 rounded-xl border border-apple-gray-200 bg-white text-sm text-apple-gray-900 focus:outline-none focus:ring-2 focus:ring-apple-gray-300'
-                    aria-label='Day'
+                    className={`${GLASS_INPUT} w-auto`}
+                    aria-label="Day"
                   />
                 )}
                 {botPeriodMode === "month" && (
                   <input
-                    type='month'
+                    type="month"
                     value={botMonth}
                     onChange={(e) => setBotMonth(e.target.value)}
-                    className='px-3 py-2 rounded-xl border border-apple-gray-200 bg-white text-sm text-apple-gray-900 focus:outline-none focus:ring-2 focus:ring-apple-gray-300'
-                    aria-label='Month'
+                    className={`${GLASS_INPUT} w-auto`}
+                    aria-label="Month"
                   />
                 )}
                 {botPeriodMode === "year" && (
                   <input
-                    type='number'
+                    type="number"
                     value={botYear}
                     onChange={(e) => setBotYear(e.target.value)}
-                    min='2020'
-                    max='2100'
-                    className='w-28 px-3 py-2 rounded-xl border border-apple-gray-200 bg-white text-sm text-apple-gray-900 focus:outline-none focus:ring-2 focus:ring-apple-gray-300'
-                    aria-label='Year'
+                    min="2020"
+                    max="2100"
+                    className={`${GLASS_INPUT} w-28`}
+                    aria-label="Year"
                   />
                 )}
-                <select
-                  value={botHostel}
-                  onChange={(e) => setBotHostel(e.target.value)}
-                  className='px-3 py-2 rounded-xl border border-apple-gray-200 bg-white text-sm text-apple-gray-900 focus:outline-none focus:ring-2 focus:ring-apple-gray-300'
-                  aria-label='Hostel'>
-                  <option value='all'>All hostels</option>
+                <select value={botHostel} onChange={(e) => setBotHostel(e.target.value)} className={`${GLASS_INPUT} w-auto`} aria-label="Hostel">
+                  <option value="all">All hostels</option>
                   {knownHostels.map((h) => (
                     <option key={h} value={h}>
                       {h}
@@ -1885,221 +1911,159 @@ export default function AdminTransactionsPage() {
               </div>
 
               {/* Headline cards */}
-              <div className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
-                <div className='bg-white rounded-2xl shadow-sm p-5'>
-                  <p className='text-sm text-apple-gray-500 mb-1'>Live 5% total</p>
-                  <p className='text-3xl font-bold text-green-600'>
-                    {loading ? "—" : `₦${botTotals.fee.toLocaleString()}`}
-                  </p>
-                  <p className='text-xs text-apple-gray-400 mt-1'>
-                    {botPeriodLabel}
-                  </p>
-                </div>
-                <div className='bg-white rounded-2xl shadow-sm p-5'>
-                  <p className='text-sm text-apple-gray-500 mb-1'>
-                    Gross collected
-                  </p>
-                  <p className='text-3xl font-bold text-apple-gray-900'>
-                    {loading ? "—" : `₦${botTotals.gross.toLocaleString()}`}
-                  </p>
-                </div>
-                <div className='bg-white rounded-2xl shadow-sm p-5'>
-                  <p className='text-sm text-apple-gray-500 mb-1'>Transactions</p>
-                  <p className='text-3xl font-bold text-apple-gray-900'>
-                    {loading ? "—" : botTotals.count.toLocaleString()}
-                  </p>
-                </div>
+              <div className="kpi-grid lg:grid-cols-4">
+                <Kpi label="Live 5% total" tone="green" value={loading ? "—" : `₦${botTotals.fee.toLocaleString()}`} note={botPeriodLabel} />
+                <Kpi label="Gross collected" tone="slate" value={loading ? "—" : `₦${botTotals.gross.toLocaleString()}`} />
+                <Kpi label="Transactions" tone="blue" value={loading ? "—" : botTotals.count.toLocaleString()} />
               </div>
 
-              <div className='bg-white rounded-2xl shadow-sm overflow-hidden'>
-                <div className='px-5 py-3 border-b border-apple-gray-100'>
-                  <h3 className='font-semibold text-apple-gray-900'>Payment scenarios</h3>
-                  <p className='text-xs text-apple-gray-500 mt-1'>Partial payments, cancelled checkouts, and DVA/card fallback cases.</p>
+              <section className="glass-panel !p-0">
+                <div className="border-b border-white/70 px-5 py-3">
+                  <h3 className="font-semibold text-slate-900">Payment scenarios</h3>
+                  <p className="mt-1 text-xs text-slate-500">Partial payments, cancelled checkouts, and DVA/card fallback cases.</p>
                 </div>
                 {botScenarios.length === 0 ? (
-                  <p className='p-5 text-sm text-apple-gray-500'>No unresolved bot payment scenarios recorded.</p>
+                  <p className="p-5 text-sm text-slate-500">No unresolved bot payment scenarios recorded.</p>
                 ) : (
-                  <div className='overflow-x-auto'>
-                    <table className='w-full text-sm'>
-                      <thead><tr className='text-left text-xs text-apple-gray-500 border-b border-apple-gray-100'>
-                        <th className='px-5 py-3'>Plan / Hostel</th><th className='px-5 py-3'>Status</th><th className='px-5 py-3 text-right'>Paid / Required</th><th className='px-5 py-3'>Reason</th>
-                      </tr></thead>
-                      <tbody>{botScenarios.slice(0, 100).map((s) => (
-                        <tr key={s.id} className='border-b border-apple-gray-50'>
-                          <td className='px-5 py-3 text-apple-gray-900'>{s.planName}<span className='block text-xs text-apple-gray-500'>{s.hostel}</span></td>
-                          <td className='px-5 py-3'><span className='px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-xs'>{s.status}</span></td>
-                          <td className='px-5 py-3 text-right'>₦{s.amountPaid.toLocaleString()} / ₦{s.amount.toLocaleString()}</td>
-                          <td className='px-5 py-3 text-apple-gray-600'>{s.fallbackReason || (s.amountRemaining ? `Remaining ₦${s.amountRemaining.toLocaleString()}` : "—")}</td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-white/70">
+                          <Th>Plan / Hostel</Th>
+                          <Th>Status</Th>
+                          <Th align="right">Paid / Required</Th>
+                          <Th>Reason</Th>
                         </tr>
-                      ))}</tbody>
+                      </thead>
+                      <tbody className="divide-y divide-white/60">
+                        {botScenarios.slice(0, 100).map((s) => (
+                          <tr key={s.id}>
+                            <Td className="text-slate-900">
+                              {s.planName}
+                              <span className="block text-xs text-slate-500">{s.hostel}</span>
+                            </Td>
+                            <Td>
+                              <span className="warning-chip">{s.status}</span>
+                            </Td>
+                            <Td align="right">
+                              ₦{s.amountPaid.toLocaleString()} / ₦{s.amount.toLocaleString()}
+                            </Td>
+                            <Td>{s.fallbackReason || (s.amountRemaining ? `Remaining ₦${s.amountRemaining.toLocaleString()}` : "—")}</Td>
+                          </tr>
+                        ))}
+                      </tbody>
                     </table>
                   </div>
                 )}
-              </div>
+              </section>
 
               {botFiltered.length === 0 ? (
-                <div className='bg-white rounded-2xl shadow-sm p-10 text-center text-apple-gray-500'>
+                <section className="glass-panel text-center text-sm text-slate-500">
                   No completed bot transactions for this filter yet.
-                </div>
+                </section>
               ) : (
                 <>
                   {/* Summaries: by hostel + by month */}
-                  <div className='grid grid-cols-1 lg:grid-cols-2 gap-4'>
-                    <div className='bg-white rounded-2xl shadow-sm overflow-hidden'>
-                      <div className='px-5 py-3 border-b border-apple-gray-100 font-semibold text-apple-gray-900'>
-                        By hostel
-                      </div>
-                      <div className='overflow-x-auto'>
-                        <table className='w-full text-sm'>
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <section className="glass-panel !p-0">
+                      <div className="border-b border-white/70 px-5 py-3 font-semibold text-slate-900">By hostel</div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
                           <thead>
-                            <tr className='text-left text-xs text-apple-gray-500 border-b border-apple-gray-100'>
-                              <th className='px-5 py-2 font-medium'>Hostel</th>
-                              <th className='px-5 py-2 font-medium text-right'>
-                                Txns
-                              </th>
-                              <th className='px-5 py-2 font-medium text-right'>
-                                Gross
-                              </th>
-                              <th className='px-5 py-2 font-medium text-right'>
-                                5% total
-                              </th>
+                            <tr className="border-b border-white/70">
+                              <Th>Hostel</Th>
+                              <Th align="right">Txns</Th>
+                              <Th align="right">Gross</Th>
+                              <Th align="right">5% total</Th>
                             </tr>
                           </thead>
-                          <tbody>
+                          <tbody className="divide-y divide-white/60">
                             {botByHostel.map(([name, v]) => (
-                              <tr
-                                key={name}
-                                className='border-b border-apple-gray-50 last:border-0'>
-                                <td className='px-5 py-2.5 text-apple-gray-900'>
-                                  {name}
-                                </td>
-                                <td className='px-5 py-2.5 text-right text-apple-gray-700'>
-                                  {v.count}
-                                </td>
-                                <td className='px-5 py-2.5 text-right text-apple-gray-700'>
-                                  ₦{v.gross.toLocaleString()}
-                                </td>
-                                <td className='px-5 py-2.5 text-right font-semibold text-green-600'>
+                              <tr key={name}>
+                                <Td className="text-slate-900">{name}</Td>
+                                <Td align="right">{v.count}</Td>
+                                <Td align="right">₦{v.gross.toLocaleString()}</Td>
+                                <Td align="right" className="font-semibold text-green-600">
                                   ₦{v.fee.toLocaleString()}
-                                </td>
+                                </Td>
                               </tr>
                             ))}
                           </tbody>
                           <tfoot>
-                            <tr className='border-t border-apple-gray-100 font-semibold text-apple-gray-900'>
-                              <td className='px-5 py-2.5'>Total</td>
-                              <td className='px-5 py-2.5 text-right'>
-                                {botTotals.count}
-                              </td>
-                              <td className='px-5 py-2.5 text-right'>
-                                ₦{botTotals.gross.toLocaleString()}
-                              </td>
-                              <td className='px-5 py-2.5 text-right text-green-600'>
+                            <tr className="border-t border-white/70 font-semibold text-slate-900">
+                              <Td>Total</Td>
+                              <Td align="right">{botTotals.count}</Td>
+                              <Td align="right">₦{botTotals.gross.toLocaleString()}</Td>
+                              <Td align="right" className="text-green-600">
                                 ₦{botTotals.fee.toLocaleString()}
-                              </td>
+                              </Td>
                             </tr>
                           </tfoot>
                         </table>
                       </div>
-                    </div>
+                    </section>
 
-                    <div className='bg-white rounded-2xl shadow-sm overflow-hidden'>
-                      <div className='px-5 py-3 border-b border-apple-gray-100 font-semibold text-apple-gray-900'>
-                        By month
-                      </div>
-                      <div className='overflow-x-auto'>
-                        <table className='w-full text-sm'>
+                    <section className="glass-panel !p-0">
+                      <div className="border-b border-white/70 px-5 py-3 font-semibold text-slate-900">By month</div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
                           <thead>
-                            <tr className='text-left text-xs text-apple-gray-500 border-b border-apple-gray-100'>
-                              <th className='px-5 py-2 font-medium'>Month</th>
-                              <th className='px-5 py-2 font-medium text-right'>
-                                Txns
-                              </th>
-                              <th className='px-5 py-2 font-medium text-right'>
-                                Gross
-                              </th>
-                              <th className='px-5 py-2 font-medium text-right'>
-                                5% total
-                              </th>
+                            <tr className="border-b border-white/70">
+                              <Th>Month</Th>
+                              <Th align="right">Txns</Th>
+                              <Th align="right">Gross</Th>
+                              <Th align="right">5% total</Th>
                             </tr>
                           </thead>
-                          <tbody>
+                          <tbody className="divide-y divide-white/60">
                             {botByMonth.map(([month, v]) => (
-                              <tr
-                                key={month}
-                                className='border-b border-apple-gray-50 last:border-0'>
-                                <td className='px-5 py-2.5 text-apple-gray-900'>
-                                  {month}
-                                </td>
-                                <td className='px-5 py-2.5 text-right text-apple-gray-700'>
-                                  {v.count}
-                                </td>
-                                <td className='px-5 py-2.5 text-right text-apple-gray-700'>
-                                  ₦{v.gross.toLocaleString()}
-                                </td>
-                                <td className='px-5 py-2.5 text-right font-semibold text-green-600'>
+                              <tr key={month}>
+                                <Td className="text-slate-900">{month}</Td>
+                                <Td align="right">{v.count}</Td>
+                                <Td align="right">₦{v.gross.toLocaleString()}</Td>
+                                <Td align="right" className="font-semibold text-green-600">
                                   ₦{v.fee.toLocaleString()}
-                                </td>
+                                </Td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
                       </div>
-                    </div>
+                    </section>
                   </div>
 
                   {/* Transaction list */}
-                  <div className='bg-white rounded-2xl shadow-sm overflow-hidden'>
-                    <div className='px-5 py-3 border-b border-apple-gray-100 font-semibold text-apple-gray-900'>
-                      Transactions
-                    </div>
-                    <div className='overflow-x-auto'>
-                      <table className='w-full text-sm'>
+                  <section className="glass-panel !p-0">
+                    <div className="border-b border-white/70 px-5 py-3 font-semibold text-slate-900">Transactions</div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
                         <thead>
-                          <tr className='text-left text-xs text-apple-gray-500 border-b border-apple-gray-100'>
-                            <th className='px-5 py-2 font-medium'>Date</th>
-                            <th className='px-5 py-2 font-medium'>Plan</th>
-                            <th className='px-5 py-2 font-medium'>Hostel</th>
-                            <th className='px-5 py-2 font-medium'>Method</th>
-                            <th className='px-5 py-2 font-medium text-right'>
-                              Gross
-                            </th>
-                            <th className='px-5 py-2 font-medium text-right'>
-                              5% charge
-                            </th>
+                          <tr className="border-b border-white/70">
+                            <Th>Date</Th>
+                            <Th>Plan</Th>
+                            <Th>Hostel</Th>
+                            <Th>Method</Th>
+                            <Th align="right">Gross</Th>
+                            <Th align="right">5% charge</Th>
                           </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y divide-white/60">
                           {botFiltered.map((t) => (
-                            <tr
-                              key={t.id}
-                              className='border-b border-apple-gray-50 last:border-0'>
-                              <td className='px-5 py-2.5 text-apple-gray-700 whitespace-nowrap'>
-                                {t.completedAt
-                                  ? new Date(t.completedAt).toLocaleString()
-                                  : "—"}
-                              </td>
-                              <td className='px-5 py-2.5 text-apple-gray-900'>
-                                {t.planName}
-                              </td>
-                              <td className='px-5 py-2.5 text-apple-gray-700'>
-                                {t.hostel || "—"}
-                              </td>
-                              <td className='px-5 py-2.5 text-apple-gray-500 uppercase text-xs'>
-                                {t.paymentMethod || "—"}
-                              </td>
-                              <td className='px-5 py-2.5 text-right text-apple-gray-700'>
-                                ₦{t.gross.toLocaleString()}
-                              </td>
-                              <td className='px-5 py-2.5 text-right font-semibold text-green-600'>
+                            <tr key={t.id}>
+                              <Td className="whitespace-nowrap">{t.completedAt ? new Date(t.completedAt).toLocaleString() : "—"}</Td>
+                              <Td className="text-slate-900">{t.planName}</Td>
+                              <Td>{t.hostel || "—"}</Td>
+                              <Td className="text-xs uppercase text-slate-500">{t.paymentMethod || "—"}</Td>
+                              <Td align="right">₦{t.gross.toLocaleString()}</Td>
+                              <Td align="right" className="font-semibold text-green-600">
                                 ₦{t.fee.toLocaleString()}
-                              </td>
+                              </Td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
-                  </div>
+                  </section>
                 </>
               )}
             </>
@@ -2109,69 +2073,62 @@ export default function AdminTransactionsPage() {
           {activeTab === "splits" && (
             <>
               {splitsError && (
-                <div className='px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-sm'>
+                <div className="glass-alert">
+                  <AlertTriangle size={18} />
                   {splitsError}
                 </div>
               )}
               {splitSuccess && (
-                <div className='px-4 py-3 bg-green-50 border border-green-200 text-green-700 rounded-2xl text-sm'>
+                <div className="glass-alert border-emerald-200 bg-emerald-50/90 text-emerald-800">
+                  <AlertTriangle size={18} />
                   {splitSuccess}
                 </div>
               )}
 
               {/* Create Split form */}
               {canEdit && !isPartner && (
-                <div className='bg-white rounded-3xl shadow-sm p-6'>
-                  <h2 className='text-lg font-semibold text-apple-gray-900 mb-4 flex items-center gap-2'>
-                    <Plus className='w-5 h-5 text-blue-500' />
-                    Create New Split
-                  </h2>
-                  {/* Deductions info banner — maintenance % editable */}
-                  <div className='flex flex-wrap items-center gap-x-4 gap-y-2 mb-5 px-4 py-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs font-semibold text-amber-900'>
-                    <span className='flex items-center gap-1.5'>
+                <section className="glass-panel">
+                  <div className="panel-heading">
+                    <div>
+                      <p className="eyebrow">SPLITS</p>
+                      <h3 className="flex items-center gap-2">
+                        <Plus size={18} className="text-blue-500" />
+                        Create new split
+                      </h3>
+                    </div>
+                  </div>
+                  {/* Deductions info banner — maintenance % editable. .glass-alert
+                      is already amber/orange by default, a direct fit here. */}
+                  <div className="glass-alert mb-5 flex-wrap gap-x-4 gap-y-2 text-xs font-semibold">
+                    <span className="flex items-center gap-1.5">
                       🔧 Maintenance:
                       <input
-                        type='number'
+                        type="number"
                         min={0}
                         max={50}
                         value={splitMaintenancePct}
-                        onChange={(e) =>
-                          setSplitMaintenancePct(
-                            e.target.value === "" ? "" : Number(e.target.value),
-                          )
-                        }
-                        className='w-14 px-1.5 py-0.5 border border-amber-300 rounded-lg text-center bg-white text-amber-900 font-bold focus:outline-none focus:ring-1 focus:ring-amber-400'
+                        onChange={(e) => setSplitMaintenancePct(e.target.value === "" ? "" : Number(e.target.value))}
+                        className="w-14 rounded-lg border border-amber-300/60 bg-white/70 px-1.5 py-0.5 text-center font-bold text-amber-900 backdrop-blur-xl focus:outline-none focus:ring-1 focus:ring-amber-400"
                       />
                       %
                     </span>
-                    <span className='text-amber-400'>|</span>
+                    <span className="opacity-40">|</span>
                     <span>
-                      💳 Paystack:{" "}
-                      <span className='font-bold'>{paystackPct}%</span>
+                      💳 Paystack: <span className="font-bold">{paystackPct}%</span>
                     </span>
-                    <span className='text-amber-400'>|</span>
-                    <span className='text-green-700'>
+                    <span className="opacity-40">|</span>
+                    <span className="text-emerald-700">
                       ✓ Available:{" "}
-                      <span className='font-bold'>
-                        {typeof splitMaintenancePct === "number"
-                          ? (100 - splitMaintenancePct - paystackPct).toFixed(
-                              1,
-                            )
-                          : "—"}
-                        %
+                      <span className="font-bold">
+                        {typeof splitMaintenancePct === "number" ? (100 - splitMaintenancePct - paystackPct).toFixed(1) : "—"}%
                       </span>
                     </span>
                   </div>
-                  <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
-                    <div className='flex flex-col gap-1.5'>
-                      <label className='text-xs font-semibold text-apple-gray-600 uppercase tracking-wide'>
-                        Hostel
-                      </label>
-                      <select
-                        value={splitHostel}
-                        onChange={(e) => setSplitHostel(e.target.value)}
-                        className='px-3 py-2.5 border border-apple-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-apple-gray-700'>
-                        <option value=''>Select hostel…</option>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Hostel</label>
+                      <select value={splitHostel} onChange={(e) => setSplitHostel(e.target.value)} className={GLASS_INPUT}>
+                        <option value="">Select hostel…</option>
                         {knownHostels.map((h) => (
                           <option key={h} value={h}>
                             {h}
@@ -2179,230 +2136,163 @@ export default function AdminTransactionsPage() {
                         ))}
                       </select>
                     </div>
-                    <div className='flex flex-col gap-1.5'>
-                      <label className='text-xs font-semibold text-apple-gray-600 uppercase tracking-wide'>
-                        Split Type
-                      </label>
-                      <div className='flex rounded-xl overflow-hidden border border-apple-gray-200'>
-                        <button
-                          type='button'
-                          onClick={() => setSplitIsOpen(false)}
-                          className={`flex-1 py-2.5 px-3 text-sm font-semibold transition-all ${
-                            !splitIsOpen
-                              ? "bg-blue-500 text-white"
-                              : "bg-white text-apple-gray-600 hover:bg-apple-gray-50"
-                          }`}>
-                          Fixed Period
-                        </button>
-                        <button
-                          type='button'
-                          onClick={() => setSplitIsOpen(true)}
-                          className={`flex-1 py-2.5 px-3 text-sm font-semibold transition-all ${
-                            splitIsOpen
-                              ? "bg-green-500 text-white"
-                              : "bg-white text-apple-gray-600 hover:bg-apple-gray-50"
-                          }`}>
-                          Ongoing ●
-                        </button>
-                      </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Split Type</label>
+                      <SegToggle
+                        value={splitIsOpen ? "open" : "fixed"}
+                        onChange={(v) => setSplitIsOpen(v === "open")}
+                        options={[
+                          { value: "fixed", label: "Fixed Period" },
+                          { value: "open", label: "Ongoing ●" },
+                        ]}
+                        activeClass={splitIsOpen ? "bg-emerald-500 text-white shadow-sm" : "bg-blue-500 text-white shadow-sm"}
+                      />
                     </div>
-                    <div className='flex flex-col gap-1.5'>
-                      <label className='text-xs font-semibold text-apple-gray-600 uppercase tracking-wide'>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                         {splitIsOpen ? "Count From" : "Period From"}
                       </label>
                       <input
-                        type='date'
+                        type="date"
                         value={splitDateFrom}
                         onChange={(e) => setSplitDateFrom(e.target.value)}
-                        className='px-3 py-2.5 border border-apple-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-apple-gray-700'
+                        className={GLASS_INPUT}
                       />
                     </div>
                     {!splitIsOpen && (
-                      <div className='flex flex-col gap-1.5'>
-                        <label className='text-xs font-semibold text-apple-gray-600 uppercase tracking-wide'>
-                          Period To
-                        </label>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Period To</label>
                         <input
-                          type='date'
+                          type="date"
                           value={splitDateTo}
                           onChange={(e) => setSplitDateTo(e.target.value)}
-                          className='px-3 py-2.5 border border-apple-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-apple-gray-700'
+                          className={GLASS_INPUT}
                         />
                       </div>
                     )}
-                    <div className='flex flex-col gap-1.5'>
-                      <label className='text-xs font-semibold text-apple-gray-600 uppercase tracking-wide'>
-                        Your Share (%)
-                      </label>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Your Share (%)</label>
                       <input
-                        type='number'
+                        type="number"
                         min={0}
                         max={100}
                         value={splitAdminPct}
                         onChange={(e) => {
-                          const v =
-                            e.target.value === "" ? "" : Number(e.target.value);
+                          const v = e.target.value === "" ? "" : Number(e.target.value);
                           setSplitAdminPct(v);
-                          if (typeof v === "number" && v >= 0 && v <= 100)
-                            setSplitPartnerPct(100 - v);
+                          if (typeof v === "number" && v >= 0 && v <= 100) setSplitPartnerPct(100 - v);
                         }}
-                        className='px-3 py-2.5 border border-apple-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-apple-gray-700'
-                        placeholder='50'
+                        className={GLASS_INPUT}
+                        placeholder="50"
                       />
                     </div>
-                    <div className='flex flex-col gap-1.5'>
-                      <label className='text-xs font-semibold text-apple-gray-600 uppercase tracking-wide'>
-                        Partner&apos;s Share (%)
-                      </label>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Partner&apos;s Share (%)</label>
                       <input
-                        type='number'
+                        type="number"
                         min={0}
                         max={100}
                         value={splitPartnerPct}
                         onChange={(e) => {
-                          const v =
-                            e.target.value === "" ? "" : Number(e.target.value);
+                          const v = e.target.value === "" ? "" : Number(e.target.value);
                           setSplitPartnerPct(v);
-                          if (typeof v === "number" && v >= 0 && v <= 100)
-                            setSplitAdminPct(100 - v);
+                          if (typeof v === "number" && v >= 0 && v <= 100) setSplitAdminPct(100 - v);
                         }}
-                        className='px-3 py-2.5 border border-apple-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-apple-gray-700'
-                        placeholder='50'
+                        className={GLASS_INPUT}
+                        placeholder="50"
                       />
                     </div>
-                    <div className='flex flex-col gap-1.5'>
-                      <label className='text-xs font-semibold text-apple-gray-600 uppercase tracking-wide'>
-                        Notes (optional)
-                      </label>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Notes (optional)</label>
                       <input
-                        type='text'
+                        type="text"
                         value={splitNotes}
                         onChange={(e) => setSplitNotes(e.target.value)}
-                        placeholder='e.g. March 2026 split'
-                        className='px-3 py-2.5 border border-apple-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-apple-gray-800'
+                        placeholder="e.g. March 2026 split"
+                        className={GLASS_INPUT}
                       />
                     </div>
-                    <div className='flex flex-col gap-1.5'>
-                      <label className='text-xs font-semibold text-apple-gray-600 uppercase tracking-wide'>
-                        Your Email (reports)
-                      </label>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Your Email (reports)</label>
                       <input
-                        type='email'
+                        type="email"
                         value={splitAdminEmail}
                         onChange={(e) => setSplitAdminEmail(e.target.value)}
-                        placeholder='your@email.com'
-                        className='px-3 py-2.5 border border-apple-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-apple-gray-800'
+                        placeholder="your@email.com"
+                        className={GLASS_INPUT}
                       />
                     </div>
-                    <div className='flex flex-col gap-1.5'>
-                      <label className='text-xs font-semibold text-apple-gray-600 uppercase tracking-wide'>
-                        Partner Email (reports)
-                      </label>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Partner Email (reports)</label>
                       <input
-                        type='email'
+                        type="email"
                         value={splitPartnerEmail}
                         onChange={(e) => setSplitPartnerEmail(e.target.value)}
-                        placeholder='partner@email.com'
-                        className='px-3 py-2.5 border border-apple-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-apple-gray-800'
+                        placeholder="partner@email.com"
+                        className={GLASS_INPUT}
                       />
                     </div>
-                    <div className='flex flex-col gap-1.5'>
-                      <label className='text-xs font-semibold text-apple-gray-600 uppercase tracking-wide'>
-                        Monthly Report Email
-                      </label>
-                      <label className='flex items-center gap-3 cursor-pointer px-3 py-2.5 border border-apple-gray-200 rounded-xl bg-white hover:bg-apple-gray-50 transition-colors'>
-                        <div className='relative shrink-0'>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Monthly Report Email</label>
+                      <label className={`flex cursor-pointer items-center gap-3 ${GLASS_INPUT} hover:bg-white/90`}>
+                        <div className="relative shrink-0">
                           <input
-                            type='checkbox'
+                            type="checkbox"
                             checked={splitSendMonthlyEmail}
-                            onChange={(e) =>
-                              setSplitSendMonthlyEmail(e.target.checked)
-                            }
-                            className='sr-only'
+                            onChange={(e) => setSplitSendMonthlyEmail(e.target.checked)}
+                            className="sr-only"
                           />
+                          <div className={`h-6 w-10 rounded-full transition-colors ${splitSendMonthlyEmail ? "bg-blue-500" : "bg-slate-300"}`} />
                           <div
-                            className={`w-10 h-6 rounded-full transition-colors ${splitSendMonthlyEmail ? "bg-blue-500" : "bg-apple-gray-300"}`}
-                          />
-                          <div
-                            className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${splitSendMonthlyEmail ? "left-5" : "left-1"}`}
+                            className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-all ${splitSendMonthlyEmail ? "left-5" : "left-1"}`}
                           />
                         </div>
-                        <span className='text-sm text-apple-gray-700'>
-                          {splitSendMonthlyEmail
-                            ? "Enabled — send monthly"
-                            : "Disabled"}
-                        </span>
+                        <span className="text-sm text-slate-700">{splitSendMonthlyEmail ? "Enabled — send monthly" : "Disabled"}</span>
                       </label>
                     </div>
                   </div>
 
                   {/* Live preview */}
                   {splitPreview && (
-                    <div className='mt-5 p-4 bg-apple-gray-50 rounded-2xl'>
+                    <div className="mt-5 rounded-2xl bg-white/60 p-4">
                       {splitPreview.count === 0 ? (
-                        <p className='text-sm text-apple-gray-500 text-center py-2'>
-                          No transactions found for this hostel and period.
-                        </p>
+                        <p className="py-2 text-center text-sm text-slate-500">No transactions found for this hostel and period.</p>
                       ) : (
                         <>
                           {/* Deduction pipeline chips */}
-                          <div className='flex flex-wrap items-center gap-2 mb-4 text-xs'>
-                            <span className='px-2.5 py-1 rounded-full bg-apple-gray-200 text-apple-gray-700 font-semibold'>
-                              Gross ₦
-                              {splitPreview.totalRevenue.toLocaleString()}
+                          <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
+                            <span className="glass-slate rounded-full px-2.5 py-1 font-semibold">
+                              Gross ₦{splitPreview.totalRevenue.toLocaleString()}
                             </span>
-                            <span className='text-apple-gray-400'>→</span>
-                            <span className='px-2.5 py-1 rounded-full bg-red-100 text-red-600 font-semibold'>
-                              −₦
-                              {splitPreview.maintenanceDeduction.toLocaleString()}{" "}
-                              Maint.
+                            <span className="text-slate-400">→</span>
+                            <span className="glass-red rounded-full px-2.5 py-1 font-semibold">
+                              −₦{splitPreview.maintenanceDeduction.toLocaleString()} Maint.
                             </span>
-                            <span className='text-apple-gray-400'>→</span>
-                            <span className='px-2.5 py-1 rounded-full bg-orange-100 text-orange-600 font-semibold'>
-                              −₦
-                              {splitPreview.paystackDeduction.toLocaleString()}{" "}
-                              Paystack
+                            <span className="text-slate-400">→</span>
+                            <span className="glass-orange rounded-full px-2.5 py-1 font-semibold">
+                              −₦{splitPreview.paystackDeduction.toLocaleString()} Paystack
                             </span>
-                            <span className='text-apple-gray-400'>→</span>
-                            <span className='px-2.5 py-1 rounded-full bg-green-100 text-green-700 font-bold'>
-                              ✓ ₦
-                              {splitPreview.splittableRevenue.toLocaleString()}{" "}
-                              Splittable
+                            <span className="text-slate-400">→</span>
+                            <span className="glass-green rounded-full px-2.5 py-1 font-bold">
+                              ✓ ₦{splitPreview.splittableRevenue.toLocaleString()} Splittable
                             </span>
                           </div>
-                          <div className='grid grid-cols-2 sm:grid-cols-4 gap-4'>
+                          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                             <div>
-                              <p className='text-xs text-apple-gray-500'>
-                                Transactions
-                              </p>
-                              <p className='text-2xl font-bold text-apple-gray-900'>
-                                {splitPreview.count}
-                              </p>
+                              <p className="text-xs text-slate-500">Transactions</p>
+                              <p className="text-2xl font-bold text-slate-900">{splitPreview.count}</p>
                             </div>
                             <div>
-                              <p className='text-xs text-apple-gray-500'>
-                                Splittable Revenue
-                              </p>
-                              <p className='text-2xl font-bold text-green-700'>
-                                ₦
-                                {splitPreview.splittableRevenue.toLocaleString()}
-                              </p>
+                              <p className="text-xs text-slate-500">Splittable Revenue</p>
+                              <p className="text-2xl font-bold text-emerald-700">₦{splitPreview.splittableRevenue.toLocaleString()}</p>
                             </div>
                             <div>
-                              <p className='text-xs text-apple-gray-500'>
-                                Your Share ({splitAdminPct}%)
-                              </p>
-                              <p className='text-2xl font-bold text-blue-600'>
-                                ₦{splitPreview.adminShare.toLocaleString()}
-                              </p>
+                              <p className="text-xs text-slate-500">Your Share ({splitAdminPct}%)</p>
+                              <p className="text-2xl font-bold text-blue-600">₦{splitPreview.adminShare.toLocaleString()}</p>
                             </div>
                             <div>
-                              <p className='text-xs text-apple-gray-500'>
-                                Partner Share ({splitPartnerPct}%)
-                              </p>
-                              <p className='text-2xl font-bold text-purple-600'>
-                                ₦{splitPreview.partnerShare.toLocaleString()}
-                              </p>
+                              <p className="text-xs text-slate-500">Partner Share ({splitPartnerPct}%)</p>
+                              <p className="text-2xl font-bold text-purple-600">₦{splitPreview.partnerShare.toLocaleString()}</p>
                             </div>
                           </div>
                         </>
@@ -2410,39 +2300,32 @@ export default function AdminTransactionsPage() {
                     </div>
                   )}
 
-                  <div className='mt-5 flex justify-end'>
+                  <div className="mt-5 flex justify-end">
                     <button
                       onClick={handleCreateSplit}
-                      disabled={
-                        creatingSplit ||
-                        !splitHostel ||
-                        !splitDateFrom ||
-                        (!splitIsOpen && !splitDateTo)
-                      }
-                      className='flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white text-sm font-semibold rounded-xl shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all'>
-                      <Scissors className='w-4 h-4' />
+                      disabled={creatingSplit || !splitHostel || !splitDateFrom || (!splitIsOpen && !splitDateTo)}
+                      className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50">
+                      <Scissors size={16} />
                       {creatingSplit ? "Saving…" : "Save Split"}
                     </button>
                   </div>
-                </div>
+                </section>
               )}
 
               {/* Splits history */}
-              <div className='bg-white rounded-3xl shadow-sm p-6'>
-                <div className='flex flex-col sm:flex-row sm:items-center gap-4 mb-5'>
-                  <h2 className='text-lg font-semibold text-apple-gray-900 flex items-center gap-2'>
-                    <BarChart3 className='w-5 h-5 text-blue-500' />
+              <section className="glass-panel">
+                <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center">
+                  <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+                    <BarChart3 size={18} className="text-blue-500" />
                     Splits History
-                    <span className='ml-1 text-sm font-normal text-apple-gray-500'>
-                      ({filteredSplits.length})
-                    </span>
-                  </h2>
-                  <div className='flex flex-wrap gap-3 sm:ml-auto'>
+                    <span className="ml-1 text-sm font-normal text-slate-500">({filteredSplits.length})</span>
+                  </h3>
+                  <div className="flex flex-wrap gap-3 sm:ml-auto">
                     <select
                       value={splitFilterHostel}
                       onChange={(e) => setSplitFilterHostel(e.target.value)}
-                      className='px-3 py-2 border border-apple-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-apple-gray-700'>
-                      <option value='all'>All Hostels</option>
+                      className={`${GLASS_INPUT} w-auto`}>
+                      <option value="all">All Hostels</option>
                       {knownHostels.map((h) => (
                         <option key={h} value={h}>
                           {h}
@@ -2458,17 +2341,14 @@ export default function AdminTransactionsPage() {
                           setSplitFilterTo("");
                         }
                       }}
-                      className='px-3 py-2 border border-apple-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-apple-gray-700'>
-                      <option value=''>All Months</option>
+                      className={`${GLASS_INPUT} w-auto`}>
+                      <option value="">All Months</option>
                       {Array.from({ length: 18 }, (_, i) => {
                         const d = new Date();
                         d.setDate(1);
                         d.setMonth(d.getMonth() - i);
                         const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-                        const label = d.toLocaleDateString("en-NG", {
-                          month: "long",
-                          year: "numeric",
-                        });
+                        const label = d.toLocaleDateString("en-NG", { month: "long", year: "numeric" });
                         return (
                           <option key={val} value={val}>
                             {label}
@@ -2479,18 +2359,18 @@ export default function AdminTransactionsPage() {
                     {!splitFilterMonth && (
                       <>
                         <input
-                          type='date'
+                          type="date"
                           value={splitFilterFrom}
                           onChange={(e) => setSplitFilterFrom(e.target.value)}
-                          title='Created from'
-                          className='px-3 py-2 border border-apple-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-apple-gray-700'
+                          title="Created from"
+                          className={`${GLASS_INPUT} w-auto`}
                         />
                         <input
-                          type='date'
+                          type="date"
                           value={splitFilterTo}
                           onChange={(e) => setSplitFilterTo(e.target.value)}
-                          title='Created to'
-                          className='px-3 py-2 border border-apple-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-apple-gray-700'
+                          title="Created to"
+                          className={`${GLASS_INPUT} w-auto`}
                         />
                       </>
                     )}
@@ -2498,8 +2378,8 @@ export default function AdminTransactionsPage() {
                       <button
                         onClick={exportSplitsToExcel}
                         disabled={filteredSplits.length === 0}
-                        className='flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white text-sm font-semibold rounded-xl shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all'>
-                        <Download className='w-4 h-4' />
+                        className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50">
+                        <Download size={16} />
                         Export Excel
                       </button>
                     )}
@@ -2507,147 +2387,73 @@ export default function AdminTransactionsPage() {
                 </div>
 
                 {splitsLoading ? (
-                  <div className='py-12 text-center text-apple-gray-400'>
-                    Loading splits…
-                  </div>
+                  <div className="py-12 text-center text-sm text-slate-400">Loading splits…</div>
                 ) : filteredSplits.length === 0 ? (
-                  <div className='py-12 text-center text-apple-gray-400'>
-                    {isPartner
-                      ? "No splits yet."
-                      : "No splits yet. Create one above."}
+                  <div className="py-12 text-center text-sm text-slate-400">
+                    {isPartner ? "No splits yet." : "No splits yet. Create one above."}
                   </div>
                 ) : (
                   <>
                     {/* Totals summary */}
                     {(() => {
                       const activeMonthLabel = splitFilterMonth
-                        ? new Date(splitFilterMonth + "-01").toLocaleDateString(
-                            "en-NG",
-                            { month: "long", year: "numeric" },
-                          )
+                        ? new Date(splitFilterMonth + "-01").toLocaleDateString("en-NG", { month: "long", year: "numeric" })
                         : "";
-                      const totals = filteredSplits.reduce(
-                        (acc, s) => {
-                          const txns = splitFilterMonth
-                            ? getSplitTransactions(s, splitFilterMonth)
-                            : getSplitTransactions(s);
-                          const gr = txns.reduce((a, t) => a + t.price, 0);
-                          const mPct = s.maintenancePct ?? maintenancePct;
-                          const splittable = Math.max(
-                            0,
-                            gr -
-                              Math.round((gr * mPct) / 100) -
-                              Math.round((gr * paystackPct) / 100),
-                          );
-                          return {
-                            revenue: acc.revenue + gr,
-                            admin:
-                              acc.admin +
-                              Math.round((splittable * s.adminPercent) / 100),
-                            partner:
-                              acc.partner +
-                              Math.round((splittable * s.partnerPercent) / 100),
-                          };
-                        },
-                        { revenue: 0, admin: 0, partner: 0 },
-                      );
                       return (
-                        <div
-                          className={`grid grid-cols-2 gap-3 mb-5 ${isPartner ? "sm:grid-cols-2" : "sm:grid-cols-4"}`}>
-                          <div className='bg-apple-gray-50 rounded-2xl px-4 py-3'>
-                            <p className='text-xs text-apple-gray-500'>
-                              Splits Shown
-                            </p>
-                            <p className='text-xl font-bold text-apple-gray-900'>
-                              {filteredSplits.length}
-                            </p>
+                        <div className={`mb-5 grid grid-cols-2 gap-3 ${isPartner ? "sm:grid-cols-2" : "sm:grid-cols-4"}`}>
+                          <div className="stat">
+                            <p className="stat-label">Splits Shown</p>
+                            <p className="stat-value">{filteredSplits.length}</p>
                           </div>
                           {!isPartner && (
-                            <div className='bg-apple-gray-50 rounded-2xl px-4 py-3'>
-                              <p className='text-xs text-apple-gray-500'>
-                                {splitFilterMonth
-                                  ? `Revenue — ${activeMonthLabel}`
-                                  : "Total Revenue"}
-                              </p>
-                              <p className='text-xl font-bold text-apple-gray-900'>
-                                ₦{totals.revenue.toLocaleString()}
-                              </p>
+                            <div className="stat">
+                              <p className="stat-label">{splitFilterMonth ? `Revenue — ${activeMonthLabel}` : "Total Revenue"}</p>
+                              <p className="stat-value">₦{splitsTotals.revenue.toLocaleString()}</p>
                             </div>
                           )}
                           {!isPartner && (
-                            <div className='bg-blue-50 rounded-2xl px-4 py-3'>
-                              <p className='text-xs text-blue-600'>
-                                {splitFilterMonth
-                                  ? `Your Share — ${activeMonthLabel}`
-                                  : "Your Total"}
+                            <div className="rounded-2xl bg-blue-50/70 px-3 py-3">
+                              <p className="text-[11px] font-medium text-blue-600">
+                                {splitFilterMonth ? `Your Share — ${activeMonthLabel}` : "Your Total"}
                               </p>
-                              <p className='text-xl font-bold text-blue-700'>
-                                ₦{totals.admin.toLocaleString()}
-                              </p>
+                              <p className="mt-1 text-lg font-semibold tracking-tight text-blue-700">₦{splitsTotals.admin.toLocaleString()}</p>
                             </div>
                           )}
-                          <div className='bg-purple-50 rounded-2xl px-4 py-3'>
-                            <p className='text-xs text-purple-600'>
-                              {splitFilterMonth
-                                ? `Partner Share — ${activeMonthLabel}`
-                                : "Partner Total"}
+                          <div className="rounded-2xl bg-purple-50/70 px-3 py-3">
+                            <p className="text-[11px] font-medium text-purple-600">
+                              {splitFilterMonth ? `Partner Share — ${activeMonthLabel}` : "Partner Total"}
                             </p>
-                            <p className='text-xl font-bold text-purple-700'>
-                              ₦{totals.partner.toLocaleString()}
-                            </p>
+                            <p className="mt-1 text-lg font-semibold tracking-tight text-purple-700">₦{splitsTotals.partner.toLocaleString()}</p>
                           </div>
                         </div>
                       );
                     })()}
 
-                    <div className='overflow-x-auto'>
-                      <table className='w-full'>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
                         <thead>
-                          <tr className='border-b border-apple-gray-100 bg-apple-gray-50'>
-                            <th className='px-5 py-3 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
-                              Created
-                            </th>
-                            <th className='px-5 py-3 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
-                              Hostel
-                            </th>
-                            <th className='px-5 py-3 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
-                              Period
-                            </th>
-                            <th className='px-5 py-3 text-center text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
-                              Txns
-                            </th>
+                          <tr className="border-b border-white/70">
+                            <Th>Created</Th>
+                            <Th>Hostel</Th>
+                            <Th>Period</Th>
+                            <Th align="center">Txns</Th>
                             {!isPartner && (
-                              <th className='px-5 py-3 text-right text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
+                              <Th align="right">
                                 Revenue
                                 {splitFilterMonth && (
-                                  <span className='ml-1 normal-case font-normal text-blue-500'>
-                                    (
-                                    {new Date(
-                                      splitFilterMonth + "-01",
-                                    ).toLocaleDateString("en-NG", {
-                                      month: "short",
-                                      year: "numeric",
-                                    })}
-                                    )
+                                  <span className="ml-1 normal-case font-normal text-blue-500">
+                                    ({new Date(splitFilterMonth + "-01").toLocaleDateString("en-NG", { month: "short", year: "numeric" })})
                                   </span>
                                 )}
-                              </th>
+                              </Th>
                             )}
-                            {!isPartner && (
-                              <th className='px-5 py-3 text-right text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
-                                Your Share
-                              </th>
-                            )}
-                            <th className='px-5 py-3 text-right text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
-                              Partner Share
-                            </th>
-                            <th className='px-5 py-3 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
-                              Notes
-                            </th>
-                            <th className='px-5 py-3' />
+                            {!isPartner && <Th align="right">Your Share</Th>}
+                            <Th align="right">Partner Share</Th>
+                            <Th>Notes</Th>
+                            <th className="px-5 py-3" />
                           </tr>
                         </thead>
-                        <tbody className='divide-y divide-apple-gray-50'>
+                        <tbody className="divide-y divide-white/60">
                           {filteredSplits.map((s) => {
                             const allSplitTxns = getSplitTransactions(s);
                             // Default expanded panel month to the active list filter month (unless manually overridden)
@@ -2709,181 +2515,111 @@ export default function AdminTransactionsPage() {
                                 : `${s.dateFrom} → ${s.dateTo}`;
                             return (
                               <React.Fragment key={s.id}>
-                                <tr
-                                  className={`transition-colors ${isExpanded ? "bg-blue-50" : "hover:bg-apple-gray-50"}`}>
-                                  <td className='px-5 py-3.5 text-sm text-apple-gray-600 whitespace-nowrap'>
-                                    {s.createdAt.toLocaleDateString("en-NG", {
-                                      day: "2-digit",
-                                      month: "short",
-                                      year: "numeric",
-                                    })}
-                                  </td>
-                                  <td className='px-5 py-3.5 text-sm font-medium text-apple-gray-900'>
-                                    {s.hostel}
-                                  </td>
-                                  <td className='px-5 py-3.5 text-xs text-apple-gray-500 whitespace-nowrap'>
+                                <tr className={`transition-colors ${isExpanded ? "bg-blue-50/60 backdrop-blur-sm" : "hover:bg-white/70"}`}>
+                                  <Td className="whitespace-nowrap">
+                                    {s.createdAt.toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" })}
+                                  </Td>
+                                  <Td className="font-medium text-slate-900">{s.hostel}</Td>
+                                  <Td className="whitespace-nowrap text-xs">
                                     {s.isOpen ? (
-                                      <span className='flex items-center gap-1.5'>
+                                      <span className="flex items-center gap-1.5">
                                         From {s.dateFrom}
-                                        <span className='px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold'>
-                                          ● Live
-                                        </span>
+                                        <span className="status-chip">● Live</span>
                                       </span>
                                     ) : (
                                       <>
                                         {s.dateFrom} → {s.dateTo}
                                       </>
                                     )}
-                                  </td>
-                                  <td className='px-5 py-3.5 text-sm text-apple-gray-700 text-center'>
-                                    {rowTxns.length}
-                                  </td>
+                                  </Td>
+                                  <Td align="center">{rowTxns.length}</Td>
                                   {!isPartner && (
-                                    <td className='px-5 py-3.5 text-sm font-semibold text-apple-gray-900 text-right whitespace-nowrap'>
+                                    <Td align="right" className="whitespace-nowrap font-semibold text-slate-900">
                                       ₦{grossRev.toLocaleString()}
-                                    </td>
+                                    </Td>
                                   )}
                                   {!isPartner && (
-                                    <td className='px-5 py-3.5 text-right whitespace-nowrap'>
-                                      <span className='text-sm font-semibold text-blue-600'>
-                                        ₦{adminShr.toLocaleString()}
-                                      </span>
-                                      <span className='text-xs text-apple-gray-400 ml-1'>
-                                        ({s.adminPercent}%)
-                                      </span>
-                                    </td>
+                                    <Td align="right" className="whitespace-nowrap">
+                                      <span className="text-sm font-semibold text-blue-600">₦{adminShr.toLocaleString()}</span>
+                                      <span className="ml-1 text-xs text-slate-400">({s.adminPercent}%)</span>
+                                    </Td>
                                   )}
-                                  <td className='px-5 py-3.5 text-right whitespace-nowrap'>
-                                    <span className='text-sm font-semibold text-purple-600'>
-                                      ₦{partnerShr.toLocaleString()}
-                                    </span>
+                                  <Td align="right" className="whitespace-nowrap">
+                                    <span className="text-sm font-semibold text-purple-600">₦{partnerShr.toLocaleString()}</span>
+                                    {!isPartner && <span className="ml-1 text-xs text-slate-400">({s.partnerPercent}%)</span>}
+                                  </Td>
+                                  <Td className="max-w-[140px] truncate">{s.notes || <span className="text-slate-300">—</span>}</Td>
+                                  <Td>
                                     {!isPartner && (
-                                      <span className='text-xs text-apple-gray-400 ml-1'>
-                                        ({s.partnerPercent}%)
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td className='px-5 py-3.5 text-sm text-apple-gray-500 max-w-[140px] truncate'>
-                                    {s.notes || (
-                                      <span className='text-apple-gray-300'>
-                                        —
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td className='px-5 py-3.5'>
-                                    {!isPartner && (
-                                      <div className='flex items-center gap-1'>
+                                      <div className="flex items-center gap-1">
                                         <button
-                                          onClick={() =>
-                                            setExpandedSplitId(
-                                              isExpanded ? null : s.id,
-                                            )
-                                          }
-                                          className={`p-1.5 rounded-lg transition-colors ${
-                                            isExpanded
-                                              ? "text-blue-500 bg-blue-100"
-                                              : "text-apple-gray-400 hover:text-blue-500 hover:bg-blue-50"
+                                          onClick={() => setExpandedSplitId(isExpanded ? null : s.id)}
+                                          className={`rounded-lg p-1.5 transition-colors ${
+                                            isExpanded ? "bg-blue-100 text-blue-500" : "text-slate-400 hover:bg-blue-50 hover:text-blue-500"
                                           }`}
-                                          title={
-                                            isExpanded
-                                              ? "Hide transaction log"
-                                              : "View transaction log"
-                                          }>
-                                          {isExpanded ? (
-                                            <ChevronUp className='w-4 h-4' />
-                                          ) : (
-                                            <ChevronDown className='w-4 h-4' />
-                                          )}
+                                          title={isExpanded ? "Hide transaction log" : "View transaction log"}>
+                                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                         </button>
                                         {canEdit && (
                                           <button
                                             onClick={() =>
-                                              handleDeleteSplit(s.id)
+                                              setConfirmModal({
+                                                isOpen: true,
+                                                title: "Delete this split?",
+                                                message: `This permanently deletes the ${s.hostel} split (${periodLabel}). This can't be undone.`,
+                                                onConfirm: () => handleDeleteSplit(s.id),
+                                              })
                                             }
                                             disabled={deletingSplit === s.id}
-                                            className='p-1.5 rounded-lg text-apple-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-40 transition-colors'
-                                            title='Delete split'>
-                                            <Trash2 className='w-4 h-4' />
+                                            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40"
+                                            title="Delete split">
+                                            <Trash2 size={16} />
                                           </button>
                                         )}
                                       </div>
                                     )}
-                                  </td>
+                                  </Td>
                                 </tr>
                                 {isExpanded && (
                                   <tr>
-                                    <td
-                                      colSpan={9}
-                                      className='px-0 py-0 border-b border-blue-100'>
-                                      <div className='bg-blue-50 px-5 py-4 space-y-4'>
-                                        {/* Deductions summary bar */}
-                                        <div className='flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs px-4 py-3 bg-white rounded-2xl border border-apple-gray-200 shadow-sm'>
-                                          <span className='font-semibold text-apple-gray-600'>
-                                            Gross: ₦{grossRev.toLocaleString()}
+                                    <td colSpan={9} className="border-b border-blue-100 px-0 py-0">
+                                      <div className="space-y-4 bg-blue-50/60 px-5 py-4 backdrop-blur-sm">
+                                        {/* Deductions summary bar — same pipeline-chip idiom as the create-form preview */}
+                                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                                          <span className="glass-slate rounded-full px-2.5 py-1 font-semibold">
+                                            Gross ₦{grossRev.toLocaleString()}
                                           </span>
-                                          <span className='text-apple-gray-400'>
-                                            |
+                                          <span className="text-slate-400">→</span>
+                                          <span className="glass-red rounded-full px-2.5 py-1 font-semibold">
+                                            −₦{mainDed.toLocaleString()} Maint. {sMaintPct}%
                                           </span>
-                                          <span className='font-semibold text-red-500'>
-                                            −Maint. {sMaintPct}%: −₦
-                                            {mainDed.toLocaleString()}
+                                          <span className="text-slate-400">→</span>
+                                          <span className="glass-orange rounded-full px-2.5 py-1 font-semibold">
+                                            −₦{paystackDed.toLocaleString()} Paystack {paystackPct}%
                                           </span>
-                                          <span className='text-apple-gray-400'>
-                                            |
-                                          </span>
-                                          <span className='font-semibold text-orange-500'>
-                                            −Paystack {paystackPct}%: −₦
-                                            {paystackDed.toLocaleString()}
-                                          </span>
-                                          <span className='text-apple-gray-400'>
-                                            |
-                                          </span>
-                                          <span className='font-bold text-green-700'>
-                                            =Splittable{" "}
-                                            {splittablePctRow.toFixed(1)}%: ₦
-                                            {splittableRev.toLocaleString()}
+                                          <span className="text-slate-400">→</span>
+                                          <span className="glass-green rounded-full px-2.5 py-1 font-bold">
+                                            ✓ ₦{splittableRev.toLocaleString()} Splittable {splittablePctRow.toFixed(1)}%
                                           </span>
                                         </div>
                                         {/* Month filter + Export */}
-                                        <div className='flex flex-wrap items-center gap-3'>
+                                        <div className="flex flex-wrap items-center gap-3">
                                           <select
-                                            value={
-                                              expandedSplitMonths[s.id] ?? ""
-                                            }
-                                            onChange={(e) =>
-                                              setExpandedSplitMonths(
-                                                (prev) => ({
-                                                  ...prev,
-                                                  [s.id]: e.target.value,
-                                                }),
-                                              )
-                                            }
-                                            className='px-3 py-2 bg-white border border-apple-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-apple-gray-700'>
-                                            <option value=''>
-                                              All time ({allSplitTxns.length}{" "}
-                                              txns)
-                                            </option>
+                                            value={expandedSplitMonths[s.id] ?? ""}
+                                            onChange={(e) => setExpandedSplitMonths((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                                            className={`${GLASS_INPUT} w-auto`}>
+                                            <option value="">All time ({allSplitTxns.length} txns)</option>
                                             {getMonthOptions(s).map((opt) => (
-                                              <option
-                                                key={opt.value}
-                                                value={opt.value}>
+                                              <option key={opt.value} value={opt.value}>
                                                 {opt.label}
                                               </option>
                                             ))}
                                           </select>
                                           <button
-                                            onClick={() =>
-                                              exportSplitLog(
-                                                s,
-                                                displayTxns,
-                                                activeMonth
-                                                  ? activeMonthLabel
-                                                  : undefined,
-                                              )
-                                            }
+                                            onClick={() => exportSplitLog(s, displayTxns, activeMonth ? activeMonthLabel : undefined)}
                                             disabled={displayTxns.length === 0}
-                                            className='flex items-center gap-1.5 px-3 py-2 bg-white border border-apple-gray-200 text-apple-gray-700 text-xs font-semibold rounded-xl hover:bg-apple-gray-50 disabled:opacity-50 transition-colors shadow-sm'>
-                                            <Download className='w-3.5 h-3.5' />
+                                            className="flex items-center gap-1.5 rounded-xl border border-white/80 bg-white/70 px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur-xl transition-colors hover:bg-white disabled:opacity-50">
+                                            <Download size={14} />
                                             Export Log
                                           </button>
                                         </div>
@@ -2913,310 +2649,154 @@ export default function AdminTransactionsPage() {
                                                 100,
                                             );
                                             return (
-                                              <div className='grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 px-1'>
-                                                <div className='bg-white rounded-2xl px-3 py-2.5 border border-apple-gray-200 shadow-sm'>
-                                                  <p className='text-xs text-apple-gray-400 mb-0.5'>
-                                                    Transactions
-                                                  </p>
-                                                  <p className='text-lg font-bold text-apple-gray-900'>
-                                                    {displayTxns.length}
-                                                  </p>
+                                              <div className="grid grid-cols-2 gap-3 px-1 sm:grid-cols-3 lg:grid-cols-6">
+                                                <div className="rounded-2xl border border-white/70 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur-xl">
+                                                  <p className="mb-0.5 text-xs text-slate-400">Transactions</p>
+                                                  <p className="text-lg font-bold text-slate-900">{displayTxns.length}</p>
                                                 </div>
-                                                <div className='bg-white rounded-2xl px-3 py-2.5 border border-apple-gray-200 shadow-sm'>
-                                                  <p className='text-xs text-apple-gray-400 mb-0.5'>
-                                                    Gross Revenue
-                                                  </p>
-                                                  <p className='text-lg font-bold text-apple-gray-900'>
-                                                    ₦{mGross.toLocaleString()}
-                                                  </p>
+                                                <div className="rounded-2xl border border-white/70 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur-xl">
+                                                  <p className="mb-0.5 text-xs text-slate-400">Gross Revenue</p>
+                                                  <p className="text-lg font-bold text-slate-900">₦{mGross.toLocaleString()}</p>
                                                 </div>
-                                                <div className='bg-red-50 rounded-2xl px-3 py-2.5 border border-red-100 shadow-sm'>
-                                                  <p className='text-xs text-red-400 mb-0.5'>
-                                                    −Maint. {sMaintPct}%
-                                                  </p>
-                                                  <p className='text-lg font-bold text-red-600'>
-                                                    −₦
-                                                    {mMainDed.toLocaleString()}
-                                                  </p>
+                                                <div className="rounded-2xl border border-white/70 bg-red-50/70 px-3 py-2.5 shadow-sm backdrop-blur-xl">
+                                                  <p className="mb-0.5 text-xs text-red-400">−Maint. {sMaintPct}%</p>
+                                                  <p className="text-lg font-bold text-red-600">−₦{mMainDed.toLocaleString()}</p>
                                                 </div>
-                                                <div className='bg-orange-50 rounded-2xl px-3 py-2.5 border border-orange-100 shadow-sm'>
-                                                  <p className='text-xs text-orange-400 mb-0.5'>
-                                                    −Paystack {paystackPct}%
-                                                  </p>
-                                                  <p className='text-lg font-bold text-orange-600'>
-                                                    −₦{mPayDed.toLocaleString()}
-                                                  </p>
+                                                <div className="rounded-2xl border border-white/70 bg-orange-50/70 px-3 py-2.5 shadow-sm backdrop-blur-xl">
+                                                  <p className="mb-0.5 text-xs text-orange-400">−Paystack {paystackPct}%</p>
+                                                  <p className="text-lg font-bold text-orange-600">−₦{mPayDed.toLocaleString()}</p>
                                                 </div>
-                                                <div className='bg-blue-50 rounded-2xl px-3 py-2.5 border border-blue-200 shadow-sm'>
-                                                  <p className='text-xs text-blue-500 mb-0.5'>
-                                                    Your Share ({s.adminPercent}
-                                                    %)
-                                                  </p>
-                                                  <p className='text-lg font-bold text-blue-700'>
-                                                    ₦
-                                                    {mAdminShr.toLocaleString()}
-                                                  </p>
+                                                <div className="rounded-2xl border border-white/70 bg-blue-50/70 px-3 py-2.5 shadow-sm backdrop-blur-xl">
+                                                  <p className="mb-0.5 text-xs text-blue-500">Your Share ({s.adminPercent}%)</p>
+                                                  <p className="text-lg font-bold text-blue-700">₦{mAdminShr.toLocaleString()}</p>
                                                 </div>
-                                                <div className='bg-purple-50 rounded-2xl px-3 py-2.5 border border-purple-200 shadow-sm'>
-                                                  <p className='text-xs text-purple-500 mb-0.5'>
-                                                    Partner Share (
-                                                    {s.partnerPercent}%)
-                                                  </p>
-                                                  <p className='text-lg font-bold text-purple-700'>
-                                                    ₦
-                                                    {mPartnerShr.toLocaleString()}
-                                                  </p>
+                                                <div className="rounded-2xl border border-white/70 bg-purple-50/70 px-3 py-2.5 shadow-sm backdrop-blur-xl">
+                                                  <p className="mb-0.5 text-xs text-purple-500">Partner Share ({s.partnerPercent}%)</p>
+                                                  <p className="text-lg font-bold text-purple-700">₦{mPartnerShr.toLocaleString()}</p>
                                                 </div>
                                               </div>
                                             );
                                           })()}
                                         {/* Email section — write permission required */}
                                         {canEdit && (
-                                          <div className='flex flex-col gap-3 px-4 py-3 bg-white rounded-2xl border border-apple-gray-200 shadow-sm'>
+                                          <div className="flex flex-col gap-3 rounded-2xl border border-white/70 bg-white/70 px-4 py-3 shadow-sm backdrop-blur-xl">
                                             {/* Quick-send buttons for stored emails */}
-                                            {(s.adminEmail ||
-                                              s.partnerEmail) && (
-                                              <div className='flex flex-wrap items-center gap-2'>
-                                                <span className='text-xs font-semibold text-apple-gray-500'>
-                                                  Quick send:
-                                                </span>
+                                            {(s.adminEmail || s.partnerEmail) && (
+                                              <div className="flex flex-wrap items-center gap-2">
+                                                <span className="text-xs font-semibold text-slate-500">Quick send:</span>
                                                 {s.adminEmail && (
                                                   <button
-                                                    onClick={() =>
-                                                      handleSendSplitEmail(
-                                                        s,
-                                                        displayTxns,
-                                                        s.adminEmail!,
-                                                        periodLabel,
-                                                      )
-                                                    }
+                                                    onClick={() => handleSendSplitEmail(s, displayTxns, s.adminEmail!, periodLabel)}
                                                     disabled={sendingEmail}
-                                                    className='flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors'>
-                                                    <Mail className='w-3 h-3' />
-                                                    To Me (
-                                                    {s.adminEmail.split("@")[0]}
-                                                    )
+                                                    className="glass-blue flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors hover:brightness-95 disabled:opacity-50">
+                                                    <Mail size={12} />
+                                                    To Me ({s.adminEmail.split("@")[0]})
                                                   </button>
                                                 )}
                                                 {s.partnerEmail && (
                                                   <button
-                                                    onClick={() =>
-                                                      handleSendSplitEmail(
-                                                        s,
-                                                        displayTxns,
-                                                        s.partnerEmail!,
-                                                        periodLabel,
-                                                      )
-                                                    }
+                                                    onClick={() => handleSendSplitEmail(s, displayTxns, s.partnerEmail!, periodLabel)}
                                                     disabled={sendingEmail}
-                                                    className='flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 border border-purple-200 text-purple-700 text-xs font-semibold rounded-lg hover:bg-purple-100 disabled:opacity-50 transition-colors'>
-                                                    <Mail className='w-3 h-3' />
-                                                    To Partner (
-                                                    {
-                                                      s.partnerEmail.split(
-                                                        "@",
-                                                      )[0]
-                                                    }
-                                                    )
+                                                    className="glass-purple flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors hover:brightness-95 disabled:opacity-50">
+                                                    <Mail size={12} />
+                                                    To Partner ({s.partnerEmail.split("@")[0]})
                                                   </button>
                                                 )}
-                                                {s.sendMonthlyEmail && (
-                                                  <span className='flex items-center gap-1 px-2 py-1 bg-green-50 border border-green-200 text-green-700 text-xs font-medium rounded-lg'>
-                                                    <span className='w-1.5 h-1.5 rounded-full bg-green-500 inline-block' />
-                                                    Monthly emails on
-                                                  </span>
-                                                )}
+                                                {s.sendMonthlyEmail && <span className="status-chip">Monthly emails on</span>}
                                               </div>
                                             )}
                                             {/* Manual email input */}
-                                            <div className='flex flex-wrap items-center gap-3'>
-                                              <Mail className='w-4 h-4 text-apple-gray-400 shrink-0' />
+                                            <div className="flex flex-wrap items-center gap-3">
+                                              <Mail size={16} className="shrink-0 text-slate-400" />
                                               <input
-                                                type='email'
-                                                placeholder='Send to any email…'
-                                                value={
-                                                  emailSplitId === s.id
-                                                    ? emailAddress
-                                                    : ""
-                                                }
+                                                type="email"
+                                                placeholder="Send to any email…"
+                                                value={emailSplitId === s.id ? emailAddress : ""}
                                                 onFocus={() => {
                                                   setEmailSplitId(s.id);
                                                   setEmailSuccess("");
                                                 }}
                                                 onChange={(e) => {
                                                   setEmailSplitId(s.id);
-                                                  setEmailAddress(
-                                                    e.target.value,
-                                                  );
+                                                  setEmailAddress(e.target.value);
                                                 }}
-                                                className='flex-1 min-w-[200px] px-3 py-2 border border-apple-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-apple-gray-800'
+                                                className={`${GLASS_INPUT} min-w-[200px] flex-1`}
                                               />
                                               <button
                                                 onClick={() =>
-                                                  handleSendSplitEmail(
-                                                    s,
-                                                    displayTxns,
-                                                    emailSplitId === s.id
-                                                      ? emailAddress
-                                                      : "",
-                                                    periodLabel,
-                                                  )
+                                                  handleSendSplitEmail(s, displayTxns, emailSplitId === s.id ? emailAddress : "", periodLabel)
                                                 }
-                                                disabled={
-                                                  sendingEmail ||
-                                                  !(
-                                                    emailSplitId === s.id &&
-                                                    emailAddress.trim()
-                                                  )
-                                                }
-                                                className='flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white text-xs font-semibold rounded-xl shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all'>
-                                                <Mail className='w-3.5 h-3.5' />
-                                                {sendingEmail &&
-                                                emailSplitId === s.id
-                                                  ? "Sending…"
-                                                  : "Send"}
+                                                disabled={sendingEmail || !(emailSplitId === s.id && emailAddress.trim())}
+                                                className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50">
+                                                <Mail size={14} />
+                                                {sendingEmail && emailSplitId === s.id ? "Sending…" : "Send"}
                                               </button>
-                                              {emailSuccess &&
-                                                emailSplitId === s.id && (
-                                                  <span className='text-xs font-semibold text-green-600'>
-                                                    {emailSuccess}
-                                                  </span>
-                                                )}
+                                              {emailSuccess && emailSplitId === s.id && (
+                                                <span className="text-xs font-semibold text-emerald-600">{emailSuccess}</span>
+                                              )}
                                             </div>
                                           </div>
                                         )}
                                         {/* Transaction table header */}
-                                        <p className='text-sm font-semibold text-apple-gray-800'>
-                                          Transaction Log —{" "}
-                                          <span className='text-blue-600'>
-                                            {s.hostel}
-                                          </span>
-                                          <span className='font-normal text-apple-gray-500 ml-2 text-xs'>
-                                            {periodLabel}
-                                          </span>
-                                          <span className='ml-2 text-xs font-normal text-apple-gray-500'>
-                                            ({displayTxns.length} transaction
-                                            {displayTxns.length !== 1
-                                              ? "s"
-                                              : ""}
-                                            )
+                                        <p className="text-sm font-semibold text-slate-800">
+                                          Transaction Log — <span className="text-blue-600">{s.hostel}</span>
+                                          <span className="ml-2 text-xs font-normal text-slate-500">{periodLabel}</span>
+                                          <span className="ml-2 text-xs font-normal text-slate-500">
+                                            ({displayTxns.length} transaction{displayTxns.length !== 1 ? "s" : ""})
                                           </span>
                                         </p>
                                         {displayTxns.length === 0 ? (
-                                          <p className='text-sm text-apple-gray-400 py-4 text-center'>
-                                            No transactions found for this
-                                            period.
-                                          </p>
+                                          <p className="py-4 text-center text-sm text-slate-400">No transactions found for this period.</p>
                                         ) : (
-                                          <div className='overflow-x-auto rounded-2xl shadow-sm'>
-                                            <table className='w-full bg-white rounded-2xl overflow-hidden'>
+                                          <div className="overflow-x-auto rounded-2xl border border-white/70 bg-white/70 shadow-sm backdrop-blur-xl">
+                                            <table className="w-full">
                                               <thead>
-                                                <tr className='border-b border-apple-gray-100 bg-apple-gray-50'>
-                                                  <th className='px-4 py-2.5 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
-                                                    Date
-                                                  </th>
-                                                  <th className='px-4 py-2.5 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
-                                                    Plan
-                                                  </th>
-                                                  <th className='px-4 py-2.5 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
-                                                    Type
-                                                  </th>
-                                                  <th className='px-4 py-2.5 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
-                                                    Email
-                                                  </th>
-                                                  <th className='px-4 py-2.5 text-left text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
-                                                    Ref
-                                                  </th>
-                                                  <th className='px-4 py-2.5 text-right text-xs font-semibold text-apple-gray-500 uppercase tracking-wide'>
-                                                    Total
-                                                  </th>
-                                                  <th className='px-4 py-2.5 text-right text-xs font-semibold text-blue-500 uppercase tracking-wide'>
-                                                    Yours ({s.adminPercent}%)
-                                                  </th>
-                                                  <th className='px-4 py-2.5 text-right text-xs font-semibold text-purple-500 uppercase tracking-wide'>
-                                                    Partner ({s.partnerPercent}
-                                                    %)
-                                                  </th>
+                                                <tr className="border-b border-white/70">
+                                                  <Th>Date</Th>
+                                                  <Th>Plan</Th>
+                                                  <Th>Type</Th>
+                                                  <Th>Email</Th>
+                                                  <Th>Ref</Th>
+                                                  <Th align="right">Total</Th>
+                                                  <Th align="right">Yours ({s.adminPercent}%)</Th>
+                                                  <Th align="right">Partner ({s.partnerPercent}%)</Th>
                                                 </tr>
                                               </thead>
-                                              <tbody className='divide-y divide-apple-gray-50'>
+                                              <tbody className="divide-y divide-white/60">
                                                 {displayTxns.map((t) => (
-                                                  <tr
-                                                    key={t.id}
-                                                    className='hover:bg-apple-gray-50 transition-colors'>
-                                                    <td className='px-4 py-3 text-xs text-apple-gray-600 whitespace-nowrap'>
-                                                      {t.purchasedAt.toLocaleDateString(
-                                                        "en-NG",
-                                                        {
-                                                          day: "2-digit",
-                                                          month: "short",
-                                                          year: "numeric",
-                                                        },
-                                                      )}
+                                                  <tr key={t.id} className="transition hover:bg-white/70">
+                                                    <Td className="whitespace-nowrap text-xs">
+                                                      {t.purchasedAt.toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" })}
                                                       <br />
-                                                      <span className='text-apple-gray-400'>
-                                                        {t.purchasedAt.toLocaleTimeString(
-                                                          "en-NG",
-                                                          {
-                                                            hour: "2-digit",
-                                                            minute: "2-digit",
-                                                          },
-                                                        )}
+                                                      <span className="text-slate-400">
+                                                        {t.purchasedAt.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}
                                                       </span>
-                                                    </td>
-                                                    <td className='px-4 py-3 text-xs font-medium text-apple-gray-900'>
-                                                      {t.planName}
-                                                    </td>
-                                                    <td className='px-4 py-3'>
-                                                      <PlanTypeBadge
-                                                        type={t.planType}
-                                                      />
-                                                    </td>
-                                                    <td className='px-4 py-3 text-xs text-apple-gray-600 max-w-[160px] truncate'>
-                                                      {t.customerEmail ?? (
-                                                        <span className='text-apple-gray-400'>
-                                                          N/A
-                                                        </span>
-                                                      )}
-                                                    </td>
-                                                    <td className='px-4 py-3 text-xs text-apple-gray-500 font-mono'>
+                                                    </Td>
+                                                    <Td className="text-xs font-medium text-slate-900">{t.planName}</Td>
+                                                    <Td>
+                                                      <PlanTypeBadge type={t.planType} />
+                                                    </Td>
+                                                    <Td className="max-w-[160px] truncate text-xs">
+                                                      {t.customerEmail ?? <span className="text-slate-400">N/A</span>}
+                                                    </Td>
+                                                    <Td className="font-mono text-xs text-slate-500">
                                                       {t.paymentRef ? (
-                                                        <span
-                                                          title={t.paymentRef}>
-                                                          {t.paymentRef.length >
-                                                          14
-                                                            ? t.paymentRef.slice(
-                                                                0,
-                                                                14,
-                                                              ) + "…"
-                                                            : t.paymentRef}
+                                                        <span title={t.paymentRef}>
+                                                          {t.paymentRef.length > 14 ? t.paymentRef.slice(0, 14) + "…" : t.paymentRef}
                                                         </span>
                                                       ) : (
-                                                        <span className='text-apple-gray-400'>
-                                                          —
-                                                        </span>
+                                                        <span className="text-slate-400">—</span>
                                                       )}
-                                                    </td>
-                                                    <td className='px-4 py-3 text-xs font-semibold text-apple-gray-900 text-right whitespace-nowrap'>
-                                                      ₦
-                                                      {t.price.toLocaleString()}
-                                                    </td>
-                                                    <td className='px-4 py-3 text-xs font-semibold text-blue-600 text-right whitespace-nowrap'>
-                                                      ₦
-                                                      {Math.round(
-                                                        (t.price *
-                                                          s.adminPercent) /
-                                                          100,
-                                                      ).toLocaleString()}
-                                                    </td>
-                                                    <td className='px-4 py-3 text-xs font-semibold text-purple-600 text-right whitespace-nowrap'>
-                                                      ₦
-                                                      {Math.round(
-                                                        (t.price *
-                                                          s.partnerPercent) /
-                                                          100,
-                                                      ).toLocaleString()}
-                                                    </td>
+                                                    </Td>
+                                                    <Td align="right" className="whitespace-nowrap text-xs font-semibold text-slate-900">
+                                                      ₦{t.price.toLocaleString()}
+                                                    </Td>
+                                                    <Td align="right" className="whitespace-nowrap text-xs font-semibold text-blue-600">
+                                                      ₦{Math.round((t.price * s.adminPercent) / 100).toLocaleString()}
+                                                    </Td>
+                                                    <Td align="right" className="whitespace-nowrap text-xs font-semibold text-purple-600">
+                                                      ₦{Math.round((t.price * s.partnerPercent) / 100).toLocaleString()}
+                                                    </Td>
                                                   </tr>
                                                 ))}
                                               </tbody>
@@ -3235,10 +2815,20 @@ export default function AdminTransactionsPage() {
                     </div>
                   </>
                 )}
-              </div>
+              </section>
             </>
           )}
-        </div>
+        </main>
+
+        <ConfirmationModal
+          isOpen={confirmModal.isOpen}
+          onClose={() => setConfirmModal((m) => ({ ...m, isOpen: false }))}
+          onConfirm={confirmModal.onConfirm}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          confirmText="Delete split"
+          type="danger"
+        />
       </div>
     </ProtectedRoute>
   );
