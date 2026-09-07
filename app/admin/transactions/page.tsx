@@ -1,7 +1,7 @@
 "use client";
 import { apiFetch } from "@/lib/apiClient";
 
-import React, { useCallback, useEffect, useState, useMemo } from "react";
+import React, { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
@@ -82,6 +82,15 @@ interface ControllerSalesRow {
   hostels: string[];
 }
 
+/** Backend-computed hostel breakdown — see `sales_by_hostel` in
+ * `app/services/controllers.py`. Server-side now (not derived from the
+ * loaded page client-side) so it stays accurate once the row list is capped. */
+interface HostelSalesRow {
+  hostel: string;
+  revenue: number;
+  count: number;
+}
+
 interface SplitRecord {
   id: string;
   hostel: string;
@@ -138,6 +147,13 @@ interface BotScenario {
   fallbackReason: string;
   createdAt: string | null;
 }
+
+/** Row-list page size sent as `?limit=` to `/api/admin/transactions`. Caps
+ * the Firestore query itself (confirmed live: a capped query is fast even
+ * against a large, growing ledger; an unbounded one isn't) — the summary
+ * cards, Revenue by Hostel/Controller, and the "showing N of TOTAL" note all
+ * still reflect the FULL filtered set regardless, per the backend response. */
+const TRANSACTIONS_PAGE_SIZE = 150;
 
 const PLAN_TYPE_LABELS: Record<string, string> = {
   device: "Device Plan",
@@ -327,6 +343,7 @@ export default function AdminTransactionsPage() {
   const router = useRouter();
   const [transactions, setTransactions] = useState<TransactionRow[]>([]);
   const [byController, setByController] = useState<ControllerSalesRow[]>([]);
+  const [byHostel, setByHostel] = useState<HostelSalesRow[]>([]);
   // Both revenue breakdowns default collapsed — their card grids can get
   // large, and collapsed panels skip rendering that grid entirely (not just
   // hide it), which is what actually keeps the initial paint light.
@@ -378,9 +395,15 @@ export default function AdminTransactionsPage() {
   );
   const [botHostel, setBotHostel] = useState("all");
 
-  // Transaction filters
+  // Transaction filters — hostel/controller/planType/paymentSource/date are
+  // sent to the backend (it does the filtering; see fetchTransactions), so
+  // changing any of them re-fetches. `searchTerm` stays client-side only,
+  // refining whatever page is currently loaded — pushing free-text search to
+  // Firestore isn't practical, and it doesn't need to be: it's a "find one
+  // thing on this page" tool, not a ledger-wide query.
   const [searchTerm, setSearchTerm] = useState("");
   const [filterHostel, setFilterHostel] = useState("all");
+  const [controllerFilter, setControllerFilter] = useState("all");
   const [filterPlanType, setFilterPlanType] = useState<
     "all" | "device" | "tv" | "unlimited"
   >("all");
@@ -389,6 +412,14 @@ export default function AdminTransactionsPage() {
   >("all");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
+  // Set from the backend's response — accurate even once the row list is
+  // capped by TRANSACTIONS_PAGE_SIZE (see fetchTransactions).
+  const [totalMatching, setTotalMatching] = useState(0);
+  const [hasMoreTransactions, setHasMoreTransactions] = useState(false);
+  // Partner-only — their true total share across every matching transaction,
+  // not just the loaded page (see `totalPartnerShare` below for when this is
+  // actually used vs. the page-scoped fallback).
+  const [totalPartnerShareAll, setTotalPartnerShareAll] = useState(0);
 
   // ── Splits state ──────────────────────────────────────────────────────────
   const [splitRecords, setSplitRecords] = useState<SplitRecord[]>([]);
@@ -447,6 +478,20 @@ export default function AdminTransactionsPage() {
       fetchBotTransactions();
     }
   }, []);
+
+  // Re-fetch whenever a structured filter changes — the backend does the
+  // filtering now, so a change here means different data to ask for, not
+  // just a different client-side view of what's already loaded. Skips its
+  // own first run since the mount effect above already fetched once with
+  // the (empty) initial filter state.
+  const filtersMounted = useRef(false);
+  useEffect(() => {
+    if (!filtersMounted.current) {
+      filtersMounted.current = true;
+      return;
+    }
+    void fetchTransactions();
+  }, [filterHostel, controllerFilter, filterPlanType, filterPaymentSource, filterDateFrom, filterDateTo]);
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
   const fetchAll = async () => {
@@ -522,65 +567,96 @@ export default function AdminTransactionsPage() {
     }
   };
 
+  /** Parses one `/api/admin/transactions` response into the shapes this page
+   * renders — shared by the normal (capped) fetch and the unbounded one
+   * Export uses, so the two never drift apart. */
+  const parseTransactionsResponse = (data: any) => {
+    const toDate = (iso: string | null): Date => (iso ? new Date(iso) : new Date(0));
+
+    const dataPurchases: DataPurchaseRow[] = (data.dataPurchases ?? []).map((d: any) => ({
+      id: d.id,
+      planId: d.planId,
+      planName: d.planName,
+      planType: d.planType,
+      usersCount: d.usersCount,
+      price: d.price,
+      partnerShare: d.partnerShare,
+      codeId: d.codeId,
+      customerEmail: d.customerEmail,
+      paymentRef: d.paymentRef,
+      hostel: d.hostel,
+      paymentSource: d.paymentSource || "",
+      purchasedAt: toDate(d.purchasedAt),
+    }));
+
+    const tvPurchases: TvPurchaseRow[] = (data.tvPurchases ?? []).map((d: any) => ({
+      id: d.id,
+      planId: d.planId,
+      planName: d.planName,
+      planType: "tv" as const,
+      price: d.price,
+      partnerShare: d.partnerShare,
+      customerEmail: d.customerEmail,
+      paymentRef: d.paymentRef,
+      hostel: d.hostel,
+      purchasedAt: toDate(d.purchasedAt),
+    }));
+
+    const all: TransactionRow[] = [...dataPurchases, ...tvPurchases].sort(
+      (a, b) => b.purchasedAt.getTime() - a.purchasedAt.getTime(),
+    );
+    const VALID_PLAN_TYPES = new Set(["device", "tv", "unlimited"]);
+    // Partner responses omit customerEmail (PII) by design, so only the admin
+    // view requires it — otherwise every partner row is dropped here and the
+    // ledger shows blank.
+    const partnerView = data.partnerView === true;
+    const valid = all.filter(
+      (t) => VALID_PLAN_TYPES.has(t.planType) && (partnerView || !!t.customerEmail?.trim()),
+    );
+    return {
+      valid,
+      byController: (data.byController ?? []) as ControllerSalesRow[],
+      byHostel: (data.byHostel ?? []) as HostelSalesRow[],
+      totalMatching: (data.totalMatching as number) ?? valid.length,
+      hasMore: data.hasMore === true,
+      totalPartnerShare: (data.totalPartnerShare as number) ?? null,
+    };
+  };
+
+  /** Query string for the current filter selections. `unbounded` drops the
+   * page-size cap — used only for Export, which must cover every matching
+   * transaction, not just what's currently on screen. */
+  const buildTransactionsQuery = (opts: { unbounded?: boolean } = {}) => {
+    const params = new URLSearchParams();
+    if (filterHostel !== "all") params.set("hostel", filterHostel);
+    if (controllerFilter !== "all") params.set("controllerId", controllerFilter);
+    if (filterPlanType !== "all") params.set("planType", filterPlanType);
+    if (filterPaymentSource !== "all") params.set("paymentSource", filterPaymentSource);
+    if (filterDateFrom) params.set("dateFrom", filterDateFrom);
+    if (filterDateTo) params.set("dateTo", filterDateTo);
+    if (!opts.unbounded) params.set("limit", String(TRANSACTIONS_PAGE_SIZE));
+    const qs = params.toString();
+    return qs ? `?${qs}` : "";
+  };
+
   const fetchTransactions = async () => {
     try {
-      const res = await apiFetch("/api/admin/transactions");
+      // The backend does the filtering now (hostel/controller/plan type/
+      // payment source/date), so it only ever has to stream what's actually
+      // relevant — and `limit` caps the row list at the Firestore query
+      // level, which is what keeps this fast even against a growing ledger.
+      const res = await apiFetch(`/api/admin/transactions${buildTransactionsQuery()}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load transactions");
-
-      const toDate = (iso: string | null): Date =>
-        iso ? new Date(iso) : new Date(0);
-
-      const dataPurchases: DataPurchaseRow[] = (data.dataPurchases ?? []).map(
-        (d: any) => ({
-          id: d.id,
-          planId: d.planId,
-          planName: d.planName,
-          planType: d.planType,
-          usersCount: d.usersCount,
-          price: d.price,
-          partnerShare: d.partnerShare,
-          codeId: d.codeId,
-          customerEmail: d.customerEmail,
-          paymentRef: d.paymentRef,
-          hostel: d.hostel,
-          paymentSource: d.paymentSource || "",
-          purchasedAt: toDate(d.purchasedAt),
-        }),
-      );
-
-      const tvPurchases: TvPurchaseRow[] = (data.tvPurchases ?? []).map(
-        (d: any) => ({
-          id: d.id,
-          planId: d.planId,
-          planName: d.planName,
-          planType: "tv" as const,
-          price: d.price,
-          partnerShare: d.partnerShare,
-          customerEmail: d.customerEmail,
-          paymentRef: d.paymentRef,
-          hostel: d.hostel,
-          purchasedAt: toDate(d.purchasedAt),
-        }),
-      );
-
-      const all: TransactionRow[] = [...dataPurchases, ...tvPurchases].sort(
-        (a, b) => b.purchasedAt.getTime() - a.purchasedAt.getTime(),
-      );
-      const VALID_PLAN_TYPES = new Set(["device", "tv", "unlimited"]);
-      // Partner responses omit customerEmail (PII) by design, so only the admin
-      // view requires it — otherwise every partner row is dropped here and the
-      // ledger shows blank.
-      const partnerView = data.partnerView === true;
-      const valid = all.filter(
-        (t) =>
-          VALID_PLAN_TYPES.has(t.planType) &&
-          (partnerView || !!t.customerEmail?.trim()),
-      );
-      setTransactions(valid);
+      const parsed = parseTransactionsResponse(data);
+      setTransactions(parsed.valid);
       // Absent from the partner response by design (see admin_transactions.py)
-      // — defaulting to [] there is what keeps the panel below hidden for them.
-      setByController(data.byController ?? []);
+      // — defaulting to [] there is what keeps the panels below hidden for them.
+      setByController(parsed.byController);
+      setByHostel(parsed.byHostel);
+      setTotalMatching(parsed.totalMatching);
+      setHasMoreTransactions(parsed.hasMore);
+      if (parsed.totalPartnerShare !== null) setTotalPartnerShareAll(parsed.totalPartnerShare);
     } catch (err) {
       console.error("Error fetching transactions:", err);
       setError("Failed to load transactions. Please try again.");
@@ -613,9 +689,16 @@ export default function AdminTransactionsPage() {
   };
 
   // ── Transactions computed ─────────────────────────────────────────────────
-  const filtered = useMemo(() => {
-    return transactions.filter((t) => {
-      // Enforce hostel-level access
+  // Access control and free-text search are the only two things NOT already
+  // applied server-side (see fetchTransactions/buildTransactionsQuery) — the
+  // hostel/planType/paymentSource/date re-checks below are now a no-op
+  // against `transactions` (the backend already filtered on all of those),
+  // kept as a cheap defense-in-depth rather than trusting the response
+  // blindly. Pulled out as its own function (not inlined in the `filtered`
+  // useMemo below) so the unbounded export fetch in exportToExcel can apply
+  // the exact same rules to freshly-fetched rows the page never loaded.
+  const matchesClientFilters = useCallback(
+    (t: TransactionRow): boolean => {
       if (
         adminProfile?.hostels?.length &&
         !adminProfile.isSuperAdmin &&
@@ -651,20 +734,36 @@ export default function AdminTransactionsPage() {
         );
       }
       return true;
-    });
-  }, [
-    transactions,
-    filterHostel,
-    filterPlanType,
-    filterPaymentSource,
-    filterDateFrom,
-    filterDateTo,
-    searchTerm,
-    adminProfile,
-    allowedHostelNames,
-  ]);
+    },
+    [
+      filterHostel,
+      filterPlanType,
+      filterPaymentSource,
+      filterDateFrom,
+      filterDateTo,
+      searchTerm,
+      adminProfile,
+      allowedHostelNames,
+    ],
+  );
 
-  const totalRevenue = filtered.reduce((s, t) => s + t.price, 0);
+  const filtered = useMemo(
+    () => transactions.filter(matchesClientFilters),
+    [transactions, matchesClientFilters],
+  );
+
+  // `filtered` only ever holds up to TRANSACTIONS_PAGE_SIZE rows once the
+  // backend caps the query, so summing it under-reports revenue once
+  // `hasMoreTransactions` is true. `byHostel` is the backend's own total
+  // over the FULL matching set (unaffected by the row-list cap) — used
+  // whenever `searchTerm` isn't narrowing things further, since search never
+  // reaches the backend and `byHostel` has no way to reflect it.
+  const totalRevenue = searchTerm
+    ? filtered.reduce((s, t) => s + t.price, 0)
+    : byHostel.reduce((s, r) => s + r.revenue, 0);
+  // Same reasoning: `totalMatching` is the backend's true count over every
+  // matching transaction, not just the loaded page.
+  const totalTransactionsCount = searchTerm ? filtered.length : totalMatching;
 
   // A partner never sees the gross transaction amount. Their share is their
   // split percentage of the FULL transaction amount — the admin decides the
@@ -692,10 +791,13 @@ export default function AdminTransactionsPage() {
       return transaction.partnerShare;
     return Math.round((transaction.price * partnerPercentFor(transaction)) / 100);
   };
-  const totalPartnerShare = filtered.reduce(
-    (sum, transaction) => sum + partnerShareFor(transaction),
-    0,
-  );
+  // Same reasoning as `totalRevenue` above: `totalPartnerShareAll` is the
+  // backend's own total (never gross, always the partner's cut) over every
+  // matching transaction, used unless a search term means the visibly-loaded
+  // page is genuinely what the partner is looking at.
+  const totalPartnerShare = searchTerm
+    ? filtered.reduce((sum, transaction) => sum + partnerShareFor(transaction), 0)
+    : totalPartnerShareAll;
 
   // ── Partner Payouts (admin-only) ──────────────────────────────────────────
   // For each partner, sum each of their hostels' FULL revenue over the selected
@@ -845,17 +947,6 @@ export default function AdminTransactionsPage() {
           ? botMonth
           : botYear;
 
-  const byHostel = useMemo(() => {
-    const map: Record<string, { count: number; revenue: number }> = {};
-    for (const t of filtered) {
-      const h = t.hostel ?? "Unknown";
-      if (!map[h]) map[h] = { count: 0, revenue: 0 };
-      map[h].count += 1;
-      map[h].revenue += t.price;
-    }
-    return Object.entries(map).sort((a, b) => b[1].revenue - a[1].revenue);
-  }, [filtered]);
-
   const knownHostels = useMemo(() => {
     const names = new Set<string>();
     // Only include allowed hostels from the API
@@ -867,8 +958,32 @@ export default function AdminTransactionsPage() {
     return Array.from(names).sort();
   }, [transactions, allowedHostels, allowedHostelNames]);
 
-  const exportToExcel = () => {
-    const rows = filtered.map((t) =>
+  const [exporting, setExporting] = useState(false);
+
+  const exportToExcel = async () => {
+    setExporting(true);
+    // The page only ever holds up to TRANSACTIONS_PAGE_SIZE rows once the
+    // backend caps the query — Export needs every matching transaction, not
+    // just what's currently on screen, so it asks for the unfiltered-by-page
+    // (but still filtered-by-filters) set directly. Falls back to what's
+    // already loaded if that request fails, rather than blocking entirely.
+    let rowsSource: TransactionRow[] = filtered;
+    try {
+      const res = await apiFetch(`/api/admin/transactions${buildTransactionsQuery({ unbounded: true })}`);
+      const data = await res.json();
+      if (res.ok) {
+        // searchTerm never reaches the backend, so it's applied here same as
+        // the on-screen `filtered` list — otherwise a search-narrowed export
+        // would silently include rows the user isn't currently looking at.
+        rowsSource = parseTransactionsResponse(data).valid.filter(matchesClientFilters);
+      }
+    } catch {
+      // network hiccup — export whatever's already loaded rather than nothing
+    } finally {
+      setExporting(false);
+    }
+
+    const rows = rowsSource.map((t) =>
       isPartner
         ? {
             Date: t.purchasedAt.toLocaleString(),
@@ -888,17 +1003,34 @@ export default function AdminTransactionsPage() {
             "Price (₦)": t.price,
           },
     );
+
+    // Recomputed from `rowsSource` rather than reused from the `byHostel`
+    // state: that state reflects the backend's filters but, like `rowsSource`
+    // above, not `searchTerm` — grouping the already search-narrowed rows
+    // here keeps the summary sheet consistent with the Transactions sheet.
+    const hostelTotals = new Map<string, { count: number; revenue: number }>();
+    for (const t of rowsSource) {
+      const h = t.hostel ?? "Unknown";
+      const cur = hostelTotals.get(h) ?? { count: 0, revenue: 0 };
+      cur.count += 1;
+      cur.revenue += t.price;
+      hostelTotals.set(h, cur);
+    }
+    const hostelRows = Array.from(hostelTotals.entries()).sort((a, b) => b[1].revenue - a[1].revenue);
+    const totalRev = rowsSource.reduce((s, t) => s + t.price, 0);
+    const totalShare = rowsSource.reduce((s, t) => s + partnerShareFor(t), 0);
+
     const summaryRows = [
-      { Label: "Total Transactions", Value: filtered.length },
+      { Label: "Total Transactions", Value: rowsSource.length },
       isPartner
-        ? { Label: "Your Total Share (₦)", Value: totalPartnerShare }
-        : { Label: "Total Revenue (₦)", Value: totalRevenue },
+        ? { Label: "Your Total Share (₦)", Value: totalShare }
+        : { Label: "Total Revenue (₦)", Value: totalRev },
       ...(isPartner
         ? []
         : [
             { Label: "", Value: "" },
             { Label: "Hostel", Value: "Transactions", Revenue: "Revenue (₦)" },
-            ...byHostel.map(([hostel, stats]) => ({
+            ...hostelRows.map(([hostel, stats]) => ({
               Label: hostel,
               Value: stats.count,
               Revenue: stats.revenue,
@@ -1474,7 +1606,7 @@ export default function AdminTransactionsPage() {
               <div className="kpi-grid lg:grid-cols-4">
                 {isPartner ? (
                   <>
-                    <Kpi label="Transactions" tone="slate" value={loading ? "—" : filtered.length.toLocaleString()} />
+                    <Kpi label="Transactions" tone="slate" value={loading ? "—" : totalTransactionsCount.toLocaleString()} />
                     <Kpi
                       label="Profit"
                       tone="purple"
@@ -1483,7 +1615,7 @@ export default function AdminTransactionsPage() {
                   </>
                 ) : (
                   <>
-                    <Kpi label="Total Transactions" tone="slate" value={loading ? "—" : filtered.length.toLocaleString()} />
+                    <Kpi label="Total Transactions" tone="slate" value={loading ? "—" : totalTransactionsCount.toLocaleString()} />
                     <Kpi label="Total Revenue" tone="green" value={loading ? "—" : `₦${totalRevenue.toLocaleString()}`} />
                     <Kpi
                       label="Device Plans"
@@ -1572,12 +1704,12 @@ export default function AdminTransactionsPage() {
                   </div>
                   {showHostelRevenue && (
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                      {byHostel.map(([hostel, stats]) => (
-                        <div key={hostel} className="glass-controller">
-                          <p className="truncate text-sm font-medium text-slate-700">{hostel}</p>
-                          <p className="mt-1 text-lg font-bold text-slate-900">₦{stats.revenue.toLocaleString()}</p>
+                      {byHostel.map((row) => (
+                        <div key={row.hostel} className="glass-controller">
+                          <p className="truncate text-sm font-medium text-slate-700">{row.hostel}</p>
+                          <p className="mt-1 text-lg font-bold text-slate-900">₦{row.revenue.toLocaleString()}</p>
                           <p className="text-xs text-slate-500">
-                            {stats.count} transaction{stats.count !== 1 ? "s" : ""}
+                            {row.count} transaction{row.count !== 1 ? "s" : ""}
                           </p>
                         </div>
                       ))}
@@ -1589,7 +1721,7 @@ export default function AdminTransactionsPage() {
               {/* Filters + Export */}
               <section className="glass-panel">
                 <div className="flex flex-col gap-4">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                     <div className="relative">
                       <Search className={GLASS_INPUT_ICON} />
                       <input
@@ -1608,6 +1740,16 @@ export default function AdminTransactionsPage() {
                         </option>
                       ))}
                     </select>
+                    {!isPartner && (
+                      <select value={controllerFilter} onChange={(e) => setControllerFilter(e.target.value)} className={GLASS_INPUT}>
+                        <option value="all">All Controllers</option>
+                        {byController.map((row) => (
+                          <option key={row.controllerId} value={row.controllerId}>
+                            {row.controllerName}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     <select
                       value={filterPlanType}
                       onChange={(e) => setFilterPlanType(e.target.value as typeof filterPlanType)}
@@ -1645,15 +1787,20 @@ export default function AdminTransactionsPage() {
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-slate-500">
                       {isPartner
-                        ? `${filtered.length} transaction${filtered.length !== 1 ? "s" : ""} • ₦${totalPartnerShare.toLocaleString()} your share`
-                        : `${filtered.length} transaction${filtered.length !== 1 ? "s" : ""} • ₦${totalRevenue.toLocaleString()} total`}
+                        ? `${totalTransactionsCount.toLocaleString()} transaction${totalTransactionsCount !== 1 ? "s" : ""} • ₦${totalPartnerShare.toLocaleString()} your share`
+                        : `${totalTransactionsCount.toLocaleString()} transaction${totalTransactionsCount !== 1 ? "s" : ""} • ₦${totalRevenue.toLocaleString()} total`}
+                      {hasMoreTransactions && (
+                        <span className="ml-1 text-slate-400">
+                          — showing the most recent {filtered.length.toLocaleString()} below
+                        </span>
+                      )}
                     </p>
                     <button
-                      onClick={exportToExcel}
-                      disabled={filtered.length === 0}
+                      onClick={() => void exportToExcel()}
+                      disabled={filtered.length === 0 || exporting}
                       className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50">
                       <Download size={16} />
-                      Export Excel
+                      {exporting ? "Exporting…" : "Export Excel"}
                     </button>
                   </div>
                 </div>
