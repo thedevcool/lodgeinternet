@@ -342,6 +342,16 @@ export default function AdminTransactionsPage() {
   const canEdit = canWrite("transactions");
   const router = useRouter();
   const [transactions, setTransactions] = useState<TransactionRow[]>([]);
+  // The COMPLETE, unfiltered, uncapped ledger — separate from `transactions`
+  // above (which the Transactions tab's own filter bar now scopes and caps
+  // for speed). Partner Payouts and the Splits tab both compute revenue for
+  // an arbitrary hostel/period that has nothing to do with whatever filter
+  // happens to be set on the Transactions tab, so they read this instead —
+  // conflating the two was a real bug: a split's revenue would silently
+  // reflect only whatever page of the Transactions tab happened to be
+  // loaded. Fetched once, in the background, for non-partners only (partners
+  // never see these tabs at all).
+  const [allTransactions, setAllTransactions] = useState<TransactionRow[]>([]);
   const [byController, setByController] = useState<ControllerSalesRow[]>([]);
   const [byHostel, setByHostel] = useState<HostelSalesRow[]>([]);
   // Both revenue breakdowns default collapsed — their card grids can get
@@ -473,6 +483,10 @@ export default function AdminTransactionsPage() {
     if (!isPartner) {
       fetchSplits();
       fetchPartners();
+      // Backgrounded — Payouts/Splits need the complete ledger, but nothing
+      // on the Transactions tab (already fast via fetchAll above) should
+      // wait on it.
+      void fetchAllTransactions();
     }
     if (isSuperAdmin) {
       fetchBotTransactions();
@@ -663,6 +677,23 @@ export default function AdminTransactionsPage() {
     }
   };
 
+  /** No query params at all — the complete, unfiltered ledger, exactly what
+   * `fetchTransactions` always fetched before it started scoping to the
+   * Transactions tab's own filters. Feeds Payouts/Splits (see
+   * `allTransactions` above); errors here are silent since it's a background
+   * fetch for tabs the user may not even open this session. */
+  const fetchAllTransactions = async () => {
+    try {
+      const res = await apiFetch("/api/admin/transactions");
+      const data = await res.json();
+      if (!res.ok) return;
+      setAllTransactions(parseTransactionsResponse(data).valid);
+    } catch {
+      // non-critical — Payouts/Splits will just show stale/empty figures
+      // until a manual refresh succeeds, rather than blocking anything
+    }
+  };
+
   const fetchSplits = async () => {
     setSplitsLoading(true);
     try {
@@ -804,14 +835,14 @@ export default function AdminTransactionsPage() {
   // period, apply their split (whole or per-hostel), and show their cut plus the
   // admin's kept share (gross − cut). No split records are created.
   const payoutTransactions = useMemo(() => {
-    if (payoutMode === "all") return transactions;
-    return transactions.filter((t) => {
+    if (payoutMode === "all") return allTransactions;
+    return allTransactions.filter((t) => {
       if (!t.purchasedAt) return false;
       const d = new Date(t.purchasedAt);
       const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       return ym === payoutMonth;
     });
-  }, [transactions, payoutMode, payoutMonth]);
+  }, [allTransactions, payoutMode, payoutMonth]);
 
   const hostelNameById = useMemo(() => {
     const m: Record<string, string> = {};
@@ -951,12 +982,19 @@ export default function AdminTransactionsPage() {
     const names = new Set<string>();
     // Only include allowed hostels from the API
     allowedHostels.forEach((h) => names.add(h.name));
-    // Also include legacy hostel values from transactions that are within allowed set
-    transactions.forEach((t) => {
+    // Also include legacy hostel values seen in either ledger view that are
+    // within the allowed set. Both sources: `transactions` is capped/filtered
+    // for partners (who never get `allTransactions`), `allTransactions` is
+    // the complete ledger for everyone else — checking both means this list
+    // is never narrower than either alone.
+    for (const t of transactions) {
       if (t.hostel && allowedHostelNames.has(t.hostel)) names.add(t.hostel);
-    });
+    }
+    for (const t of allTransactions) {
+      if (t.hostel && allowedHostelNames.has(t.hostel)) names.add(t.hostel);
+    }
     return Array.from(names).sort();
-  }, [transactions, allowedHostels, allowedHostelNames]);
+  }, [transactions, allTransactions, allowedHostels, allowedHostelNames]);
 
   const [exporting, setExporting] = useState(false);
 
@@ -1062,7 +1100,7 @@ export default function AdminTransactionsPage() {
     from.setHours(0, 0, 0, 0);
     const to = splitIsOpen ? new Date() : new Date(splitDateTo);
     to.setHours(23, 59, 59, 999);
-    const relevant = transactions.filter(
+    const relevant = allTransactions.filter(
       (t) =>
         (t.hostel ?? "Unknown") === splitHostel &&
         t.purchasedAt >= from &&
@@ -1088,7 +1126,7 @@ export default function AdminTransactionsPage() {
       partnerShare: Math.round((splittableRev * pPct) / 100),
     };
   }, [
-    transactions,
+    allTransactions,
     splitHostel,
     splitDateFrom,
     splitDateTo,
@@ -1328,22 +1366,23 @@ export default function AdminTransactionsPage() {
   ]);
 
   // Grouped once per data refresh so `getSplitTransactions` below never scans
-  // the full ledger — it was doing a full `transactions.filter()` per split,
-  // per render (the Splits History table calls it 2-3x per row), which meant
-  // O(splits × transactions) work on every re-render, including ones that
-  // have nothing to do with the data (e.g. toggling a row open). Grouping by
-  // hostel up front turns each call into an O(that hostel's own transactions)
-  // lookup instead.
+  // the full ledger on every call — the Splits History table calls it 2-3x
+  // per row, which would otherwise mean O(splits × ledger) work on every
+  // re-render, including ones that have nothing to do with the data (e.g.
+  // toggling a row open). Built from `allTransactions` (the complete
+  // ledger), not `transactions` (the Transactions tab's own capped/filtered
+  // view) — a split's revenue must reflect its actual hostel/period
+  // regardless of whatever filter happens to be set on a different tab.
   const transactionsByHostel = useMemo(() => {
     const map = new Map<string, TransactionRow[]>();
-    for (const t of transactions) {
+    for (const t of allTransactions) {
       const key = t.hostel ?? "Unknown";
       const bucket = map.get(key);
       if (bucket) bucket.push(t);
       else map.set(key, [t]);
     }
     return map;
-  }, [transactions]);
+  }, [allTransactions]);
 
   const getSplitTransactions = useCallback(
     (s: SplitRecord, monthFilter?: string): TransactionRow[] => {
@@ -1512,7 +1551,14 @@ export default function AdminTransactionsPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => fetchAll()} disabled={loading} title="Refresh transactions" className="glass-button">
+            <button
+              onClick={() => {
+                fetchAll();
+                if (!isPartner) void fetchAllTransactions();
+              }}
+              disabled={loading}
+              title="Refresh transactions"
+              className="glass-button">
               <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
