@@ -19,6 +19,7 @@ import {
   Mail,
   Plus,
   RefreshCw,
+  Router,
   Scissors,
   Search,
   Trash2,
@@ -64,6 +65,22 @@ interface TvPurchaseRow {
 }
 
 type TransactionRow = DataPurchaseRow | TvPurchaseRow;
+
+/** Per-controller revenue breakdown, computed by the backend from the same
+ * dataPurchases/tvPurchases rows above — see `sales_by_controller` in
+ * `app/services/controllers.py`. Absent from the partner response by design. */
+interface ControllerSalesRow {
+  controllerId: string;
+  controllerName: string;
+  dataPurchases: number;
+  dataRevenue: number;
+  tvSubscriptions: number;
+  tvRevenue: number;
+  revenue: number;
+  transactions: number;
+  hostelCount: number;
+  hostels: string[];
+}
 
 interface SplitRecord {
   id: string;
@@ -181,6 +198,7 @@ export default function AdminTransactionsPage() {
   const canEdit = canWrite("transactions");
   const router = useRouter();
   const [transactions, setTransactions] = useState<TransactionRow[]>([]);
+  const [byController, setByController] = useState<ControllerSalesRow[]>([]);
   const [hostels, setHostels] = useState<Hostel[]>([]);
   const allowedHostels = useMemo(
     () =>
@@ -419,6 +437,9 @@ export default function AdminTransactionsPage() {
           (partnerView || !!t.customerEmail?.trim()),
       );
       setTransactions(valid);
+      // Absent from the partner response by design (see admin_transactions.py)
+      // — defaulting to [] there is what keeps the panel below hidden for them.
+      setByController(data.byController ?? []);
     } catch (err) {
       console.error("Error fetching transactions:", err);
       setError("Failed to load transactions. Please try again.");
@@ -1378,6 +1399,37 @@ export default function AdminTransactionsPage() {
                         <p className='text-xs text-apple-gray-500'>
                           {stats.count} transaction
                           {stats.count !== 1 ? "s" : ""}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Per-controller breakdown — server-computed, unaffected by the
+                  filters below (it reflects the whole ledger, not `filtered`) */}
+              {!isPartner && !loading && byController.length > 0 && (
+                <div className='bg-white rounded-3xl shadow-sm p-6'>
+                  <h2 className='text-base font-semibold text-apple-gray-900 mb-4 flex items-center gap-2'>
+                    <Router className='w-4 h-4 text-blue-500' />
+                    Revenue by Controller
+                  </h2>
+                  <div className='grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3'>
+                    {byController.map((row) => (
+                      <div
+                        key={row.controllerId}
+                        className='bg-apple-gray-50 rounded-2xl px-4 py-3'>
+                        <p className='text-sm font-medium text-apple-gray-700 truncate'>
+                          {row.controllerName}
+                        </p>
+                        <p className='text-lg font-bold text-apple-gray-900'>
+                          ₦{row.revenue.toLocaleString()}
+                        </p>
+                        <p className='text-xs text-apple-gray-500'>
+                          {row.transactions} transaction
+                          {row.transactions !== 1 ? "s" : ""} ·{" "}
+                          {row.hostelCount} hostel
+                          {row.hostelCount !== 1 ? "s" : ""}
                         </p>
                       </div>
                     ))}

@@ -71,6 +71,19 @@ type Controller = {
 
 type RecentEvent = { at: string; type: string; plan: string; hostel: string; amount: number };
 
+type ControllerSales = {
+  controllerId: string;
+  controllerName: string;
+  dataPurchases: number;
+  dataRevenue: number;
+  tvSubscriptions: number;
+  tvRevenue: number;
+  revenue: number;
+  transactions: number;
+  hostelCount: number;
+  hostels: string[];
+};
+
 type Analytics = {
   generatedAt: string;
   freshness: "live" | "cached" | "stale";
@@ -90,6 +103,7 @@ type Analytics = {
   inventory: CountMap & { byStatus?: CountMap };
   pools?: Pool[];
   sales: CountMap;
+  salesByController?: ControllerSales[];
   users: { total: number; verified: number };
   hostels: { total: number; controllerManaged: number; standalone: number };
   controllers: Controller[];
@@ -295,6 +309,7 @@ export default function AdminDashboardPage() {
   const pools = catalogue?.pools ?? {};
   const inventory = data?.inventory ?? {};
   const sales = data?.sales ?? {};
+  const salesByController = data?.salesByController ?? [];
   const bot = data?.bot ?? {};
   const tv = data?.tv ?? {};
   const emails = data?.emails ?? {};
@@ -650,6 +665,35 @@ export default function AdminDashboardPage() {
                   </div>
                 </Section>
               </div>
+
+              {/* ── Revenue by controller ─────────────────────────────────── */}
+              {salesByController.length > 0 && (
+                <Section eyebrow="SALES & PAYMENTS" title="Revenue by controller" href="/admin/transactions">
+                  <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+                    {salesByController.map((row) => (
+                      <div key={row.controllerId} className="glass-controller">
+                        <div className="flex items-center justify-between gap-2">
+                          <b>{row.controllerName}</b>
+                          <span className="status-chip">{money(row.revenue)}</span>
+                        </div>
+                        <p className="mt-1 text-sm opacity-60">
+                          {row.hostelCount} hostels · {fmt(row.transactions)} transactions
+                        </p>
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-center text-xs">
+                          <div className="rounded-xl bg-white/70 py-2">
+                            <div className="text-base font-semibold">{money(row.dataRevenue)}</div>
+                            <div className="opacity-60">{fmt(row.dataPurchases)} data sales</div>
+                          </div>
+                          <div className="rounded-xl bg-white/70 py-2">
+                            <div className="text-base font-semibold">{money(row.tvRevenue)}</div>
+                            <div className="opacity-60">{fmt(row.tvSubscriptions)} TV sales</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+              )}
 
               {/* ── People, TV, comms ─────────────────────────────────────── */}
               <div className="grid gap-5 xl:grid-cols-3">
