@@ -1879,11 +1879,11 @@ export default function CollageHostelPlansPage({
                         </div>
 
                         <div className="text-sm text-apple-gray-600 font-medium">
-                          {plan.planType === "tv"
-                            ? `${plan.duration} Days Subscription`
-                            : plan.planType === "unlimited"
-                              ? `${plan.duration ? plan.duration + " Day" : "Daily"} Unlimited${plan.usersCount ? ` • ${plan.usersCount} Device${plan.usersCount !== 1 ? "s" : ""}` : ""}`
-                              : `Monthly Plan • ${plan.usersCount} Device${plan.usersCount !== 1 ? "s" : ""}`}
+{plan.planType === "tv"
+                             ? `${plan.duration} Days Subscription`
+                             : plan.planType === "unlimited"
+                               ? `${plan.duration ? plan.duration + " Day" : "Daily"} Unlimited${plan.usersCount ? ` • ${plan.usersCount} Device${plan.usersCount !== 1 ? "s" : ""}` : ""}`
+                               : `${plan.name}${plan.usersCount ? ` • ${plan.usersCount} Device${plan.usersCount !== 1 ? "s" : ""}` : ""}`}
                         </div>
                       </div>
                     </div>
