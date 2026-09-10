@@ -46,6 +46,15 @@ type PendingPayment =
   | { kind: "device" }
   | { kind: "tv"; isExisting: boolean };
 
+/** Human-readable duration label from a plan's duration in days. */
+function durationLabel(duration?: number): string {
+  if (!duration) return "Monthly";
+  if (duration === 1) return "Daily";
+  if (duration === 7) return "Weekly";
+  if (duration === 30) return "Monthly";
+  return `${duration}-Day`;
+}
+
 export default function CollageHostelPlansPage({
   params,
 }: {
@@ -1878,13 +1887,13 @@ export default function CollageHostelPlansPage({
                           </span>
                         </div>
 
-                        <div className="text-sm text-apple-gray-600 font-medium">
-{plan.planType === "tv"
+<div className="text-sm text-apple-gray-600 font-medium">
+                           {plan.planType === "tv"
                              ? `${plan.duration} Days Subscription`
                              : plan.planType === "unlimited"
                                ? `${plan.duration ? plan.duration + " Day" : "Daily"} Unlimited${plan.usersCount ? ` • ${plan.usersCount} Device${plan.usersCount !== 1 ? "s" : ""}` : ""}`
-                               : `${plan.name}${plan.usersCount ? ` • ${plan.usersCount} Device${plan.usersCount !== 1 ? "s" : ""}` : ""}`}
-                        </div>
+                               : `${durationLabel(plan.duration)} Plan • ${plan.usersCount} Device${plan.usersCount !== 1 ? "s" : ""}`}
+                         </div>
                       </div>
                     </div>
                   );
@@ -1920,8 +1929,10 @@ export default function CollageHostelPlansPage({
                       ) : (
                         <>
                           <Smartphone className="w-5 h-5" />
-                          {selectedPlan.usersCount} Device
-                          {selectedPlan.usersCount !== 1 ? "s" : ""}
+                          {durationLabel(selectedPlan.duration)} Plan
+                          {selectedPlan.usersCount
+                            ? ` · ${selectedPlan.usersCount} Device${selectedPlan.usersCount !== 1 ? "s" : ""}`
+                            : ""}
                         </>
                       )}
                     </p>

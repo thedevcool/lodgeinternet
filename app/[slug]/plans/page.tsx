@@ -46,6 +46,15 @@ type PendingPayment =
   | { kind: "device" }
   | { kind: "tv"; isExisting: boolean };
 
+/** Human-readable duration label from a plan's duration in days. */
+function durationLabel(duration?: number): string {
+  if (!duration) return "Monthly";
+  if (duration === 1) return "Daily";
+  if (duration === 7) return "Weekly";
+  if (duration === 30) return "Monthly";
+  return `${duration}-Day`;
+}
+
 export default function HostelPlansPage({
   params,
 }: {
@@ -1905,7 +1914,7 @@ export default function HostelPlansPage({
                             ? `${plan.duration} Days Subscription`
                             : plan.planType === "unlimited"
                               ? `${plan.duration ? plan.duration + " Day" : "Daily"} Unlimited${plan.usersCount ? ` • ${plan.usersCount} Device${plan.usersCount !== 1 ? "s" : ""}` : ""}`
-                              : `Monthly Plan • ${plan.usersCount} Device${plan.usersCount !== 1 ? "s" : ""}`}
+                              : `${durationLabel(plan.duration)} Plan • ${plan.usersCount} Device${plan.usersCount !== 1 ? "s" : ""}`}
                         </div>
                       </div>
                     </div>
@@ -1942,8 +1951,10 @@ export default function HostelPlansPage({
                       ) : (
                         <>
                           <Smartphone className="w-5 h-5" />
-                          {selectedPlan.usersCount} Device
-                          {selectedPlan.usersCount !== 1 ? "s" : ""}
+                          {durationLabel(selectedPlan.duration)} Plan
+                          {selectedPlan.usersCount
+                            ? ` · ${selectedPlan.usersCount} Device${selectedPlan.usersCount !== 1 ? "s" : ""}`
+                            : ""}
                         </>
                       )}
                     </p>
