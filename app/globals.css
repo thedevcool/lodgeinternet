@@ -163,3 +163,233 @@
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CLIENT DESIGN SYSTEM — iOS 27 + apple.com
+   Everything below is used only by the customer-facing pages (app/(client)).
+   Admin never reads these tokens, and dark mode only switches on while a
+   `.client-root` is on the page (`:root:has(.client-root)`), so admin always
+   stays light. Class names are prefixed `ui-` to keep clear of admin's
+   `.glass-*`, `.tile*`, `.segmented`, `.btn-*` classes above.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Tokens (RGB channels so Tailwind opacity modifiers work) ───────────── */
+:root {
+  --canvas: 245 245 247;      /* #F5F5F7 apple.com page grey */
+  --surface: 255 255 255;     /* cards */
+  --surface-2: 242 242 247;   /* inputs / grouped fills on white */
+  --ink: 29 29 31;            /* #1D1D1F primary text */
+  --ink-2: 110 110 115;       /* #6E6E73 secondary text (4.9:1 on white) */
+  --ink-3: 134 134 139;       /* #86868B placeholders, icons, dividers only */
+  --hairline: rgb(60 60 67 / 0.14);
+  --accent: 37 99 235;        /* #2563EB Figma blue — fills with white text */
+  --accent-ink: 37 99 235;    /* links / tinted text */
+  --success: 21 128 61;       /* #15803D */
+  --warning: 180 83 9;        /* #B45309 */
+  --danger: 220 38 38;        /* #DC2626 */
+  --wa: 21 128 61;            /* WhatsApp fill, darkened so white text passes 4.5:1 */
+  --wa-ink: 21 128 61;
+  --glass: 255 255 255;
+  --glass-edge: rgb(0 0 0 / 0.08);
+  --glass-highlight: rgb(255 255 255 / 0.75);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 12px 32px -20px rgb(0 0 0 / 0.18);
+  --shadow-float: 0 18px 48px -18px rgb(0 0 0 / 0.28), 0 2px 8px rgb(0 0 0 / 0.06);
+  --backdrop: rgb(0 0 0 / 0.32);
+}
+
+:root:has(.client-root) {
+  color-scheme: light dark;
+}
+:root[data-theme="light"]:has(.client-root) { color-scheme: light; }
+:root[data-theme="dark"]:has(.client-root) { color-scheme: dark; }
+
+/* Dark tokens apply when the system is dark (unless the visitor picked
+   Light), or when they picked Dark — see components/client/ThemeToggle. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):has(.client-root) {
+    --canvas: 0 0 0;
+    --surface: 28 28 30;       /* #1C1C1E */
+    --surface-2: 44 44 46;     /* #2C2C2E */
+    --ink: 245 245 247;
+    --ink-2: 161 161 166;      /* #A1A1A6 */
+    --ink-3: 110 110 115;
+    --hairline: rgb(84 84 88 / 0.5);
+    --accent: 37 99 235;
+    --accent-ink: 96 165 250;  /* #60A5FA */
+    --success: 74 222 128;
+    --warning: 251 191 36;
+    --danger: 248 113 113;
+    --wa: 21 128 61;
+    --wa-ink: 74 222 128;
+    --glass: 30 30 32;
+    --glass-edge: rgb(255 255 255 / 0.12);
+    --glass-highlight: rgb(255 255 255 / 0.1);
+    --shadow-card: 0 0 0 1px rgb(255 255 255 / 0.04);
+    --shadow-float: 0 18px 48px -18px rgb(0 0 0 / 0.8);
+    --backdrop: rgb(0 0 0 / 0.6);
+  }
+}
+
+:root[data-theme="dark"]:has(.client-root) {
+  --canvas: 0 0 0;
+  --surface: 28 28 30;       /* #1C1C1E */
+  --surface-2: 44 44 46;     /* #2C2C2E */
+  --ink: 245 245 247;
+  --ink-2: 161 161 166;      /* #A1A1A6 */
+  --ink-3: 110 110 115;
+  --hairline: rgb(84 84 88 / 0.5);
+  --accent: 37 99 235;
+  --accent-ink: 96 165 250;  /* #60A5FA */
+  --success: 74 222 128;
+  --warning: 251 191 36;
+  --danger: 248 113 113;
+  --wa: 21 128 61;
+  --wa-ink: 74 222 128;
+  --glass: 30 30 32;
+  --glass-edge: rgb(255 255 255 / 0.12);
+  --glass-highlight: rgb(255 255 255 / 0.1);
+  --shadow-card: 0 0 0 1px rgb(255 255 255 / 0.04);
+  --shadow-float: 0 18px 48px -18px rgb(0 0 0 / 0.8);
+  --backdrop: rgb(0 0 0 / 0.6);
+  }
+
+/* ── Page base ──────────────────────────────────────────────────────────── */
+/* `body:has()` also covers toasts and anything portalled outside the root.
+   `.client-root` repeats it for browsers without :has() (they stay light). */
+body:has(.client-root),
+.client-root {
+  background-color: rgb(var(--canvas));
+  color: rgb(var(--ink));
+  font-family: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-feature-settings: "cv11", "ss01";
+}
+
+.client-root {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Sheets lock scrolling with a class on <html>, never with body.style —
+   Paystack writes body.style.overflow when its popup opens and closes. */
+html.ui-scroll-locked,
+html.ui-scroll-locked body {
+  overflow: hidden;
+}
+
+@layer components {
+  /* ── Liquid Glass (iOS 27) ─────────────────────────────────────────────
+     More opaque than iOS 26, a defined 1px edge instead of a heavy shadow,
+     and a bright specular line along the top. Floating chrome only. */
+  .ui-glass {
+    background-color: rgb(var(--glass) / 0.72);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid var(--glass-edge);
+    box-shadow: inset 0 1px 0 var(--glass-highlight), var(--shadow-float);
+  }
+
+  /* Nav bar after scrolling: glass with a hard hairline edge, no shadow. */
+  .ui-glass-bar {
+    background-color: rgb(var(--canvas) / 0.72);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+    box-shadow: inset 0 -1px 0 var(--hairline);
+  }
+
+  /* ── Type scale (iOS) ──────────────────────────────────────────────── */
+  .ui-display { font-size: clamp(40px, 6.2vw, 80px); line-height: 1.04; font-weight: 700; letter-spacing: -0.03em; }
+  .ui-large-title { font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.022em; }
+  .ui-title-1 { font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em; }
+  .ui-title-2 { font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: -0.017em; }
+  .ui-title-3 { font-size: 20px; line-height: 25px; font-weight: 600; letter-spacing: -0.015em; }
+  .ui-headline { font-size: 17px; line-height: 22px; font-weight: 600; letter-spacing: -0.01em; }
+  .ui-body { font-size: 17px; line-height: 24px; letter-spacing: -0.01em; }
+  .ui-callout { font-size: 16px; line-height: 21px; letter-spacing: -0.01em; }
+  .ui-subhead { font-size: 15px; line-height: 20px; letter-spacing: -0.005em; }
+  .ui-footnote { font-size: 13px; line-height: 18px; }
+  .ui-caption { font-size: 12px; line-height: 16px; }
+  .ui-eyebrow { font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+
+  /* ── Loading shimmer ───────────────────────────────────────────────── */
+  .ui-skeleton {
+    border-radius: 10px;
+    background: linear-gradient(90deg, rgb(var(--ink) / 0.06) 25%, rgb(var(--ink) / 0.11) 37%, rgb(var(--ink) / 0.06) 63%);
+    background-size: 400% 100%;
+    animation: ui-shimmer 1.4s ease infinite;
+  }
+
+  /* Inset-grouped list: hairline between rows, starting after the leading
+     tile (rows set --inset; defaults to the 16px row padding). */
+  .ui-grouped > * + *::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: var(--inset, 16px);
+    height: 1px;
+    background: var(--hairline);
+  }
+
+  /* Horizontal scrollers (chips, carousels) — no visible scrollbar. */
+  .ui-scroll-x {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .ui-scroll-x::-webkit-scrollbar { display: none; }
+}
+
+@keyframes ui-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+/* ── iOS 27 motion ─────────────────────────────────────────────────────────
+   Fill-mode "backwards" on purpose: once an entrance finishes, no transform
+   is left behind (a lingering transform would re-anchor position:fixed
+   children such as the mobile checkout bar). */
+.ui-page-in { animation: ui-page-in 460ms cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+.ui-stagger > * { animation: ui-rise 520ms cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+.ui-stagger > *:nth-child(2) { animation-delay: 40ms; }
+.ui-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.ui-stagger > *:nth-child(4) { animation-delay: 120ms; }
+.ui-stagger > *:nth-child(5) { animation-delay: 160ms; }
+.ui-stagger > *:nth-child(6) { animation-delay: 200ms; }
+.ui-stagger > *:nth-child(7) { animation-delay: 240ms; }
+.ui-stagger > *:nth-child(n + 8) { animation-delay: 280ms; }
+
+@keyframes ui-page-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.995); }
+}
+@keyframes ui-rise {
+  from { opacity: 0; transform: translateY(12px); }
+}
+
+/* ── Accessibility fallbacks ────────────────────────────────────────────── */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .ui-glass { background-color: rgb(var(--glass)); }
+  .ui-glass-bar { background-color: rgb(var(--canvas)); }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .ui-glass { background-color: rgb(var(--glass)); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .ui-glass-bar { background-color: rgb(var(--canvas)); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+@media (prefers-contrast: more) {
+  .ui-glass { background-color: rgb(var(--glass)); border-color: rgb(var(--ink) / 0.45); }
+  .ui-glass-bar { background-color: rgb(var(--canvas)); box-shadow: inset 0 -1px 0 rgb(var(--ink) / 0.45); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .client-root *,
+  .client-root *::before,
+  .client-root *::after,
+  .ui-toast {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}

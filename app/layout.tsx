@@ -1,7 +1,16 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/Toast";
-import WhatsAppBotCTA from "@/components/WhatsAppBotCTA";
+
+// Inter is only *declared* here (as a CSS variable). The client pages apply it
+// through `.client-root` in globals.css; admin keeps its system font.
+// latin-ext carries the ₦ glyph.
+const inter = Inter({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-inter",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Lodge Internet - Fast and Reliable Hostel Internet",
@@ -15,12 +24,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={inter.variable}>
       <body>
-        <ToastProvider>
-          <WhatsAppBotCTA variant="top-banner" prefill="Hi Lodge Internet" />
-          {children}
-        </ToastProvider>
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );

@@ -6,7 +6,10 @@ import {
   reauthenticateWithCredential,
 } from "firebase/auth";
 import { getAuthInstance } from "@/lib/firebase";
-import { Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
+import Sheet from "@/components/ui/Sheet";
+import Button from "@/components/ui/Button";
+import TextField from "@/components/ui/TextField";
 
 interface ReAuthModalProps {
   /** Called with a fresh ID token after successful re-authentication */
@@ -14,9 +17,13 @@ interface ReAuthModalProps {
   onCancel: () => void;
 }
 
+/**
+ * "Confirm your identity" — shown when the server says the session is too
+ * old (SESSION_EXPIRED). Re-auth logic unchanged; now an iOS sheet that sits
+ * above any other open sheet (e.g. the post-payment code sheet).
+ */
 export default function ReAuthModal({ onSuccess, onCancel }: ReAuthModalProps) {
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -61,95 +68,33 @@ export default function ReAuthModal({ onSuccess, onCancel }: ReAuthModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 relative">
-        <button
-          onClick={onCancel}
-          className="absolute top-4 right-4 text-apple-gray-400 hover:text-apple-gray-600 transition-colors"
-        >
-          <svg
-            className="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl mb-4">
-            <ShieldCheck className="w-8 h-8 text-white" />
-          </div>
-          <h3 className="text-2xl font-semibold text-apple-gray-900 mb-2">
-            Confirm Your Identity
-          </h3>
-          <p className="text-apple-gray-600 text-sm">
-            For your security, please re-enter your password to continue with
-            this purchase.
-          </p>
-        </div>
-
-        {error && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleReAuth} className="space-y-5">
-          <div>
-            <label
-              htmlFor="reauth-password"
-              className="block text-sm font-semibold text-apple-gray-900 mb-2"
-            >
-              Password
-            </label>
-            <div className="relative">
-              <input
-                id="reauth-password"
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoFocus
-                placeholder="Enter your password"
-                className="w-full px-4 py-3 bg-apple-gray-50 border border-apple-gray-200 rounded-xl text-apple-gray-900 placeholder-apple-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-apple-gray-500 hover:text-apple-gray-700 transition-colors"
-              >
-                {showPassword ? (
-                  <EyeOff className="w-5 h-5" />
-                ) : (
-                  <Eye className="w-5 h-5" />
-                )}
-              </button>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white font-semibold py-4 rounded-2xl hover:opacity-90 transition-opacity shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Verifying...
-              </span>
-            ) : (
-              "Confirm & Continue"
-            )}
-          </button>
-        </form>
+    <Sheet open onClose={onCancel} layer="sheet-over" ariaLabel="Confirm your identity">
+      <div className="pb-2 pt-2 text-center">
+        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-[16px] bg-warning/15 text-warning">
+          <ShieldCheck className="h-7 w-7" />
+        </span>
+        <h2 className="ui-title-2 mt-4 text-ink">Confirm your identity</h2>
+        <p className="ui-subhead mx-auto mt-1.5 max-w-xs text-ink-2">
+          For your security, please re-enter your password to continue.
+        </p>
       </div>
-    </div>
+
+      <form onSubmit={handleReAuth} className="mt-5 space-y-5">
+        <TextField
+          label="Password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          autoFocus
+          autoComplete="current-password"
+          placeholder="Enter your password"
+          error={error || null}
+        />
+        <Button type="submit" full loading={loading}>
+          {loading ? "Verifying…" : "Confirm & Continue"}
+        </Button>
+      </form>
+    </Sheet>
   );
 }

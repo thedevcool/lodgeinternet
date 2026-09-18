@@ -2,7 +2,11 @@
 import { apiFetch } from "@/lib/apiClient";
 
 import { useState } from "react";
-import { Tv, AlertTriangle } from "lucide-react";
+import { Tv } from "lucide-react";
+import Sheet from "@/components/ui/Sheet";
+import Button from "@/components/ui/Button";
+import TextField from "@/components/ui/TextField";
+import InlineAlert from "@/components/ui/InlineAlert";
 
 interface UpdateMacModalProps {
   subscriptionId: string;
@@ -77,52 +81,21 @@ export default function UpdateMacModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 relative animate-in fade-in slide-in-from-bottom-4 duration-200">
-        <button
-          onClick={onCancel}
-          className="absolute top-4 right-4 text-apple-gray-400 hover:text-apple-gray-600 transition-colors"
-          aria-label="Close"
-        >
-          <svg
-            className="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
+    <Sheet open onClose={onCancel} ariaLabel="Update TV MAC address">
+      <div className="pt-1 text-center">
+        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-[16px] bg-accent text-white">
+          <Tv className="h-7 w-7" />
+        </span>
+        <h2 className="ui-title-2 mt-4 text-ink">Update TV MAC Address</h2>
+        <p className="ui-subhead mt-1 text-ink-2">{planName}</p>
+      </div>
 
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-400 to-purple-500 rounded-2xl mb-4">
-            <Tv className="w-8 h-8 text-white" />
-          </div>
-          <h3 className="text-2xl font-semibold text-apple-gray-900 mb-2">
-            Update TV MAC Address
-          </h3>
-          <p className="text-apple-gray-600 text-sm">
-            {planName}
-          </p>
-        </div>
-
-        {error && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-            {error}
-          </div>
-        )}
-
-        <div className="mb-5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-amber-800 leading-relaxed">
-            Submitting a new MAC will notify the admin to re-provision your TV on the network. There may be a short delay before the change takes effect.
-          </p>
-        </div>
+      <div className="mt-6 space-y-5">
+        {error && <InlineAlert>{error}</InlineAlert>}
+        <InlineAlert tone="warning">
+          Submitting a new MAC will notify the admin to re-provision your TV on the network. There may be a short delay
+          before the change takes effect.
+        </InlineAlert>
 
         <form
           onSubmit={(e) => {
@@ -131,44 +104,24 @@ export default function UpdateMacModal({
           }}
           className="space-y-5"
         >
-          <div>
-            <label
-              htmlFor="mac-address"
-              className="block text-sm font-semibold text-apple-gray-900 mb-2"
-            >
-              TV MAC Address
-            </label>
-            <input
-              id="mac-address"
-              type="text"
-              value={macAddress}
-              onChange={(e) => setMacAddress(e.target.value)}
-              required
-              autoFocus
-              placeholder="00:1A:2B:3C:4D:5E"
-              className="w-full px-4 py-3 bg-apple-gray-50 border border-apple-gray-200 rounded-xl text-apple-gray-900 placeholder-apple-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all font-mono"
-            />
-            <p className="text-xs text-apple-gray-500 mt-2">
-              Find this in your TV's network settings. Accepts colons, hyphens, or no separator.
-            </p>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white font-semibold py-4 rounded-2xl hover:opacity-90 transition-opacity shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Updating...
-              </span>
-            ) : (
-              "Update MAC Address"
-            )}
-          </button>
+          <TextField
+            label="TV MAC Address"
+            value={macAddress}
+            onChange={(e) => setMacAddress(e.target.value)}
+            required
+            autoFocus
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder="00:1A:2B:3C:4D:5E"
+            className="[&_input]:font-mono"
+            hint="Find this in your TV’s network settings. Accepts colons, hyphens, or no separator."
+          />
+          <Button type="submit" full loading={loading}>
+            {loading ? "Updating..." : "Update MAC Address"}
+          </Button>
         </form>
       </div>
-    </div>
+    </Sheet>
   );
 }

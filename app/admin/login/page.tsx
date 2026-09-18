@@ -3,8 +3,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
-import Logo from "@/components/Logo";
+import { BrandGlyph } from "@/components/ui/BrandMark";
+import Button from "@/components/ui/Button";
+import TextField from "@/components/ui/TextField";
+import InlineAlert from "@/components/ui/InlineAlert";
 
+/**
+ * Admin sign-in, in the client design language. `.client-root` opts this one
+ * admin page into the client tokens, Inter and light/dark; the rest of admin
+ * is unchanged. Login logic is unchanged.
+ */
 export default function AdminLogin() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -30,72 +38,42 @@ export default function AdminLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-50 to-black-50 flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <div className="flex justify-center mb-8">
-            <Logo variant="dark" />
+    <div className="client-root flex min-h-dvh items-center justify-center px-4 py-12">
+      <div className="ui-page-in w-full max-w-[400px]">
+        <div className="rounded-sheet bg-surface p-7 shadow-card sm:p-9">
+          <div className="flex justify-center">
+            <BrandGlyph className="h-14 w-14" />
           </div>
+          <p className="ui-eyebrow mt-6 text-center text-accent-ink">Lodge Internet Admin</p>
+          <h1 className="ui-title-1 mt-1 text-center text-ink">Sign in</h1>
+          <p className="ui-subhead mt-1.5 text-center text-ink-2">Manage hostels, plans and customers.</p>
 
-          <h1 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-blue-400 via-blue-500 to-black-400 bg-clip-text text-transparent">
-            Admin Login
-          </h1>
-          <p className="text-center text-apple-gray-600 mb-8">
-            Sign in to manage your Lodge Internet
-          </p>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label
-                htmlFor="username"
-                className="block text-sm font-medium text-apple-gray-700 mb-2"
-              >
-                Username
-              </label>
-              <input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-4 py-3 border border-apple-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter username"
-                required
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-apple-gray-700 mb-2"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-apple-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter password"
-                required
-              />
-            </div>
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-400 via-blue-500 to-black-400 text-white font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
+          <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+            <TextField
+              label="Username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Enter username"
+              autoComplete="username"
+              autoCapitalize="none"
+              required
+            />
+            <TextField
+              label="Password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter password"
+              autoComplete="current-password"
+              required
+            />
+            {error && <InlineAlert>{error}</InlineAlert>}
+            <Button type="submit" full loading={loading} className="!mt-6">
               {loading ? "Signing in..." : "Sign In"}
-            </button>
+            </Button>
           </form>
         </div>
+        <p className="ui-footnote mt-6 text-center text-ink-3">Authorised staff only</p>
       </div>
     </div>
   );

@@ -1,8 +1,13 @@
 "use client";
 
 import { createContext, useContext, useState, ReactNode } from "react";
-import { CheckCircle, XCircle, AlertCircle, Info, X } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, Info, X } from "lucide-react";
 
+/**
+ * Toasts — iOS-style glass banners. Top-centre on phones (below the notch),
+ * top-right on desktop. API unchanged: useToast().addToast({ type, title,
+ * message?, duration? }). Also used by two admin pages, which get the same look.
+ */
 interface Toast {
   id: string;
   type: "success" | "error" | "warning" | "info";
@@ -19,11 +24,14 @@ interface ToastContextType {
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
+// Counter ids: two toasts in the same millisecond no longer collide.
+let nextToastId = 0;
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const addToast = (toast: Omit<Toast, "id">) => {
-    const id = Date.now().toString();
+    const id = `toast-${++nextToastId}`;
     const newToast = { ...toast, id };
     setToasts((prev) => [...prev, newToast]);
 
@@ -63,13 +71,24 @@ function ToastContainer({
   removeToast: (id: string) => void;
 }) {
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2">
+    <div
+      aria-live="polite"
+      className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+10px)] z-[80] flex flex-col items-center gap-2 px-3 md:inset-x-auto md:right-4 md:top-4 md:items-end"
+    >
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
       ))}
     </div>
   );
 }
+
+// Literal class strings per type (Tailwind keeps only classes it can see).
+const ICONS = {
+  success: { Icon: CheckCircle2, cls: "text-green-600" },
+  error: { Icon: XCircle, cls: "text-red-500" },
+  warning: { Icon: AlertTriangle, cls: "text-amber-500" },
+  info: { Icon: Info, cls: "text-blue-500" },
+} as const;
 
 function ToastItem({
   toast,
@@ -78,66 +97,25 @@ function ToastItem({
   toast: Toast;
   onRemove: (id: string) => void;
 }) {
-  const getIcon = () => {
-    switch (toast.type) {
-      case "success":
-        return <CheckCircle className="w-5 h-5 text-green-600" />;
-      case "error":
-        return <XCircle className="w-5 h-5 text-red-600" />;
-      case "warning":
-        return <AlertCircle className="w-5 h-5 text-yellow-600" />;
-      case "info":
-        return <Info className="w-5 h-5 text-blue-600" />;
-    }
-  };
-
-  const getBgColor = () => {
-    switch (toast.type) {
-      case "success":
-        return "bg-green-50 border-green-200";
-      case "error":
-        return "bg-red-50 border-red-200";
-      case "warning":
-        return "bg-yellow-50 border-yellow-200";
-      case "info":
-        return "bg-blue-50 border-blue-200";
-    }
-  };
-
-  const getTextColor = () => {
-    switch (toast.type) {
-      case "success":
-        return "text-green-800";
-      case "error":
-        return "text-red-800";
-      case "warning":
-        return "text-yellow-800";
-      case "info":
-        return "text-blue-800";
-    }
-  };
+  const { Icon, cls } = ICONS[toast.type];
 
   return (
     <div
-      className={`
-        ${getBgColor()} ${getTextColor()}
-        border rounded-2xl shadow-lg p-4 max-w-md
-        animate-in slide-in-from-top-2 fade-in duration-300
-      `}
+      role={toast.type === "error" ? "alert" : "status"}
+      className="ui-glass ui-toast pointer-events-auto w-full max-w-[400px] animate-toast-in rounded-[22px] px-4 py-3 text-[rgb(var(--ink))]"
     >
       <div className="flex items-start gap-3">
-        {getIcon()}
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold">{toast.title}</p>
-          {toast.message && (
-            <p className="text-sm mt-1 opacity-90">{toast.message}</p>
-          )}
+        <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${cls}`} strokeWidth={2.2} />
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-semibold leading-5">{toast.title}</p>
+          {toast.message && <p className="mt-0.5 text-[14px] leading-[19px] opacity-70">{toast.message}</p>}
         </div>
         <button
           onClick={() => onRemove(toast.id)}
-          className="opacity-70 hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-black/5"
+          aria-label="Dismiss"
+          className="-mr-1 rounded-full p-1 opacity-50 transition-opacity hover:opacity-90"
         >
-          <X className="w-4 h-4" />
+          <X className="h-4 w-4" />
         </button>
       </div>
     </div>
