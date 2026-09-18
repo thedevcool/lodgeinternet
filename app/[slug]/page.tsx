@@ -10,10 +10,13 @@ import {
   LogIn,
   Building2,
   LayoutDashboard,
+  Layers,
+  ChevronRight,
 } from "lucide-react";
 import { toHostelSlug } from "@/lib/hostelSlug";
 import WhatsAppBotCTA from "@/components/WhatsAppBotCTA";
-import type { Hostel, HostelCollage } from "@/types";
+import type { Hostel, HostelCollage, HostelSchool } from "@/types";
+import PublicHeader from "@/components/PublicHeader";
 
 export default function CollagePage({
   params,
@@ -23,6 +26,8 @@ export default function CollagePage({
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [collage, setCollage] = useState<HostelCollage | null>(null);
+  const [school, setSchool] = useState<HostelSchool | null>(null);
+  const [schoolCollages, setSchoolCollages] = useState<HostelCollage[]>([]);
   const [hostels, setHostels] = useState<Hostel[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,13 +37,28 @@ export default function CollagePage({
     Promise.all([
       apiFetch("/api/hostel-collages").then((r) => r.json()),
       apiFetch("/api/hostels").then((r) => r.json()),
+      apiFetch("/api/hostel-schools").then((r) => r.json()),
     ])
-      .then(([collagesData, hostelsData]) => {
+      .then(([collagesData, hostelsData, schoolsData]) => {
         if (cancelled) return;
 
         const found = ((collagesData.collages as any[]) || []).find(
           (c) => c.slug === params.slug,
         );
+
+        const foundSchool = ((schoolsData.schools as HostelSchool[]) || []).find(
+          (s) => s.slug === params.slug,
+        );
+        if (foundSchool) {
+          setSchool(foundSchool);
+          setSchoolCollages(
+            ((collagesData.collages as HostelCollage[]) || []).filter(
+              (c) => c.schoolId === foundSchool.id,
+            ),
+          );
+          setLoading(false);
+          return;
+        }
 
         if (found) {
           setCollage(found);
@@ -92,6 +112,37 @@ export default function CollagePage({
       <div className="min-h-screen bg-apple-gray-50 flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
       </div>
+    );
+  }
+
+  if (school) {
+    return (
+      <main className="min-h-screen bg-apple-gray-50">
+        <PublicHeader />
+        <section className="bg-gradient-to-b from-blue-50 to-white py-16">
+          <div className="max-w-5xl mx-auto px-4 text-center">
+            <p className="text-sm font-semibold text-blue-600 uppercase tracking-wide">School</p>
+            <h1 className="text-4xl sm:text-6xl font-semibold text-apple-gray-900 mt-2">{school.name}</h1>
+            <p className="text-lg text-apple-gray-600 mt-4">Select your college to view its hostels.</p>
+          </div>
+        </section>
+        <section className="py-12">
+          <div className="max-w-5xl mx-auto px-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {schoolCollages.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => router.push(`/${school.slug}/${item.slug}`)}
+                className="bg-white rounded-3xl border-2 border-apple-gray-200 p-6 text-center hover:border-blue-300 hover:shadow-xl transition-all"
+              >
+                <Layers className="w-8 h-8 mx-auto mb-4 text-blue-600" />
+                <span className="block text-lg font-semibold text-apple-gray-900">{item.name}</span>
+                <span className="text-sm text-apple-gray-500 inline-flex items-center gap-1 mt-2">View hostels <ChevronRight className="w-3.5 h-3.5" /></span>
+              </button>
+            ))}
+          </div>
+          {schoolCollages.length === 0 && <p className="text-center text-apple-gray-600">No colleges in this school yet.</p>}
+        </section>
+      </main>
     );
   }
 

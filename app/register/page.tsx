@@ -30,7 +30,11 @@ function safeRedirectPath(raw: string | null): string | null {
 interface Hostel {
   id: string;
   name: string;
+  collageId?: string;
 }
+
+interface School { id: string; name: string; slug: string; }
+interface College { id: string; name: string; schoolId?: string; }
 
 type Step = "hostel" | "credentials" | "verify" | "done";
 
@@ -54,6 +58,10 @@ function RegisterContent() {
 
   const [step, setStep] = useState<Step>(verifyOnly ? "verify" : "hostel");
   const [hostels, setHostels] = useState<Hostel[]>([]);
+  const [schools, setSchools] = useState<School[]>([]);
+  const [colleges, setColleges] = useState<College[]>([]);
+  const [selectedSchool, setSelectedSchool] = useState<string>("");
+  const [selectedCollege, setSelectedCollege] = useState<string>("");
   const [loadingHostels, setLoadingHostels] = useState(true);
   const [selectedHostel, setSelectedHostel] = useState(prefillHostel);
   const [email, setEmail] = useState(prefillEmail);
@@ -78,9 +86,16 @@ function RegisterContent() {
 
   // Load hostels
   useEffect(() => {
-    apiFetch("/api/hostels")
-      .then((r) => r.json())
-      .then((data) => setHostels(data.hostels || []))
+    Promise.all([
+      apiFetch("/api/hostels").then((r) => r.json()),
+      apiFetch("/api/hostel-schools").then((r) => r.json()),
+      apiFetch("/api/hostel-collages").then((r) => r.json()),
+    ])
+      .then(([hostelData, schoolData, collegeData]) => {
+        setHostels(hostelData.hostels || []);
+        setSchools(schoolData.schools || []);
+        setColleges(collegeData.collages || []);
+      })
       .catch(() => setHostels([]))
       .finally(() => setLoadingHostels(false));
   }, []);
@@ -492,7 +507,34 @@ function RegisterContent() {
                   No hostels available
                 </div>
               ) : (
-                hostels.map((hostel) => {
+                <>
+                {schools.length > 0 && !selectedSchool && (
+                  <div className="space-y-3">
+                    <p className="text-sm text-apple-gray-600">First choose your school.</p>
+                    {schools.map((school) => (
+                      <button key={school.id} onClick={() => setSelectedSchool(school.id)} className="w-full flex items-center gap-4 p-4 rounded-2xl border bg-apple-gray-50 border-apple-gray-200 hover:border-blue-300 hover:bg-blue-50 text-left">
+                        <Building2 className="w-5 h-5 text-blue-600" />
+                        <span className="font-semibold text-apple-gray-900">{school.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {selectedSchool && !selectedCollege && (
+                  <div className="space-y-3">
+                    <button onClick={() => setSelectedSchool("")} className="text-sm text-blue-600">← Change school</button>
+                    <p className="text-sm text-apple-gray-600">Now choose your college.</p>
+                    {colleges.filter((college) => college.schoolId === selectedSchool).map((college) => (
+                      <button key={college.id} onClick={() => setSelectedCollege(college.id)} className="w-full flex items-center gap-4 p-4 rounded-2xl border bg-apple-gray-50 border-apple-gray-200 hover:border-blue-300 hover:bg-blue-50 text-left">
+                        <Building2 className="w-5 h-5 text-blue-600" />
+                        <span className="font-semibold text-apple-gray-900">{college.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {(!schools.length || (selectedSchool && selectedCollege)) && (
+                <>
+                {selectedCollege && <button onClick={() => setSelectedCollege("")} className="text-sm text-blue-600 mb-2">← Change college</button>}
+                {hostels.filter((hostel) => !selectedCollege || hostel.collageId === selectedCollege).map((hostel) => {
                   const isCurrent =
                     updateMode && currentHostel && hostel.name === currentHostel;
                   return (
@@ -530,7 +572,10 @@ function RegisterContent() {
                       )}
                     </button>
                   );
-                })
+                })}
+                </>
+                )}
+                </>
               )}
             </div>
           )}

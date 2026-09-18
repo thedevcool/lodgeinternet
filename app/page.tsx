@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { toHostelSlug } from "@/lib/hostelSlug";
 import WhatsAppBotCTA from "@/components/WhatsAppBotCTA";
-import type { HostelCollage } from "@/types";
+import type { HostelCollage, HostelSchool } from "@/types";
 
 interface Hostel {
   id: string;
@@ -36,16 +36,19 @@ export default function LandingPage() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [hostels, setHostels] = useState<Hostel[]>([]);
   const [collages, setCollages] = useState<HostelCollage[]>([]);
+  const [schools, setSchools] = useState<HostelSchool[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
       apiFetch("/api/hostels").then((r) => r.json()),
       apiFetch("/api/hostel-collages").then((r) => r.json()),
+      apiFetch("/api/hostel-schools").then((r) => r.json()),
     ])
-      .then(([hostelsData, collagesData]) => {
+      .then(([hostelsData, collagesData, schoolsData]) => {
         setHostels(hostelsData.hostels || []);
         setCollagesData(collagesData.collages || []);
+        setSchools(schoolsData.schools || []);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -91,12 +94,19 @@ export default function LandingPage() {
     router.push(`/${slug}`);
   };
 
+  const handleSchoolSelect = (slug: string) => {
+    router.push(`/${slug}`);
+  };
+
   // If logged in with a verified profile, only show their hostel
   const displayHostels = userProfile
     ? hostels.filter((h) => h.name === userProfile.hostelId)
     : hostels.filter((h) => !h.collageId);
 
-  const displayCollages = userProfile ? [] : collages;
+  const displayCollages = userProfile
+    ? []
+    : collages.filter((c) => !c.schoolId);
+  const displaySchools = userProfile ? [] : schools;
 
   return (
     <>
@@ -191,7 +201,7 @@ export default function LandingPage() {
             <div className='text-center py-10 text-apple-gray-600'>
               Loading...
             </div>
-          ) : displayHostels.length === 0 && displayCollages.length === 0 ? (
+          ) : displayHostels.length === 0 && displayCollages.length === 0 && displaySchools.length === 0 ? (
             <div className='text-center py-10 text-apple-gray-600'>
               No hostels available yet. Please contact support.
             </div>
@@ -220,6 +230,32 @@ export default function LandingPage() {
             </div>
           ) : (
             <>
+              {displaySchools.length > 0 && (
+                <div className='mb-12'>
+                  <h3 className='text-xl sm:text-2xl font-semibold text-apple-gray-800 mb-4 sm:mb-6 flex items-center gap-2'>
+                    <Layers className='w-5 h-5 text-blue-500' />
+                    Schools
+                  </h3>
+                  <div className='grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3'>
+                    {displaySchools.map((school) => (
+                      <div
+                        key={school.id}
+                        onClick={() => handleSchoolSelect(school.slug)}
+                        className='group bg-white rounded-3xl border-2 border-apple-gray-200 p-5 sm:p-6 cursor-pointer hover:border-blue-300 hover:shadow-xl hover:scale-105 transition-all duration-300 text-center'
+                      >
+                        <div className='inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4 bg-gradient-to-br from-blue-100 to-blue-200'>
+                          <Layers className='w-7 h-7 text-blue-600' strokeWidth={2} />
+                        </div>
+                        <h3 className='text-lg sm:text-xl font-semibold text-apple-gray-900 mb-1'>{school.name}</h3>
+                        <p className='text-sm text-apple-gray-500 flex items-center justify-center gap-1'>
+                          View colleges <ChevronRight className='w-3.5 h-3.5' />
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Collages */}
               {displayCollages.length > 0 && (
                 <div className='mb-12'>

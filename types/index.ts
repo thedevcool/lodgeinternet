@@ -125,6 +125,16 @@ export interface HostelCollage {
   id: string;
   name: string;
   slug: string;
+  schoolId?: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface HostelSchool {
+  id: string;
+  name: string;
+  slug: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;

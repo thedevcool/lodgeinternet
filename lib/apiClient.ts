@@ -75,6 +75,7 @@ const ADMIN_AUTH_EXACT = new Set<string>([
   // required for the write methods on the same path.
   "/api/hostels",
   "/api/hostel-collages",
+  "/api/hostel-schools",
   // Feedback POST is a public customer submission; the GET (admin list) is
   // guarded. Same story — token attaches only when an admin has one.
   "/api/data-codes/feedback",
