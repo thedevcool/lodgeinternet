@@ -1,5 +1,5 @@
 "use client";
-import { apiFetch } from "@/lib/apiClient";
+import { adminFetch } from "@/lib/apiClient";
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -225,7 +225,7 @@ function RichEditor({
       try {
         const formData = new FormData();
         formData.append("file", file);
-        const res = await apiFetch("/api/admin/upload-email-image", {
+        const res = await adminFetch("/api/admin/upload-email-image", {
           method: "POST",
           body: formData,
         });
@@ -592,7 +592,7 @@ export default function EmailsPage() {
   const fetchDrafts = async () => {
     setLoadingDrafts(true);
     try {
-      const res = await apiFetch("/api/admin/email-drafts");
+      const res = await adminFetch("/api/admin/email-drafts");
       const data = await res.json();
       if (res.ok) setDrafts(data.drafts ?? []);
     } catch {
@@ -609,7 +609,7 @@ export default function EmailsPage() {
     }
     setSavingDraft(true);
     try {
-      const res = await apiFetch("/api/admin/email-drafts", {
+      const res = await adminFetch("/api/admin/email-drafts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ subject, html }),
@@ -627,7 +627,7 @@ export default function EmailsPage() {
 
   const deleteDraft = async (id: string) => {
     try {
-      await apiFetch("/api/admin/email-drafts", {
+      await adminFetch("/api/admin/email-drafts", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
@@ -669,7 +669,7 @@ export default function EmailsPage() {
 
   // Load hostels for the filter dropdown
   useEffect(() => {
-    apiFetch("/api/hostels")
+    adminFetch("/api/hostels")
       .then((r) => r.json())
       .then((data) => {
         const all: Hostel[] = data.hostels ?? [];
@@ -707,7 +707,7 @@ export default function EmailsPage() {
     const params = new URLSearchParams({ group: recipientGroup });
     if (hostelFilter) params.set("hostel", hostelFilter);
 
-    apiFetch(`/api/admin/get-email-recipients?${params}`, {
+    adminFetch(`/api/admin/get-email-recipients?${params}`, {
       signal: controller.signal,
     })
       .then((r) => r.json())
@@ -803,7 +803,7 @@ export default function EmailsPage() {
         : Array.from(selectedEmails);
 
     try {
-      const res = await apiFetch("/api/admin/send-email", {
+      const res = await adminFetch("/api/admin/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

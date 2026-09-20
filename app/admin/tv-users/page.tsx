@@ -12,7 +12,7 @@
  * All the reconciling happens in `/api/admin/tv-devices`. This file renders.
  */
 
-import { apiFetch } from "@/lib/apiClient";
+import { adminFetch } from "@/lib/apiClient";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
 import Logo from "@/components/Logo";
@@ -225,7 +225,7 @@ export default function AdminTVUsersPage() {
   const fetchSubscriptions = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiFetch("/api/tv/subscriptions?isAdmin=true");
+      const res = await adminFetch("/api/tv/subscriptions?isAdmin=true");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not load subscriptions");
       setSubscriptions(data.subscriptions || []);
@@ -240,7 +240,7 @@ export default function AdminTVUsersPage() {
   const fetchDevices = useCallback(async () => {
     setLoadingDevices(true);
     try {
-      const res = await apiFetch("/api/admin/tv-devices");
+      const res = await adminFetch("/api/admin/tv-devices");
       const data = await res.json();
       if (res.ok) setDevices(data);
     } catch {
@@ -252,7 +252,7 @@ export default function AdminTVUsersPage() {
 
   const fetchTVPlans = useCallback(async () => {
     try {
-      const res = await apiFetch("/api/tv/plans");
+      const res = await adminFetch("/api/tv/plans");
       const data = await res.json();
       if (res.ok) setTvPlans(data.plans || []);
     } catch {
@@ -262,7 +262,7 @@ export default function AdminTVUsersPage() {
 
   const fetchHostels = useCallback(async () => {
     try {
-      const res = await apiFetch("/api/hostels");
+      const res = await adminFetch("/api/hostels");
       const data = await res.json();
       if (res.ok) setHostels(data.hostels || []);
     } catch {
@@ -272,7 +272,7 @@ export default function AdminTVUsersPage() {
 
   const fetchTvPassword = useCallback(async () => {
     try {
-      const res = await apiFetch("/api/admin/tv-settings");
+      const res = await adminFetch("/api/admin/tv-settings");
       const data = await res.json();
       if (!res.ok) return;
       setTvPassword(data.tvPassword || "");
@@ -297,7 +297,7 @@ export default function AdminTVUsersPage() {
     setSavingTvPassword(true);
     setError("");
     try {
-      const res = await apiFetch("/api/admin/tv-settings", {
+      const res = await adminFetch("/api/admin/tv-settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tvPassword }),
@@ -324,7 +324,7 @@ export default function AdminTVUsersPage() {
     if (!planModal || !selectedPlanId) return;
     setUpdatingPlan(true);
     try {
-      const res = await apiFetch("/api/tv/update-plan", {
+      const res = await adminFetch("/api/tv/update-plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ subscriptionId: planModal.subId, planId: selectedPlanId }),
@@ -344,7 +344,7 @@ export default function AdminTVUsersPage() {
   const handleCheckExpiry = async () => {
     setCheckingExpiry(true);
     try {
-      const res = await apiFetch("/api/tv/check-expiry", { method: "POST" });
+      const res = await adminFetch("/api/tv/check-expiry", { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Expiry check failed");
       await Promise.all([fetchSubscriptions(), fetchDevices()]);
@@ -366,7 +366,7 @@ export default function AdminTVUsersPage() {
   const confirmDelete = async (subscriptionId: string) => {
     setDeleting(subscriptionId);
     try {
-      const res = await apiFetch(`/api/tv/delete?id=${subscriptionId}`, { method: "DELETE" });
+      const res = await adminFetch(`/api/tv/delete?id=${subscriptionId}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not delete");
       await fetchSubscriptions();
@@ -441,7 +441,7 @@ export default function AdminTVUsersPage() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute module="tv-users">
       <div className="min-h-screen analytics-shell">
         <header className="glass-header">
           <div className="flex items-center gap-3">

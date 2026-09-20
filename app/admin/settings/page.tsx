@@ -1,5 +1,5 @@
 "use client";
-import { apiFetch } from "@/lib/apiClient";
+import { adminFetch } from "@/lib/apiClient";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -43,7 +43,7 @@ export default function AdminSettingsPage() {
   };
 
   useEffect(() => {
-    apiFetch("/api/admin/settings")
+    adminFetch("/api/admin/settings")
       .then((r) => r.json())
       .then((data: SiteSettings) => {
         setSettings(data);
@@ -69,7 +69,7 @@ export default function AdminSettingsPage() {
     setSaving(true);
     setFeedback(null);
     try {
-      const res = await apiFetch("/api/admin/settings", {
+      const res = await adminFetch("/api/admin/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -123,7 +123,7 @@ export default function AdminSettingsPage() {
   };
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute module="settings">
       <div className='min-h-screen bg-apple-gray-50'>
         {/* Header */}
         <header className='bg-white shadow-sm sticky top-0 z-10'>

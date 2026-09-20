@@ -1,5 +1,5 @@
 "use client";
-import { apiFetch } from "@/lib/apiClient";
+import { adminFetch } from "@/lib/apiClient";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -396,7 +396,7 @@ export default function AdminDataCodesPage() {
 
   const fetchDataCodesSummary = async () => {
     try {
-      const response = await apiFetch("/api/data-codes/summary");
+      const response = await adminFetch("/api/data-codes/summary");
       if (!response.ok) return;
       const data = await response.json();
       setDataCodesSummary(data ?? null);
@@ -408,7 +408,7 @@ export default function AdminDataCodesPage() {
   const fetchSyncFilters = async (controllerId = "") => {
     try {
       const query = controllerId ? `?controllerId=${encodeURIComponent(controllerId)}` : "";
-      const response = await apiFetch(`/api/data-codes/sync-filters${query}`);
+      const response = await adminFetch(`/api/data-codes/sync-filters${query}`);
       if (!response.ok) return;
       const data = await response.json();
       setSyncFilterPatterns(data.controllerBlockedGroupPatterns?.length ? data.controllerBlockedGroupPatterns : data.globalBlockedGroupPatterns ?? ["test", "testing"]);
@@ -421,7 +421,7 @@ export default function AdminDataCodesPage() {
   const saveSyncFilters = async () => {
     setSavingSyncFilters(true);
     try {
-      const response = await apiFetch("/api/data-codes/sync-filters", {
+      const response = await adminFetch("/api/data-codes/sync-filters", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scope: syncFilterScope, controllerId: syncFilterScope === "controller" ? syncFilterController : undefined, patterns: syncFilterPatterns, lowStockThreshold: syncLowStockThreshold }),
@@ -439,7 +439,7 @@ export default function AdminDataCodesPage() {
 
   const fetchLowStock = async () => {
     try {
-      const res = await apiFetch("/api/data-codes/low-stock");
+      const res = await adminFetch("/api/data-codes/low-stock");
       if (!res.ok) return;
       const data = await res.json();
       setLowStock(data.plans ?? []);
@@ -451,7 +451,7 @@ export default function AdminDataCodesPage() {
 
   const fetchControllers = async () => {
     try {
-      const res = await apiFetch("/api/admin/controllers");
+      const res = await adminFetch("/api/admin/controllers");
       if (!res.ok) return;
       const data = await res.json();
       const nextControllers = data.controllers ?? [];
@@ -467,7 +467,7 @@ export default function AdminDataCodesPage() {
 
   const fetchPlans = async () => {
     try {
-      const res = await apiFetch("/api/admin/plans");
+      const res = await adminFetch("/api/admin/plans");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to fetch plans");
       const plans: DataPlan[] = (data.plans ?? []).map((d: any) => ({
@@ -496,7 +496,7 @@ export default function AdminDataCodesPage() {
 
     try {
       const params = hostel ? `?hostel=${encodeURIComponent(hostel)}` : "";
-      const response = await apiFetch(`/api/data-codes/feedback${params}`);
+      const response = await adminFetch(`/api/data-codes/feedback${params}`);
       const result = await response.json();
 
       if (response.ok) {
@@ -511,7 +511,7 @@ export default function AdminDataCodesPage() {
 
   const fetchPendingTVSubscriptions = async () => {
     try {
-      const response = await apiFetch(
+      const response = await adminFetch(
         "/api/tv/subscriptions?status=pending_activation&isAdmin=true",
       );
       if (response.ok) {
@@ -525,7 +525,7 @@ export default function AdminDataCodesPage() {
 
   const fetchHostels = async () => {
     try {
-      const res = await apiFetch("/api/hostels");
+      const res = await adminFetch("/api/hostels");
       const data = await res.json();
       const all: Hostel[] = data.hostels || [];
       setHostels(all);
@@ -585,7 +585,7 @@ export default function AdminDataCodesPage() {
   const fetchCodes = async (targetPlanId: string, hostel: string) => {
     setLoadingCodes(true);
     try {
-      const res = await fetch(
+      const res = await adminFetch(
         `/api/data-codes/add?planId=${encodeURIComponent(targetPlanId)}&hostel=${encodeURIComponent(hostel)}`,
       );
       const data = await res.json();
@@ -680,7 +680,7 @@ export default function AdminDataCodesPage() {
         requestBody.duration = currentDuration;
       }
 
-      const response = await apiFetch("/api/data-codes/add", {
+      const response = await adminFetch("/api/data-codes/add", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -762,7 +762,7 @@ export default function AdminDataCodesPage() {
         usersCount: ctrlUsersCount,
         code: ctrlCode.trim(),
       };
-      const response = await apiFetch("/api/data-codes/add", {
+      const response = await adminFetch("/api/data-codes/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
@@ -792,7 +792,7 @@ export default function AdminDataCodesPage() {
     if (showLoader) setLoadingCtrlBuckets(true);
     setSelectedCtrlBucket("");
     try {
-      const res = await apiFetch(
+      const res = await adminFetch(
         `/api/data-codes/controller-buckets?controllerId=${encodeURIComponent(controllerId)}`,
       );
       const data = await res.json();
@@ -810,7 +810,7 @@ export default function AdminDataCodesPage() {
     setLoadingCtrlCodes(true);
     setCtrlCodes([]);
     try {
-      const res = await apiFetch(
+      const res = await adminFetch(
         `/api/data-codes/controller-codes?controllerId=${encodeURIComponent(controllerId)}&poolKey=${encodeURIComponent(poolKey)}`,
       );
       const data = await res.json();
@@ -868,7 +868,7 @@ export default function AdminDataCodesPage() {
     setSyncingResolve(poolKey);
     setError("");
     try {
-      const res = await apiFetch(
+      const res = await adminFetch(
         "/api/data-codes/controller-buckets/resolve-price",
         {
           method: "POST",
@@ -905,7 +905,7 @@ export default function AdminDataCodesPage() {
   const fetchSyncStatus = async (showLoader = true) => {
     if (showLoader) setLoadingSync(true);
     try {
-      const res = await apiFetch("/api/data-codes/sync-status");
+      const res = await adminFetch("/api/data-codes/sync-status");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load sync status");
       setSyncStatus(data.controllers ?? []);
@@ -936,9 +936,22 @@ export default function AdminDataCodesPage() {
   // second request on top of it.
   const syncPollInFlight = useRef(false);
 
+  // A run that has just finished changed pools, plans and stock — reload them
+  // once, when the last controller stops reporting progress.
+  const wasSyncing = useRef(false);
+  useEffect(() => {
+    if (wasSyncing.current && !syncInProgress) {
+      void Promise.all([fetchPlans(), fetchDataCodesSummary(), fetchLowStock()]);
+    }
+    wasSyncing.current = syncInProgress;
+  }, [syncInProgress]);
+
   useEffect(() => {
     if (!showSync || !syncInProgress) return;
     const timer = window.setInterval(async () => {
+      // Same guard the dashboard uses: a backgrounded tab shouldn't keep
+      // hitting the server every 1.5s.
+      if (document.visibilityState !== "visible") return;
       if (syncPollInFlight.current) return;
       syncPollInFlight.current = true;
       try {
@@ -956,15 +969,19 @@ export default function AdminDataCodesPage() {
      setSuccessMessage("");
      setError("");
      try {
-       const res = await apiFetch("/api/data-codes/sync", {
+       const res = await adminFetch("/api/data-codes/sync", {
          method: "POST",
          headers: { "Content-Type": "application/json" },
          body: JSON.stringify({ controllerId }),
        });
        const data = await res.json();
        if (!res.ok) throw new Error(data.error || "Sync failed");
+       // The sync now runs on the server and reports progress as it goes, so
+       // this returns straight away instead of holding the request open.
        setSuccessMessage(
-         `${controllerName}: synced ${data.lastSync?.added ?? 0} new, ${data.lastSync?.skipped ?? 0} skipped.`,
+         data.status === "already_running"
+           ? `${controllerName}: a sync is already running — watch the progress below.`
+           : `${controllerName}: sync started — progress updates below.`,
        );
        setTimeout(() => setSuccessMessage(""), 8000);
        await fetchSyncStatus(false);
@@ -981,22 +998,16 @@ export default function AdminDataCodesPage() {
      setSuccessMessage("");
      setError("");
      try {
-       const res = await apiFetch("/api/data-codes/sync", {
+       const res = await adminFetch("/api/data-codes/sync", {
          method: "POST",
          headers: { "Content-Type": "application/json" },
          body: JSON.stringify({ all: true }),
        });
        const data = await res.json();
        if (!res.ok) throw new Error(data.error || "All-controller sync failed");
-       const failed = Number(data.failed ?? 0);
-       const completed = (data.results ?? []).filter((r: { status?: string }) => r.status === "ok").length;
-       if (failed) {
-         setError(`Sync completed with ${failed} failure${failed === 1 ? "" : "s"}; ${completed} controller${completed === 1 ? "" : "s"} completed.`);
-       } else {
-         setSuccessMessage(`All controllers synced: ${completed} completed.`);
-         setTimeout(() => setSuccessMessage(""), 8000);
-       }
-       await Promise.all([fetchSyncStatus(false), fetchPlans(), fetchDataCodesSummary(), fetchLowStock()]);
+       setSuccessMessage("Sync started for every controller — progress updates below.");
+       setTimeout(() => setSuccessMessage(""), 8000);
+       await fetchSyncStatus(false);
      } catch (err: any) {
        setError(err?.message || "All-controller sync failed");
      } finally {
@@ -1012,7 +1023,7 @@ export default function AdminDataCodesPage() {
      setSuccessMessage("");
      setError("");
      try {
-       const res = await apiFetch("/api/data-codes/sync", {
+       const res = await adminFetch("/api/data-codes/sync", {
          method: "POST",
          headers: { "Content-Type": "application/json" },
          body: JSON.stringify({
@@ -1024,14 +1035,16 @@ export default function AdminDataCodesPage() {
        const data = await res.json();
        if (!res.ok) throw new Error(data.error || "Clean resync failed");
        setSuccessMessage(
-         `${target.name}: backup created and codes rebuilt. ${
-           cleanSyncKeepPrices
-             ? "Existing prices were kept."
-             : "Prices were reset — set them again before these pools can sell."
-         }`,
+         data.status === "already_running"
+           ? `${target.name}: a sync is already running — watch the progress below.`
+           : `${target.name}: clean resync started. ${
+               cleanSyncKeepPrices
+                 ? "Existing prices will be kept."
+                 : "Prices will be reset — set them again before these pools can sell."
+             }`,
        );
        setTimeout(() => setSuccessMessage(""), 8000);
-       await Promise.all([fetchSyncStatus(false), fetchPlans(), fetchDataCodesSummary(), fetchLowStock()]);
+       await fetchSyncStatus(false);
      } catch (err: any) {
        setError(err?.message || "Clean resync failed");
      } finally {
@@ -1043,7 +1056,7 @@ export default function AdminDataCodesPage() {
      setSyncDetailControllerId(controllerId);
      setSyncDetailLoading(true);
      try {
-       const res = await apiFetch(`/api/data-codes/controller-buckets?controllerId=${encodeURIComponent(controllerId)}`);
+       const res = await adminFetch(`/api/data-codes/controller-buckets?controllerId=${encodeURIComponent(controllerId)}`);
        const data = await res.json();
        if (!res.ok) throw new Error(data.error || "Failed to load controller pools");
        setSyncDetailBuckets(data.buckets ?? []);
@@ -1061,7 +1074,7 @@ export default function AdminDataCodesPage() {
      if (!draft) return;
      setSyncSavingKey(key);
      try {
-       const res = await apiFetch(`/api/admin/controllers/${controllerId}/pools/${encodeURIComponent(poolKey)}/metadata`, {
+       const res = await adminFetch(`/api/admin/controllers/${controllerId}/pools/${encodeURIComponent(poolKey)}/metadata`, {
          method: "PUT",
          headers: { "Content-Type": "application/json" },
          body: JSON.stringify({
@@ -1091,7 +1104,7 @@ export default function AdminDataCodesPage() {
      const key = `${controllerId}:${hostel}:${poolKey}`;
      setSyncSavingKey(key);
      try {
-       const res = await apiFetch(`/api/admin/controllers/${controllerId}/hostels/${encodeURIComponent(hostel)}/pools/${encodeURIComponent(poolKey)}/override`, {
+       const res = await adminFetch(`/api/admin/controllers/${controllerId}/hostels/${encodeURIComponent(hostel)}/pools/${encodeURIComponent(poolKey)}/override`, {
          method: "PUT",
          headers: { "Content-Type": "application/json" },
          body: JSON.stringify({ [field]: value }),
@@ -1150,7 +1163,7 @@ export default function AdminDataCodesPage() {
     setError("");
 
     try {
-      const response = await apiFetch("/api/data-codes/duplicate", {
+      const response = await adminFetch("/api/data-codes/duplicate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fromHostel: dupFrom, toHostel: dupTo }),
@@ -1182,7 +1195,7 @@ export default function AdminDataCodesPage() {
     setError("");
 
     try {
-      const response = await apiFetch("/api/data-codes/delete", {
+      const response = await adminFetch("/api/data-codes/delete", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -1225,7 +1238,7 @@ export default function AdminDataCodesPage() {
     setError("");
 
     try {
-      const response = await apiFetch("/api/data-codes/delete-plan", {
+      const response = await adminFetch("/api/data-codes/delete-plan", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -1301,7 +1314,7 @@ export default function AdminDataCodesPage() {
         body.unlimitedPeriod = editUnlimitedPeriod;
       }
 
-      const response = await apiFetch("/api/data-codes/update-plan", {
+      const response = await adminFetch("/api/data-codes/update-plan", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

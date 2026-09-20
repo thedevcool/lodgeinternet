@@ -1,5 +1,5 @@
 "use client";
-import { apiFetch } from "@/lib/apiClient";
+import { adminFetch } from "@/lib/apiClient";
 
 import React, { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
@@ -325,7 +325,7 @@ export default function AdminTransactionsPage() {
   useEffect(() => {
     void (async () => {
       try {
-        const res = await apiFetch("/api/admin/split-config");
+        const res = await adminFetch("/api/admin/split-config");
         if (!res.ok) return;
         const data = await res.json();
         if (typeof data.maintenancePct === "number") setMaintenancePct(data.maintenancePct);
@@ -486,12 +486,24 @@ export default function AdminTransactionsPage() {
       // Backgrounded — Payouts/Splits need the complete ledger, but nothing
       // on the Transactions tab (already fast via fetchAll above) should
       // wait on it.
-      void fetchAllTransactions();
+      // (loaded lazily — see the Payouts/Splits effect below)
     }
     if (isSuperAdmin) {
       fetchBotTransactions();
     }
   }, []);
+
+  // Payouts and Splits are the only tabs that need the complete, unfiltered
+  // ledger — by far the most expensive request in the admin. Fetch it the
+  // first time one of those tabs is opened rather than on every page load.
+  const allTransactionsLoaded = useRef(false);
+  useEffect(() => {
+    if (isPartner) return;
+    if (activeTab !== "payouts" && activeTab !== "splits") return;
+    if (allTransactionsLoaded.current) return;
+    allTransactionsLoaded.current = true;
+    void fetchAllTransactions();
+  }, [activeTab, isPartner]);
 
   // Re-fetch whenever a structured filter changes — the backend does the
   // filtering now, so a change here means different data to ask for, not
@@ -520,7 +532,7 @@ export default function AdminTransactionsPage() {
 
   const fetchHostels = async () => {
     try {
-      const res = await apiFetch("/api/hostels");
+      const res = await adminFetch("/api/hostels");
       const data = await res.json();
       if (res.ok) {
         const all = data.hostels ?? [];
@@ -547,7 +559,7 @@ export default function AdminTransactionsPage() {
   // Non-critical: on any failure the view just stays empty.
   const fetchBotTransactions = async () => {
     try {
-      const res = await apiFetch("/api/admin/bot-transactions");
+      const res = await adminFetch("/api/admin/bot-transactions");
       const data = await res.json();
       if (!res.ok) return;
       setBotTxns(data.transactions ?? []);
@@ -561,7 +573,7 @@ export default function AdminTransactionsPage() {
   // failure the view just stays empty.
   const fetchPartners = async () => {
     try {
-      const res = await apiFetch("/api/admin/admins");
+      const res = await adminFetch("/api/admin/admins");
       const data = await res.json();
       if (!res.ok) return;
       const rows: PartnerRow[] = (data.admins ?? [])
@@ -659,7 +671,7 @@ export default function AdminTransactionsPage() {
       // payment source/date), so it only ever has to stream what's actually
       // relevant — and `limit` caps the row list at the Firestore query
       // level, which is what keeps this fast even against a growing ledger.
-      const res = await apiFetch(`/api/admin/transactions${buildTransactionsQuery()}`);
+      const res = await adminFetch(`/api/admin/transactions${buildTransactionsQuery()}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load transactions");
       const parsed = parseTransactionsResponse(data);
@@ -684,7 +696,7 @@ export default function AdminTransactionsPage() {
    * fetch for tabs the user may not even open this session. */
   const fetchAllTransactions = async () => {
     try {
-      const res = await apiFetch("/api/admin/transactions");
+      const res = await adminFetch("/api/admin/transactions");
       const data = await res.json();
       if (!res.ok) return;
       setAllTransactions(parseTransactionsResponse(data).valid);
@@ -697,7 +709,7 @@ export default function AdminTransactionsPage() {
   const fetchSplits = async () => {
     setSplitsLoading(true);
     try {
-      const res = await apiFetch("/api/admin/splits");
+      const res = await adminFetch("/api/admin/splits");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to load splits");
       const records = (data.splits ?? []).map((s: any) => ({
@@ -1007,7 +1019,7 @@ export default function AdminTransactionsPage() {
     // already loaded if that request fails, rather than blocking entirely.
     let rowsSource: TransactionRow[] = filtered;
     try {
-      const res = await apiFetch(`/api/admin/transactions${buildTransactionsQuery({ unbounded: true })}`);
+      const res = await adminFetch(`/api/admin/transactions${buildTransactionsQuery({ unbounded: true })}`);
       const data = await res.json();
       if (res.ok) {
         // searchTerm never reaches the backend, so it's applied here same as
@@ -1158,7 +1170,7 @@ export default function AdminTransactionsPage() {
     setCreatingSplit(true);
     setSplitsError("");
     try {
-      const res = await apiFetch("/api/admin/splits", {
+      const res = await adminFetch("/api/admin/splits", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1211,7 +1223,7 @@ export default function AdminTransactionsPage() {
   const handleDeleteSplit = async (id: string) => {
     setDeletingSplit(id);
     try {
-      const res = await fetch(
+      const res = await adminFetch(
         `/api/admin/splits?id=${encodeURIComponent(id)}`,
         {
           method: "DELETE",
@@ -1280,7 +1292,7 @@ export default function AdminTransactionsPage() {
       partnerShare: Math.round((t.price * s.partnerPercent) / 100),
     }));
     try {
-      const res = await apiFetch("/api/admin/send-split-email", {
+      const res = await adminFetch("/api/admin/send-split-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

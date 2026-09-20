@@ -1,5 +1,5 @@
 "use client";
-import { apiFetch } from "@/lib/apiClient";
+import { adminFetch } from "@/lib/apiClient";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -113,7 +113,7 @@ export default function MigrationsPage() {
     setVerifying(true);
     setPasswordError("");
     try {
-      const res = await apiFetch("/api/admin/verify-migration-password", {
+      const res = await adminFetch("/api/admin/verify-migration-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: passwordInput }),
@@ -143,7 +143,7 @@ export default function MigrationsPage() {
     });
 
     try {
-      const res = await fetch(migration.endpoint, {
+      const res = await adminFetch(migration.endpoint, {
         method: migration.method,
         headers: { "x-migration-password": passwordInput },
       });

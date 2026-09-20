@@ -27,7 +27,7 @@ import {
 import AdminDrawer from "@/components/admin/AdminDrawer";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
 import Logo from "@/components/Logo";
-import { apiFetch } from "@/lib/apiClient";
+import { adminFetch } from "@/lib/apiClient";
 import { ADMIN_NAV, primeAttention } from "@/lib/adminNav";
 import { useAuthStore } from "@/store/authStore";
 
@@ -271,7 +271,7 @@ export default function AdminDashboardPage() {
     else setLoading(true);
 
     try {
-      const response = await apiFetch(
+      const response = await adminFetch(
         mode === "rebuild" ? "/api/admin/analytics/rebuild" : "/api/admin/analytics",
         { method: mode === "rebuild" ? "POST" : "GET", signal: controller.signal },
       );
@@ -321,7 +321,7 @@ export default function AdminDashboardPage() {
   );
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requireSuperAdmin>
       <div className="min-h-screen analytics-shell">
         <header className="glass-header">
           <div className="flex items-center gap-3">

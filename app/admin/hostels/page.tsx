@@ -1,5 +1,5 @@
 "use client";
-import { apiFetch } from "@/lib/apiClient";
+import { adminFetch } from "@/lib/apiClient";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -108,7 +108,7 @@ export default function AdminHostelsPage() {
       // Without this, a deactivated hostel is invisible to the public listing
       // and would vanish from this page too — the only way back on would be
       // gone along with it.
-      const res = await apiFetch("/api/hostels?includeInactive=true");
+      const res = await adminFetch("/api/hostels?includeInactive=true");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to fetch hostels");
       setHostels(data.hostels ?? []);
@@ -121,7 +121,7 @@ export default function AdminHostelsPage() {
 
   const fetchCollages = async () => {
     try {
-      const res = await apiFetch("/api/hostel-collages?includeInactive=true");
+      const res = await adminFetch("/api/hostel-collages?includeInactive=true");
       const data = await res.json();
       if (res.ok) setCollages(data.collages ?? []);
     } catch {
@@ -131,7 +131,7 @@ export default function AdminHostelsPage() {
 
   const fetchSchools = async () => {
     try {
-      const res = await apiFetch("/api/hostel-schools?includeInactive=true");
+      const res = await adminFetch("/api/hostel-schools?includeInactive=true");
       const data = await res.json();
       if (res.ok) setSchools(data.schools ?? []);
     } catch {
@@ -151,7 +151,7 @@ export default function AdminHostelsPage() {
     setAdding(true);
     setError("");
     try {
-      const res = await apiFetch("/api/hostels", {
+      const res = await adminFetch("/api/hostels", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, collageId: newCollageId || undefined }),
@@ -196,7 +196,7 @@ export default function AdminHostelsPage() {
     setSaving(true);
     setError("");
     try {
-      const res = await apiFetch("/api/hostels", {
+      const res = await adminFetch("/api/hostels", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -242,7 +242,7 @@ export default function AdminHostelsPage() {
     setTogglingId(hostel.id);
     setError("");
     try {
-      const res = await apiFetch("/api/admin/hostels/status", {
+      const res = await adminFetch("/api/admin/hostels/status", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ hostel: hostel.name, isActive: nextActive }),
@@ -279,7 +279,7 @@ export default function AdminHostelsPage() {
       // apiFetch, not a bare fetch: DELETE /api/hostels is admin-guarded and
       // needs the bearer token, and the backend now lives on its own origin —
       // neither of which a same-origin fetch() gets for free.
-      const res = await apiFetch(
+      const res = await adminFetch(
         `/api/hostels?id=${encodeURIComponent(deleteTarget.id)}`,
         {
           method: "DELETE",
@@ -303,7 +303,7 @@ export default function AdminHostelsPage() {
     setCreatingCollage(true);
     setError("");
     try {
-      const res = await apiFetch("/api/hostel-collages", {
+      const res = await adminFetch("/api/hostel-collages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, schoolId: newSchoolId || undefined }),
@@ -327,7 +327,7 @@ export default function AdminHostelsPage() {
     setCreatingSchool(true);
     setError("");
     try {
-      const res = await apiFetch("/api/hostel-schools", {
+      const res = await adminFetch("/api/hostel-schools", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
@@ -352,7 +352,7 @@ export default function AdminHostelsPage() {
     setCreatingCollege(true);
     setError("");
     try {
-      const res = await apiFetch("/api/hostel-collages", {
+      const res = await adminFetch("/api/hostel-collages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, schoolId: newCollegeSchoolId || undefined }),
@@ -384,7 +384,7 @@ export default function AdminHostelsPage() {
     setError("");
     try {
       const results = await Promise.all(selected.map(async (college) => {
-        const res = await apiFetch("/api/hostel-collages", {
+        const res = await adminFetch("/api/hostel-collages", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: college.id, name: college.name, schoolId }),
@@ -411,7 +411,7 @@ export default function AdminHostelsPage() {
     setError("");
     try {
       const results = await Promise.all(selected.map(async (hostel) => {
-        const res = await apiFetch("/api/hostels", {
+        const res = await adminFetch("/api/hostels", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: hostel.id, name: hostel.name, collageId }),
@@ -447,7 +447,7 @@ export default function AdminHostelsPage() {
     try {
       const isSchool = groupEdit.kind === "school";
       const currentCollege = isSchool ? null : collages.find((college) => college.id === groupEdit.id);
-      const res = await apiFetch(isSchool ? "/api/hostel-schools" : "/api/hostel-collages", {
+      const res = await adminFetch(isSchool ? "/api/hostel-schools" : "/api/hostel-collages", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -474,7 +474,7 @@ export default function AdminHostelsPage() {
     setGroupToggling(`${kind}:${id}`);
     setError("");
     try {
-      const res = await apiFetch(`/api/admin/hostel-${kind === "school" ? "schools" : "collages"}/status`, {
+      const res = await adminFetch(`/api/admin/hostel-${kind === "school" ? "schools" : "collages"}/status`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ [`${kind}Id`]: id, isActive: !isActive }),
@@ -495,7 +495,7 @@ export default function AdminHostelsPage() {
     if (!window.confirm(`Delete ${label} "${name}"? It must have no descendants.`)) return;
     setError("");
     try {
-      const res = await apiFetch(`/api/hostel-${kind === "school" ? "schools" : "collages"}?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const res = await adminFetch(`/api/hostel-${kind === "school" ? "schools" : "collages"}?id=${encodeURIComponent(id)}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Failed to delete ${label}`);
       showSuccess(`${label[0].toUpperCase() + label.slice(1)} deleted`);

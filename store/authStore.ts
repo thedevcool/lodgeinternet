@@ -1,7 +1,15 @@
 "use client";
 
 import { create } from "zustand";
-import { apiFetch } from "@/lib/apiClient";
+import { adminFetch, apiFetch } from "@/lib/apiClient";
+import {
+  ADMIN_COOKIE_KEY as COOKIE_KEY,
+  ADMIN_PROFILE_KEY as PROFILE_KEY,
+  ADMIN_TOKEN_KEY as TOKEN_KEY,
+  getAdminToken,
+  isTokenLive,
+} from "@/lib/adminSession";
+import { clearAttentionCache } from "@/lib/adminNav";
 import type { AdminModule, AdminProfile, ModulePermission } from "@/types";
 
 interface AuthStore {
@@ -9,6 +17,10 @@ interface AuthStore {
   adminProfile: AdminProfile | null;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
+  /** Renew a live session (and re-read permissions). False = it's over. */
+  refresh: () => Promise<boolean>;
+  /** Wipe local session state — used when the backend says it's over. */
+  endSession: () => void;
   /** Returns true if the admin has any permission for the given module */
   canAccess: (module: string) => boolean;
   /** Returns true if the admin may view data in the given module */
@@ -20,12 +32,6 @@ interface AuthStore {
 }
 
 // ─── Cookie / Storage helpers ─────────────────────────────────────────────────
-
-const COOKIE_KEY = "Davo-Nexus Limited-admin";
-const PROFILE_KEY = "Davo-Nexus Limited-admin-profile";
-// Signed admin session token issued by the FastAPI backend on login. `apiClient`
-// reads this same key to attach `Authorization: Bearer` on admin API calls.
-const TOKEN_KEY = "Davo-Nexus Limited-admin-token";
 
 const setCookie = (name: string, value: string, hours: number) => {
   const date = new Date();
@@ -47,6 +53,35 @@ const deleteCookie = (name: string) => {
   document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
 };
 
+function profileFrom(data: any, fallbackUsername: string): AdminProfile {
+  return {
+    username: data.username ?? fallbackUsername,
+    role: data.isSuperAdmin ? "super-admin" : "admin",
+    modulePermissions: data.modulePermissions ?? [],
+    hostels: data.hostels ?? [],
+    isSuperAdmin: data.isSuperAdmin ?? false,
+    isPartner: data.isPartner ?? false,
+    partnerSplitPercent: data.partnerSplitPercent ?? 0,
+    partnerSplitMode: data.partnerSplitMode ?? "whole",
+    partnerHostelSplits: data.partnerHostelSplits ?? {},
+  };
+}
+
+/** Persist a session the backend just handed us (login or refresh). */
+function storeSession(profile: AdminProfile, token: string | undefined): void {
+  if (typeof window === "undefined") return;
+  // The cookie is only a hint for the maintenance redirect; auth itself is
+  // decided by the token below.
+  setCookie(COOKIE_KEY, "true", 12);
+  try {
+    localStorage.setItem(COOKIE_KEY, "true");
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    // storage blocked — the session lives for this page only
+  }
+}
+
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
@@ -64,25 +99,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       const data = await response.json();
 
       if (data.success) {
-        const profile: AdminProfile = {
-          username: data.username ?? username,
-          role: data.isSuperAdmin ? "super-admin" : "admin",
-          modulePermissions: data.modulePermissions ?? [],
-          hostels: data.hostels ?? [],
-          isSuperAdmin: data.isSuperAdmin ?? false,
-          isPartner: data.isPartner ?? false,
-          partnerSplitPercent: data.partnerSplitPercent ?? 0,
-          partnerSplitMode: data.partnerSplitMode ?? "whole",
-          partnerHostelSplits: data.partnerHostelSplits ?? {},
-        };
+        const profile = profileFrom(data, username);
         set({ isAuthenticated: true, adminProfile: profile });
-        if (typeof window !== "undefined") {
-          setCookie(COOKIE_KEY, "true", 12);
-          localStorage.setItem(COOKIE_KEY, "true");
-          localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-          // Persist the signed session token for admin API calls.
-          if (data.token) localStorage.setItem(TOKEN_KEY, data.token);
-        }
+        storeSession(profile, data.token);
         return true;
       }
       return false;
@@ -92,13 +111,39 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  logout: () => {
+  logout: () => get().endSession(),
+
+  endSession: () => {
     set({ isAuthenticated: false, adminProfile: null });
+    // The drawer's badge counts are module-scoped and would otherwise follow
+    // the next admin who signs in on this browser.
+    clearAttentionCache();
     if (typeof window !== "undefined") {
       deleteCookie(COOKIE_KEY);
-      localStorage.removeItem(COOKIE_KEY);
-      localStorage.removeItem(PROFILE_KEY);
-      localStorage.removeItem(TOKEN_KEY);
+      try {
+        localStorage.removeItem(COOKIE_KEY);
+        localStorage.removeItem(PROFILE_KEY);
+        localStorage.removeItem(TOKEN_KEY);
+      } catch {
+        // nothing to clear
+      }
+    }
+  },
+
+  refresh: async () => {
+    try {
+      const response = await adminFetch("/api/admin/refresh", { method: "POST" });
+      if (!response.ok) return false;
+      const data = await response.json();
+      if (!data?.success) return false;
+      // Permissions come back fresh, so a revoked module applies from here on.
+      const profile = profileFrom(data, get().adminProfile?.username ?? "");
+      set({ isAuthenticated: true, adminProfile: profile });
+      storeSession(profile, data.token);
+      return true;
+    } catch {
+      // Offline or the backend is down — keep the session and try again later.
+      return false;
     }
   },
 
@@ -143,18 +188,31 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
 // ─── Restore session on page load ─────────────────────────────────────────────
 
-if (typeof window !== "undefined") {
-  const cookieAuth = getCookie(COOKIE_KEY) === "true";
-  if (cookieAuth) {
-    const profileJson = localStorage.getItem(PROFILE_KEY);
-    const profile: AdminProfile | null = profileJson
-      ? (JSON.parse(profileJson) as AdminProfile)
-      : null;
-    useAuthStore.setState({ isAuthenticated: true, adminProfile: profile });
-  } else {
-    localStorage.removeItem(COOKIE_KEY);
-    localStorage.removeItem(PROFILE_KEY);
-    localStorage.removeItem(TOKEN_KEY);
-    useAuthStore.setState({ isAuthenticated: false, adminProfile: null });
+function readStoredProfile(): AdminProfile | null {
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY);
+    return raw ? (JSON.parse(raw) as AdminProfile) : null;
+  } catch {
+    // A corrupt value used to throw here at import time and blank the whole
+    // admin app. Treat it as "no profile" instead.
+    return null;
   }
+}
+
+/** Decide, from the token alone, whether this browser has a live session. */
+function restoreSession(): void {
+  if (isTokenLive(getAdminToken())) {
+    useAuthStore.setState({ isAuthenticated: true, adminProfile: readStoredProfile() });
+  } else {
+    useAuthStore.getState().endSession();
+  }
+}
+
+if (typeof window !== "undefined") {
+  restoreSession();
+
+  // Signing out (or in) in one tab now applies to the others.
+  window.addEventListener("storage", (event) => {
+    if (event.key === TOKEN_KEY || event.key === null) restoreSession();
+  });
 }

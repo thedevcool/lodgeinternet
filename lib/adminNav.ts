@@ -25,7 +25,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { apiFetch } from "./apiClient";
+import { adminFetch } from "./apiClient";
 
 export type AdminNavItem = {
   label: string;
@@ -42,11 +42,11 @@ export type AdminNavItem = {
 export const ADMIN_NAV: AdminNavItem[] = [
   { label: "Data Codes", href: "/admin/data-codes", icon: KeyRound, module: "data-codes",
     description: "Pools, pricing, voucher stock and Omada sync." },
-  { label: "Controllers", href: "/admin/controllers", icon: Server, module: "controllers",
+  { label: "Controllers", href: "/admin/controllers", icon: Server, module: "controllers", superAdminOnly: true,
     description: "Omada controllers, member hostels and pool metadata." },
   { label: "Transactions", href: "/admin/transactions", icon: BarChart3, module: "transactions",
     description: "Purchases, revenue splits and partner statements." },
-  { label: "Bot Analytics", href: "/admin/bot-analytics", icon: Activity, module: "bot-analytics",
+  { label: "Bot Analytics", href: "/admin/bot-analytics", icon: Activity, module: "bot-analytics", superAdminOnly: true,
     description: "WhatsApp checkouts, payment methods and drop-off." },
   { label: "TV Users", href: "/admin/tv-users", icon: Tv, module: "tv-users",
     description: "Subscriptions awaiting activation and expiry." },
@@ -76,6 +76,11 @@ export type AttentionCounts = Record<string, number>;
 const BADGE_TTL_MS = 60_000;
 let cached: { at: number; counts: AttentionCounts } | null = null;
 
+/** Forget cached counts (sign-out: they belong to the admin who just left). */
+export function clearAttentionCache(): void {
+  cached = null;
+}
+
 export function primeAttention(counts: AttentionCounts | undefined): void {
   if (counts) cached = { at: Date.now(), counts };
 }
@@ -93,7 +98,7 @@ export function useAttention(enabled: boolean): AttentionCounts {
     const controller = new AbortController();
     void (async () => {
       try {
-        const response = await apiFetch("/api/admin/analytics", { signal: controller.signal });
+        const response = await adminFetch("/api/admin/analytics", { signal: controller.signal });
         if (!response.ok) return;
         const body = await response.json();
         const modules = (body?.attention?.modules ?? {}) as AttentionCounts;

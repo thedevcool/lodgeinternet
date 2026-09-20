@@ -1,5 +1,5 @@
 "use client";
-import { apiFetch } from "@/lib/apiClient";
+import { adminFetch } from "@/lib/apiClient";
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -230,7 +230,7 @@ export default function AdminManagementPage() {
     setLoading(true);
     setLoadError("");
     try {
-      const res = await apiFetch("/api/admin/admins");
+      const res = await adminFetch("/api/admin/admins");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load admins");
       setAdmins(data.admins ?? []);
@@ -244,7 +244,7 @@ export default function AdminManagementPage() {
   const fetchHostels = useCallback(async () => {
     setHostelsLoading(true);
     try {
-      const res = await apiFetch("/api/hostels");
+      const res = await adminFetch("/api/hostels");
       const data = await res.json();
       setAvailableHostels(data.hostels ?? []);
     } catch {
@@ -424,7 +424,7 @@ export default function AdminManagementPage() {
       if (form.password) body.password = form.password;
 
       try {
-        const res = await apiFetch(`/api/admin/admins/${editingAdmin.id}`, {
+        const res = await adminFetch(`/api/admin/admins/${editingAdmin.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -440,7 +440,7 @@ export default function AdminManagementPage() {
       }
     } else {
       try {
-        const res = await apiFetch("/api/admin/admins", {
+        const res = await adminFetch("/api/admin/admins", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -471,7 +471,7 @@ export default function AdminManagementPage() {
 
   const toggleActive = async (admin: AdminRow) => {
     try {
-      const res = await apiFetch(`/api/admin/admins/${admin.id}`, {
+      const res = await adminFetch(`/api/admin/admins/${admin.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: !admin.isActive }),
@@ -489,7 +489,7 @@ export default function AdminManagementPage() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      const res = await apiFetch(`/api/admin/admins/${deleteTarget.id}`, {
+      const res = await adminFetch(`/api/admin/admins/${deleteTarget.id}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Failed to delete");
@@ -503,7 +503,7 @@ export default function AdminManagementPage() {
   };
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requireSuperAdmin>
       <div className='min-h-screen bg-apple-gray-50'>
         {/* Header */}
         <header className='bg-white shadow-sm sticky top-0 z-10'>

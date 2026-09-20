@@ -1,5 +1,5 @@
 "use client";
-import { apiFetch } from "@/lib/apiClient";
+import { adminFetch } from "@/lib/apiClient";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -123,8 +123,8 @@ export default function AdminControllersPage() {
     setError("");
     try {
       const [ctrlRes, hostelRes] = await Promise.all([
-        apiFetch("/api/admin/controllers"),
-        apiFetch("/api/hostels"),
+        adminFetch("/api/admin/controllers"),
+        adminFetch("/api/hostels"),
       ]);
       const ctrlData = await ctrlRes.json();
       const hostelData = await hostelRes.json();
@@ -157,7 +157,7 @@ export default function AdminControllersPage() {
     setCreating(true);
     setError("");
     try {
-      const res = await apiFetch("/api/admin/controllers", {
+      const res = await adminFetch("/api/admin/controllers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
@@ -192,7 +192,7 @@ export default function AdminControllersPage() {
     setSaving(true);
     setError("");
     try {
-      const res = await apiFetch(`/api/admin/controllers/${id}`, {
+      const res = await adminFetch(`/api/admin/controllers/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
@@ -213,7 +213,7 @@ export default function AdminControllersPage() {
 
   const handleToggleActive = async (ctrl: Controller) => {
     try {
-      const res = await apiFetch(`/api/admin/controllers/${ctrl.id}`, {
+      const res = await adminFetch(`/api/admin/controllers/${ctrl.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: !ctrl.isActive }),
@@ -234,7 +234,7 @@ export default function AdminControllersPage() {
     setDeleting(true);
     setError("");
     try {
-      const res = await apiFetch(`/api/admin/controllers/${deleteTarget.id}`, {
+      const res = await adminFetch(`/api/admin/controllers/${deleteTarget.id}`, {
         method: "DELETE",
       });
       const data = await res.json();
@@ -261,7 +261,7 @@ export default function AdminControllersPage() {
     setAssigning(true);
     setError("");
     try {
-      const res = await apiFetch(
+      const res = await adminFetch(
         `/api/admin/controllers/${assignTarget.id}/hostels`,
         {
           method: "POST",
@@ -293,7 +293,7 @@ export default function AdminControllersPage() {
     setUnassigning(true);
     setError("");
     try {
-      const res = await apiFetch(
+      const res = await adminFetch(
         `/api/admin/controllers/${unassignTarget.controllerId}/hostels/${encodeURIComponent(unassignTarget.hostelName)}`,
         { method: "DELETE" },
       );
@@ -318,7 +318,7 @@ export default function AdminControllersPage() {
     setRenaming(true);
     setError("");
     try {
-      const res = await apiFetch(
+      const res = await adminFetch(
         `/api/admin/controllers/${renameTarget.controllerId}/hostels/rename`,
         {
           method: "POST",
@@ -345,7 +345,7 @@ export default function AdminControllersPage() {
     const key = draftKey(ctrl.id, poolKey);
     setSavingPool(key);
     try {
-      const res = await apiFetch(`/api/admin/controllers/${ctrl.id}/pools/${encodeURIComponent(poolKey)}/metadata`, {
+      const res = await adminFetch(`/api/admin/controllers/${ctrl.id}/pools/${encodeURIComponent(poolKey)}/metadata`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(explicitDraft ?? poolDrafts[key] ?? ctrl.poolMetadata[poolKey]),
@@ -365,7 +365,7 @@ export default function AdminControllersPage() {
     const key = `${controllerId}:${hostel}:${poolKey}`;
     setSavingOverride(key);
     try {
-      const res = await apiFetch(`/api/admin/controllers/${controllerId}/hostels/${encodeURIComponent(hostel)}/pools/${encodeURIComponent(poolKey)}/override`, {
+      const res = await adminFetch(`/api/admin/controllers/${controllerId}/hostels/${encodeURIComponent(hostel)}/pools/${encodeURIComponent(poolKey)}/override`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(overrideDrafts[key] ?? {}),
@@ -384,7 +384,7 @@ export default function AdminControllersPage() {
   const syncController = async (ctrl: Controller) => {
     setSyncingController(ctrl.id);
     try {
-      const res = await apiFetch("/api/data-codes/sync", {
+      const res = await adminFetch("/api/data-codes/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ controllerId: ctrl.id }),
@@ -403,7 +403,7 @@ export default function AdminControllersPage() {
   const syncAllControllers = async () => {
     setSyncingAll(true);
     try {
-      const res = await apiFetch("/api/data-codes/sync", {
+      const res = await adminFetch("/api/data-codes/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ all: true }),
@@ -462,7 +462,7 @@ export default function AdminControllersPage() {
   };
 
   return (
-    <ProtectedRoute module="hostels">
+    <ProtectedRoute requireSuperAdmin>
       <div className="min-h-screen bg-apple-gray-50">
         <header className="bg-white shadow-sm border-b border-apple-gray-200 sticky top-0 z-10">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">

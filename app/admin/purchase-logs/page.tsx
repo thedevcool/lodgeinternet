@@ -1,5 +1,5 @@
 "use client";
-import { apiFetch } from "@/lib/apiClient";
+import { adminFetch } from "@/lib/apiClient";
 
 import { useEffect, useMemo, useState } from "react";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
@@ -43,14 +43,22 @@ export default function PurchaseLogsPage() {
   const [filterPlan, setFilterPlan] = useState<string>("all");
   const [filterHostel, setFilterHostel] = useState<string>("all");
 
+  // `hasMore` tells us the server had more rows than the page we asked for.
+  const [hasMore, setHasMore] = useState(false);
+
   useEffect(() => {
-    fetchPurchases();
     fetchHostels();
   }, []);
 
+  // Re-ask the server when the hostel filter changes, instead of downloading
+  // the whole ledger once and filtering it in the browser.
+  useEffect(() => {
+    void fetchPurchases();
+  }, [filterHostel]);
+
   const fetchHostels = async () => {
     try {
-      const res = await apiFetch("/api/hostels");
+      const res = await adminFetch("/api/hostels");
       if (res.ok) {
         const data = await res.json();
         setHostels(data.hostels ?? []);
@@ -60,9 +68,14 @@ export default function PurchaseLogsPage() {
     }
   };
 
+  const PAGE_SIZE = 300;
+
   const fetchPurchases = async () => {
+    setLoading(true);
     try {
-      const res = await apiFetch("/api/admin/transactions");
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
+      if (filterHostel !== "all") params.set("hostel", filterHostel);
+      const res = await adminFetch(`/api/admin/transactions?${params.toString()}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load purchases");
 
@@ -80,6 +93,7 @@ export default function PurchaseLogsPage() {
         }),
       );
       setPurchases(purchases);
+      setHasMore(Boolean(data.hasMore));
     } catch (err) {
       console.error("Error fetching purchases:", err);
     } finally {
@@ -153,7 +167,7 @@ export default function PurchaseLogsPage() {
   };
 
   return (
-    <ProtectedRoute module="purchase-logs">
+    <ProtectedRoute module="transactions">
       <div className="min-h-screen bg-apple-gray-50">
         <header className="bg-white shadow-sm border-b border-apple-gray-200 sticky top-0 z-10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -371,6 +385,7 @@ export default function PurchaseLogsPage() {
           {filteredPurchases.length > 0 && (
             <div className="mt-4 text-sm text-apple-gray-600 text-right">
               Showing {filteredPurchases.length} of {visiblePurchases.length} purchases
+              {hasMore && ` — latest ${PAGE_SIZE}; pick a hostel to narrow the search`}
             </div>
           )}
         </div>

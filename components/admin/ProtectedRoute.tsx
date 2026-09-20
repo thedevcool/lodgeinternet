@@ -1,28 +1,33 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 
 export default function ProtectedRoute({
   children,
   module,
   requireWrite,
+  requireSuperAdmin,
 }: {
   children: React.ReactNode;
   /** If provided, the admin must have access to this module */
   module?: string;
   /** If true, the admin must have write permission for the module */
   requireWrite?: boolean;
+  /** If true, only a super admin may open this page (match the endpoints it calls) */
+  requireSuperAdmin?: boolean;
 }) {
-  const { isAuthenticated, canAccess, canWrite } = useAuthStore();
+  const { isAuthenticated, canAccess, canWrite, adminProfile } = useAuthStore();
   const router = useRouter();
+  const pathname = usePathname() ?? "";
 
   useEffect(() => {
     if (!isAuthenticated) {
-      router.push("/admin/login");
+      // Carry the current page so signing in returns here.
+      router.replace(`/admin/login?next=${encodeURIComponent(pathname)}`);
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, pathname, router]);
 
   if (!isAuthenticated) {
     return (
@@ -35,41 +40,17 @@ export default function ProtectedRoute({
     );
   }
 
+  // Super-admin-only pages: every endpoint behind them requires it, so
+  // opening the page by URL should refuse here rather than render a shell
+  // whose data all comes back 403.
+  if (requireSuperAdmin && !adminProfile?.isSuperAdmin) {
+    return <AccessDenied router={router} />;
+  }
+
   // Module-level access check
   if (module && !canAccess(module)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-apple-gray-50">
-        <div className="text-center p-8 max-w-sm">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg
-              className="w-8 h-8 text-red-500"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-              />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-apple-gray-900 mb-2">
-            Access Denied
-          </h2>
-          <p className="text-apple-gray-600 mb-6 text-sm">
-            You don&apos;t have permission to access this section. Contact the
-            super-admin to request access.
-          </p>
-          <button
-            onClick={() => router.push("/admin/dashboard")}
-            className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:opacity-90 transition-opacity"
-          >
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
+      <AccessDenied router={router} />
     );
   }
 
@@ -112,4 +93,42 @@ export default function ProtectedRoute({
   }
 
   return <>{children}</>;
+}
+
+/** Shown when an admin opens a page they may not use. */
+function AccessDenied({ router }: { router: ReturnType<typeof useRouter> }) {
+  return (
+      <div className="min-h-screen flex items-center justify-center bg-apple-gray-50">
+        <div className="text-center p-8 max-w-sm">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg
+              className="w-8 h-8 text-red-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+              />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-apple-gray-900 mb-2">
+            Access Denied
+          </h2>
+          <p className="text-apple-gray-600 mb-6 text-sm">
+            You don&apos;t have permission to access this section. Contact the
+            super-admin to request access.
+          </p>
+          <button
+            onClick={() => router.push("/admin/dashboard")}
+            className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:opacity-90 transition-opacity"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+  );
 }

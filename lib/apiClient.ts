@@ -14,18 +14,20 @@
  *   route is ported, so it's simply `/api`. To roll back to the old same-origin
  *   route for a group during the switch, remove/narrow the prefix here.
  *
- * Admin auth (the server-side security fix):
- * - `/api/admin/*` and the admin-only actions listed in `ADMIN_AUTH_EXACT` are
- *   protected by `require_admin` on the  `apiFetch` reads the admin JWT
- *   that `authStore` saved on login and attaches it as `Authorization: Bearer`.
- * - It never overwrites an `Authorization` header the caller already set (e.g.
- *   customer calls that pass a Firebase ID token), and only touches admin paths.
+ * Two clients, deliberately separate:
+ * - `apiFetch`  — customer side. NEVER sends the admin token. It used to
+ *   attach it to "public but sometimes admin" paths, which meant a browser
+ *   with an admin session received hostel Wi-Fi passwords on the customer
+ *   registration page.
+ * - `adminFetch` — admin screens. Always sends the token, and turns a 401
+ *   into one app-wide "session ended" signal so no page is left silently
+ *   empty. Neither overwrites an `Authorization` header the caller set (e.g.
+ *   a customer call carrying a Firebase ID token).
  */
 
-const BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/+$/, "");
+import { announceSessionEnded, getAdminToken } from "./adminSession";
 
-/** localStorage key holding the admin JWT — must match `store/authStore.ts`. */
-const ADMIN_TOKEN_KEY = "Davo-Nexus Limited-admin-token";
+const BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/+$/, "");
 
 /** Path prefixes served by the FastAPI backend (all routes are ported).
  *
@@ -37,63 +39,8 @@ const ADMIN_TOKEN_KEY = "Davo-Nexus Limited-admin-token";
  */
 export const MIGRATED_PREFIXES: string[] = ["/api"];
 
-/**
- * Admin-only endpoints that live under otherwise-customer prefixes
- * (`/api/data-codes/*`, `/api/tv/*`, `/api/cron/*`). Everything under
- * `/api/admin/` is covered separately by the prefix check below.
- */
-const ADMIN_AUTH_EXACT = new Set<string>([
-  "/api/data-codes/add",
-  "/api/data-codes/delete",
-  "/api/data-codes/delete-plan",
-  "/api/data-codes/duplicate",
-  "/api/data-codes/update-plan",
-  "/api/data-codes/controller-buckets",
-  "/api/data-codes/controller-codes",
-  "/api/data-codes/controller-buckets/resolve-price",
-  "/api/data-codes/sync-status",
-  "/api/data-codes/summary",
-  "/api/data-codes/low-stock",
-  "/api/data-codes/sync",
-  // Guarded by require_admin("data-codes") on the backend, so without the
-  // token this returns 401 — and it also needs the token to pass the
-  // lockdown gate while the site is closed.
-  "/api/data-codes/sync-filters",
-  "/api/tv/activate",
-  "/api/tv/delete",
-  "/api/tv/update-plan",
-  "/api/tv/check-expiry",
-  // TV subscription listing doubles as the admin "pending activation" source
-  // (isAdmin=true); attach the admin token so the is_admin branch can verify it.
-  "/api/tv/subscriptions",
-  // Public GET, but the TV admin screens read it too. The token is ignored by
-  // the route and is what carries those screens through a site lockdown.
-  "/api/tv/plans",
-  "/api/cron/cleanup-email-images",
-  // Hostel/collage GET is public, but create/update/delete are admin-guarded.
-  // Attaching the token is harmless on the public GET (it's ignored), and
-  // required for the write methods on the same path.
-  "/api/hostels",
-  "/api/hostel-collages",
-  "/api/hostel-schools",
-  // Feedback POST is a public customer submission; the GET (admin list) is
-  // guarded. Same story — token attaches only when an admin has one.
-  "/api/data-codes/feedback",
-]);
-
 function isMigrated(path: string): boolean {
   return MIGRATED_PREFIXES.some((p) => path === p || path.startsWith(p));
-}
-
-/** Does this path hit a backend route guarded by `require_admin`? */
-function needsAdminAuth(path: string): boolean {
-  const clean = path.split("?")[0];
-  return clean.startsWith("/api/admin/") || ADMIN_AUTH_EXACT.has(clean);
-}
-
-function getAdminToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(ADMIN_TOKEN_KEY);
 }
 
 /**
@@ -104,26 +51,40 @@ export function apiUrl(path: string): string {
   return BASE && isMigrated(path) ? BASE + path : path;
 }
 
-/**
- * Attach the admin JWT for admin paths, without clobbering an Authorization
- * header the caller already provided. Returns the (possibly unchanged) init.
- */
-function withAdminAuth(
-  path: string,
-  init?: RequestInit,
-): RequestInit | undefined {
-  if (!needsAdminAuth(path)) return init;
-  const token = getAdminToken();
-  if (!token) return init;
-
-  const headers = new Headers(init?.headers);
-  if (!headers.has("Authorization")) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-  return { ...init, headers };
+/** Customer-side fetch. Carries no admin credentials, ever. */
+export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  return fetch(apiUrl(path), init);
 }
 
-/** Drop-in replacement for `fetch("/api/...")` used across the app. */
-export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-  return fetch(apiUrl(path), withAdminAuth(path, init));
+/**
+ * Admin-side fetch: attaches the session token and watches for a dead session.
+ *
+ * A 401 here means the session is over — every admin screen used to handle
+ * that on its own, or (mostly) not at all, which is why an expired session
+ * looked like an admin page where every table was empty. Now it is announced
+ * once and `AdminSessionKeeper` does the rest. A 403 is left alone: the
+ * session is fine, this admin simply may not do that.
+ */
+export async function adminFetch(path: string, init?: RequestInit): Promise<Response> {
+  const token = getAdminToken();
+  let request = init;
+  if (token) {
+    const headers = new Headers(init?.headers);
+    if (!headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
+    request = { ...init, headers };
+  }
+
+  const response = await fetch(apiUrl(path), request);
+
+  if (response.status === 401) {
+    let code = "";
+    try {
+      code = (await response.clone().json())?.code ?? "";
+    } catch {
+      // non-JSON body — treat as a plain expiry
+    }
+    announceSessionEnded(code === "session_invalid" ? "invalid" : "expired");
+  }
+
+  return response;
 }

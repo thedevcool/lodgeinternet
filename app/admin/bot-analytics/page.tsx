@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Activity, ArrowLeft, LogOut } from "lucide-react";
-import { apiFetch } from "@/lib/apiClient";
+import { adminFetch } from "@/lib/apiClient";
 import { useAuthStore } from "@/store/authStore";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
 import Logo from "@/components/Logo";
@@ -27,7 +27,7 @@ export default function BotAnalyticsPage() {
 
   useEffect(() => {
     if (!adminProfile?.isSuperAdmin) return;
-    apiFetch("/api/admin/bot-analytics")
+    adminFetch("/api/admin/bot-analytics")
       .then(async (res) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Could not load analytics");
@@ -50,7 +50,7 @@ export default function BotAnalyticsPage() {
     : [];
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requireSuperAdmin>
       <div className="min-h-screen bg-apple-gray-50">
         <header className="bg-white shadow-sm">
           <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">

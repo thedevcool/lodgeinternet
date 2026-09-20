@@ -10,6 +10,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Menu } from "lucide-react";
 import AdminDrawer from "@/components/admin/AdminDrawer";
+import AdminSessionKeeper from "@/components/admin/AdminSessionKeeper";
 import { useAttention } from "@/lib/adminNav";
 import { useAuthStore } from "@/store/authStore";
 
@@ -22,10 +23,18 @@ export default function AdminChrome({ children }: { children: React.ReactNode })
   // badges rather than a failed request on every page.
   const attention = useAttention(!ownsItsOwnDrawer && !!adminProfile?.isSuperAdmin);
 
-  if (ownsItsOwnDrawer) return <>{children}</>;
+  if (ownsItsOwnDrawer) {
+    return (
+      <>
+        <AdminSessionKeeper />
+        {children}
+      </>
+    );
+  }
 
   return (
     <>
+      <AdminSessionKeeper />
       <button aria-label="Open admin navigation" onClick={() => setOpen(true)} className="admin-global-menu">
         <Menu size={19} />
       </button>

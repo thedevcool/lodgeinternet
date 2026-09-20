@@ -1,7 +1,7 @@
 "use client";
-import { apiFetch } from "@/lib/apiClient";
+import { adminFetch } from "@/lib/apiClient";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
@@ -180,7 +180,7 @@ export default function AdminUsersPage() {
   };
 
   useEffect(() => {
-    apiFetch("/api/hostels")
+    adminFetch("/api/hostels")
       .then((r) => r.json())
       .then((d) => setHostels(d.hostels || []))
       .catch(() => {});
@@ -192,7 +192,7 @@ export default function AdminUsersPage() {
       const params = new URLSearchParams();
       if (selectedHostel) params.set("hostel", selectedHostel);
       if (search.trim()) params.set("search", search.trim());
-      const res = await apiFetch(`/api/admin/users?${params.toString()}`);
+      const res = await adminFetch(`/api/admin/users?${params.toString()}`);
       const data = await res.json();
       if (res.ok) setUsers(data.users || []);
     } catch {
@@ -206,8 +206,15 @@ export default function AdminUsersPage() {
     loadUsers();
   }, [selectedHostel, loadUsers]);
 
-  // Debounced search
+  // Debounced search. Skips its own first run: the effect above already
+  // loaded once on mount, and without this guard every page load fired the
+  // same request twice, 350ms apart.
+  const searchMounted = useRef(false);
   useEffect(() => {
+    if (!searchMounted.current) {
+      searchMounted.current = true;
+      return;
+    }
     const t = setTimeout(() => loadUsers(), 350);
     return () => clearTimeout(t);
   }, [search, loadUsers]);
@@ -218,7 +225,7 @@ export default function AdminUsersPage() {
     setHistoryFilter("all");
     setHistoryLoading(true);
     try {
-      const res = await apiFetch(`/api/admin/users?history=${user.id}`);
+      const res = await adminFetch(`/api/admin/users?history=${user.id}`);
       const data = await res.json();
       if (res.ok) setPurchases(data.purchases || []);
     } catch {
@@ -241,7 +248,7 @@ export default function AdminUsersPage() {
     setTogglingId(userId);
     setFeedback(null);
     try {
-      const res = await apiFetch("/api/admin/users", {
+      const res = await adminFetch("/api/admin/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, isActive }),
@@ -275,7 +282,7 @@ export default function AdminUsersPage() {
     setDeletingId(user.id);
     setFeedback(null);
     try {
-      const res = await apiFetch(`/api/admin/users?userId=${encodeURIComponent(user.id)}`, {
+      const res = await adminFetch(`/api/admin/users?userId=${encodeURIComponent(user.id)}`, {
         method: "DELETE",
       });
       const data = await res.json();
@@ -316,7 +323,7 @@ export default function AdminUsersPage() {
     setReminderFeedback(null);
     try {
       const body = userIds === "all" ? {} : { userIds };
-      const res = await apiFetch("/api/admin/send-registration-reminder", {
+      const res = await adminFetch("/api/admin/send-registration-reminder", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

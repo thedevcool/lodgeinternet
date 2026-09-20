@@ -1,5 +1,5 @@
 "use client";
-import { apiFetch } from "@/lib/apiClient";
+import { adminFetch } from "@/lib/apiClient";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -88,7 +88,7 @@ export default function AdminWaitlistPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await apiFetch("/api/admin/waitlist");
+      const res = await adminFetch("/api/admin/waitlist");
       if (!res.ok) throw new Error("Failed to load waitlist");
       const data = await res.json();
       setEntries(data.entries ?? []);
@@ -252,7 +252,7 @@ export default function AdminWaitlistPage() {
     const prev = entries;
     setEntries((es) => es.map((e) => (e.id === id ? { ...e, status } : e)));
     try {
-      const res = await apiFetch(`/api/admin/waitlist/${id}`, {
+      const res = await adminFetch(`/api/admin/waitlist/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
@@ -267,7 +267,7 @@ export default function AdminWaitlistPage() {
 
   const deleteEntry = async (id: string) => {
     try {
-      const res = await apiFetch(`/api/admin/waitlist/${id}`, { method: "DELETE" });
+      const res = await adminFetch(`/api/admin/waitlist/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete entry");
       setEntries((es) => es.filter((e) => e.id !== id));
       addToast({ type: "success", title: "Deleted", message: "Entry removed." });
