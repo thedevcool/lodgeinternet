@@ -5,7 +5,7 @@ import Button from "@/components/ui/Button";
 import TextField from "@/components/ui/TextField";
 import InlineAlert from "@/components/ui/InlineAlert";
 import WhatsAppCard from "@/components/ui/WhatsAppCard";
-import { checkoutCharges, checkoutTotal } from "@/lib/pricing";
+import { planCharges, planTotal } from "@/lib/pricing";
 import type { DataPlan } from "@/types";
 import { planTypeLine } from "./checkout";
 import type { PlansCheckout } from "./usePlansCheckout";
@@ -66,7 +66,7 @@ export default function CheckoutPanel({ c }: { c: PlansCheckout }) {
                 ? "Loading payment..."
                 : c.purchasing
                   ? "Processing..."
-                  : `Pay ₦${checkoutTotal(plan.price).toLocaleString()}`}
+                  : `Pay ₦${planTotal(plan).toLocaleString()}`}
           </Button>
           <SecureNote />
         </form>
@@ -107,11 +107,11 @@ function OrderSummary({ plan }: { plan: DataPlan }) {
         </div>
         <div className="flex justify-between text-ink-2">
           <dt>Bank Charges</dt>
-          <dd className="tabular-nums">₦{checkoutCharges(plan.price).toLocaleString()}</dd>
+          <dd className="tabular-nums">₦{planCharges(plan).toLocaleString()}</dd>
         </div>
         <div className="flex justify-between border-t border-hairline pt-3 text-[17px] font-semibold text-ink">
           <dt>Total to Pay</dt>
-          <dd className="tabular-nums">₦{checkoutTotal(plan.price).toLocaleString()}</dd>
+          <dd className="tabular-nums">₦{planTotal(plan).toLocaleString()}</dd>
         </div>
       </dl>
     </div>
@@ -149,7 +149,7 @@ export function CheckoutBar({ plan, onContinue }: { plan: DataPlan; onContinue: 
       <div className="min-w-0 flex-1">
         <p className="ui-footnote truncate text-ink-2">{plan.name}</p>
         <p className="ui-headline tabular-nums text-ink">
-          ₦{checkoutTotal(plan.price).toLocaleString()} <span className="ui-footnote font-normal text-ink-2">total</span>
+          ₦{planTotal(plan).toLocaleString()} <span className="ui-footnote font-normal text-ink-2">total</span>
         </p>
       </div>
       <Button size="md" onClick={onContinue}>

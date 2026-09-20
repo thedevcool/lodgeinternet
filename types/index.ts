@@ -98,6 +98,10 @@ export interface DataPlan {
   id: string;
   name: string;
   planType: "device" | "tv" | "unlimited"; // Type of plan
+  /** What the customer actually pays, quoted by the backend (price + charges). */
+  total?: number;
+  /** Everything added on top of the plan price, quoted by the backend. */
+  charges?: number;
   unlimitedPeriod?: "daily" | "weekly" | "monthly" | "yearly" | string; // Subtype for unlimited plans
   usersCount?: number; // Only for device plans (3 or 5)
   duration?: number; // For TV plans and unlimited - duration in days

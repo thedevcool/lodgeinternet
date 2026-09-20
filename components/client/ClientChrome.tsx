@@ -7,6 +7,7 @@ import { PageChromeProvider } from "./PageChrome";
 import NavBar from "./NavBar";
 import TabBar from "./TabBar";
 import Footer from "./Footer";
+import MaintenanceWatch from "./MaintenanceWatch";
 
 /**
  * Shared frame for every client page: nav bar, content, footer, tab bar, and
@@ -30,6 +31,7 @@ export default function ClientChrome({ children }: { children: ReactNode }) {
 
   return (
     <PageChromeProvider>
+      <MaintenanceWatch />
       {showNavAndFooter && <NavBar />}
       <div
         className={cx(

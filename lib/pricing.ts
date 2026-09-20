@@ -32,3 +32,21 @@ export function checkoutTotal(price: number): number {
 export function checkoutCharges(price: number): number {
   return checkoutTotal(price) - price;
 }
+
+// ─── Prefer the server's figures ─────────────────────────────────────────────
+// The backend quotes `total` and `charges` with every plan and verifies the
+// payment against that same total, so the browser no longer decides what a
+// checkout costs. The formula above stays as a fallback for a plan served by
+// an older backend, and the two agree by construction.
+
+type PricedPlan = { price: number; total?: number; charges?: number };
+
+/** What to charge for this plan. */
+export function planTotal(plan: PricedPlan): number {
+  return typeof plan.total === "number" ? plan.total : checkoutTotal(plan.price);
+}
+
+/** What to show on the "charges" line. */
+export function planCharges(plan: PricedPlan): number {
+  return typeof plan.charges === "number" ? plan.charges : checkoutCharges(plan.price);
+}

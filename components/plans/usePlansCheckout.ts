@@ -34,7 +34,7 @@ import { getAuthInstance } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { useToast } from "@/components/Toast";
 import { generatePaymentRef } from "@/lib/generateRef";
-import { checkoutTotal } from "@/lib/pricing";
+import { planTotal } from "@/lib/pricing";
 import { toHostelSlug } from "@/lib/hostelSlug";
 import type { DataPlan, Hostel } from "@/types";
 import { saveCodeToLocalStorage, type PendingPayment, type PlanView } from "./checkout";
@@ -660,7 +660,7 @@ export function usePlansCheckout(params: PlansParams) {
       }
 
       // Proceed with payment now that the code is held.
-      const totalAmount = checkoutTotal(selectedPlan.price);
+      const totalAmount = planTotal(selectedPlan);
       let paymentSucceeded = false;
       const handler = window.PaystackPop.setup({
         key: paystackKey,
@@ -1013,7 +1013,7 @@ export function usePlansCheckout(params: PlansParams) {
         }
       }
 
-      const totalAmount = checkoutTotal(selectedPlan.price);
+      const totalAmount = planTotal(selectedPlan);
       let paymentSucceeded = false;
       const handler = window.PaystackPop.setup({
         key: paystackKey,
