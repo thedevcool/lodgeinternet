@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
+import { adminHome } from "@/lib/adminHome";
 import { takeSessionEndReason } from "@/lib/adminSession";
 import { BrandGlyph } from "@/components/ui/BrandMark";
 import Button from "@/components/ui/Button";
@@ -49,7 +50,8 @@ function AdminLogin() {
     // Set by whichever redirect brought us here.
     setEndedReason((current) => current || takeSessionEndReason() || "");
   }, []);
-  const next = safeNext(searchParams.get("next"));
+  const rawNext = searchParams.get("next");
+  const next = safeNext(rawNext);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,7 +61,12 @@ function AdminLogin() {
     const success = await login(username, password);
 
     if (success) {
-      router.push(next);
+      // A supplied `next` wins; otherwise the admin lands on the page they
+      // belong to — the super-admin dashboard, or a module admin's first
+      // accessible section. Pointing every admin at the dashboard would send
+      // module admins to an Access Denied page the moment they sign in.
+      const profile = useAuthStore.getState().adminProfile;
+      router.push(rawNext ? next : (adminHome(profile) ?? "/admin/dashboard"));
     } else {
       setError("Invalid username or password");
       setLoading(false);

@@ -13,6 +13,7 @@
  */
 
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -28,6 +29,7 @@ import AdminDrawer from "@/components/admin/AdminDrawer";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
 import Logo from "@/components/Logo";
 import { adminFetch } from "@/lib/apiClient";
+import { adminHome } from "@/lib/adminHome";
 import { ADMIN_NAV, primeAttention } from "@/lib/adminNav";
 import { useAuthStore } from "@/store/authStore";
 
@@ -232,6 +234,11 @@ function Meter({ parts }: { parts: [number, string][] }) {
 
 export default function AdminDashboardPage() {
   const { logout, adminProfile, canAccess } = useAuthStore();
+
+  // The login page and every "Back to Dashboard" button aim admins at this
+  // overview, but it is super-admin-only. A module admin is sent to their own
+  // first module rather than left staring at an Access Denied page.
+  const adminHomeHref = adminHome(adminProfile);
   const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [rebuilding, setRebuilding] = useState(false);
@@ -319,6 +326,12 @@ export default function AdminDashboardPage() {
   const tiles = ADMIN_NAV.filter((item) =>
     item.superAdminOnly ? adminProfile?.isSuperAdmin : canAccess(item.module),
   );
+
+  // A module admin who lands here (stale login link, drawer, back button) is
+  // bounced during render to their own first module — no Access Denied flash.
+  if (adminHomeHref && adminHomeHref !== "/admin/dashboard") {
+    redirect(adminHomeHref);
+  }
 
   return (
     <ProtectedRoute requireSuperAdmin>

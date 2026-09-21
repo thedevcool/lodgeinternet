@@ -50,16 +50,18 @@ export default function AdminDrawer({
         </div>
 
         <nav className="mt-6 space-y-1">
-          <Link
-            href={DASHBOARD}
-            onClick={onClose}
-            aria-current={pathname === DASHBOARD ? "page" : undefined}
-            className={`drawer-link${pathname === DASHBOARD ? " active" : ""}`}
-          >
-            <BarChart3 size={18} />
-            <span className="flex-1">Analytics overview</span>
-            <ChevronRight size={15} className="opacity-40" />
-          </Link>
+          {adminProfile?.isSuperAdmin && (
+            <Link
+              href={DASHBOARD}
+              onClick={onClose}
+              aria-current={pathname === DASHBOARD ? "page" : undefined}
+              className={`drawer-link${pathname === DASHBOARD ? " active" : ""}`}
+            >
+              <BarChart3 size={18} />
+              <span className="flex-1">Analytics overview</span>
+              <ChevronRight size={15} className="opacity-40" />
+            </Link>
+          )}
 
           {links.map(({ label, href, icon: Icon, module }) => {
             const badge = attention[module] || 0;
