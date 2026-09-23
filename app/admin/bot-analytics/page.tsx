@@ -53,7 +53,7 @@ export default function BotAnalyticsPage() {
     <ProtectedRoute requireSuperAdmin>
       <div className="min-h-screen bg-apple-gray-50">
         <header className="bg-white shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="max-w-7xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <Logo variant="dark" />
               <div>

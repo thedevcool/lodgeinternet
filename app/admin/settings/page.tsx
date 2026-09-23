@@ -128,7 +128,7 @@ export default function AdminSettingsPage() {
         {/* Header */}
         <header className='bg-white shadow-sm sticky top-0 z-10'>
           <div className='max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4'>
-            <div className='flex items-center justify-between'>
+            <div className='flex flex-wrap items-center justify-between gap-3'>
               <div className='flex items-center gap-3'>
                 <button
                   onClick={() => router.push("/admin/dashboard")}

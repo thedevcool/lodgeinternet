@@ -18,7 +18,9 @@
 
 @layer components {
   .analytics-shell { background: radial-gradient(circle at 8% 0%,rgba(219,234,254,.92),transparent 28%), radial-gradient(circle at 96% 18%,rgba(233,213,255,.58),transparent 24%), linear-gradient(145deg,#f8fafc 0%,#eef2f7 48%,#f8fafc 100%); color: #101828; }
-  .glass-header { @apply sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-white/80 px-4 py-3 shadow-[0_8px_30px_rgba(15,23,42,.06)] backdrop-blur-2xl sm:px-8; background: rgba(255,255,255,.55); }
+  /* Wraps rather than overflowing: these headers carry a title plus a row of
+     actions, which together are wider than a phone. */
+  .glass-header { @apply sticky top-0 z-30 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-white/80 px-4 py-3 shadow-[0_8px_30px_rgba(15,23,42,.06)] backdrop-blur-2xl sm:px-8; background: rgba(255,255,255,.55); }
   .glass-hero, .glass-panel { @apply rounded-[30px] border border-white/85 bg-white/60 p-5 shadow-[0_18px_60px_rgba(31,41,55,0.09)] backdrop-blur-2xl sm:p-7; position: relative; overflow: hidden; }
   .glass-hero::before, .glass-panel::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(120deg,rgba(255,255,255,.52),transparent 34%,rgba(255,255,255,.16) 70%,rgba(255,255,255,.42)); opacity: .78; }
   .glass-hero > *, .glass-panel > * { position: relative; z-index: 1; }
@@ -78,6 +80,28 @@
   .glass-violet, .glass-purple { background: rgba(243,234,255,.85); color: #7135c4; } .glass-red { background: rgba(255,232,232,.9); color: #b42318; }
   .glass-icon { @apply inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/90 text-slate-700 shadow-[0_6px_18px_rgba(15,23,42,.08)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white; background: rgba(255,255,255,.65); }
   .admin-global-menu { @apply fixed bottom-5 left-5 z-30 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/90 bg-white/75 text-slate-700 shadow-[0_10px_28px_rgba(15,23,42,.14)] backdrop-blur-2xl transition hover:-translate-y-0.5 hover:bg-white; }
+
+  /* ── Admin frame ───────────────────────────────────────────────────────
+     One sidebar, two presentations. From `lg` up it is pinned and part of
+     the layout, so an admin can always see which section they are in; below
+     that it is an overlay drawer and the top bar is the way to it. */
+  .admin-shell { @apply min-h-screen lg:flex; }
+  .admin-sidebar { @apply hidden lg:flex lg:fixed lg:left-3 lg:top-3 lg:bottom-3 lg:z-40 lg:w-[268px] lg:shrink-0 lg:flex-col lg:p-5; }
+  /* Matches the pinned sidebar's width plus its 12px gutters. */
+  .admin-main { @apply min-w-0 flex-1 lg:ml-[292px]; }
+  .admin-topbar { @apply sticky top-0 z-40 flex items-center gap-3 border-b border-white/70 px-4 py-3 backdrop-blur-xl lg:hidden; background: rgba(255,255,255,.72); }
+  /* Below `lg` the top bar is the one thing pinned to the top. Every admin
+     page also has its own `sticky top-0` header, and two elements pinned to
+     the same edge just cover each other — the bar wins on z-index and hides
+     the page title behind it. On a phone, reaching the navigation matters
+     more than keeping a page header in view, so the page headers scroll
+     away and the bar stays. One rule here beats an offset on all 14 pages. */
+  @media (max-width: 1023px) {
+    .admin-main header { position: relative; top: auto; }
+    .admin-main > header.admin-topbar { position: sticky; top: 0; }
+  }
+  .drawer-footer { @apply mt-4 flex items-center justify-between gap-3 border-t border-white/80 pt-4; }
+  .drawer-signout { @apply inline-flex shrink-0 items-center gap-2 rounded-full border border-white/90 px-3 py-2 text-sm font-medium text-slate-700 shadow-[0_6px_18px_rgba(15,23,42,.07)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white hover:text-red-600; background: rgba(255,255,255,.65); }
   .glass-button { @apply inline-flex items-center gap-2 rounded-full border border-white/90 px-4 py-2 text-sm font-medium shadow-[0_6px_18px_rgba(15,23,42,.07)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white; background: rgba(255,255,255,.65); }
   .live-pill { @apply inline-flex items-center gap-2 rounded-full bg-emerald-100/80 px-3 py-2 text-xs font-semibold text-emerald-700; }
   .live-dot { @apply h-2 w-2 rounded-full bg-emerald-500; }

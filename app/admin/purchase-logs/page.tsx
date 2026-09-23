@@ -171,7 +171,7 @@ export default function PurchaseLogsPage() {
       <div className="min-h-screen bg-apple-gray-50">
         <header className="bg-white shadow-sm border-b border-apple-gray-200 sticky top-0 z-10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <Logo variant="dark" />
                 <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-400 via-blue-500 to-black-400 bg-clip-text text-transparent">

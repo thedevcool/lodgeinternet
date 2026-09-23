@@ -444,14 +444,14 @@ export default function AdminTVUsersPage() {
     <ProtectedRoute module="tv-users">
       <div className="min-h-screen analytics-shell">
         <header className="glass-header">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <Logo variant="dark" />
             <div>
               <p className="eyebrow">TELEVISION</p>
               <h1 className="text-xl font-semibold sm:text-2xl">TV subscriptions</h1>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => {
                 void fetchSubscriptions();

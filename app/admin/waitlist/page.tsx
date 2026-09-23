@@ -347,7 +347,7 @@ export default function AdminWaitlistPage() {
         {/* Header */}
         <header className="bg-white border-b border-apple-gray-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <Link href="/" className="flex items-center">
                 <Logo />
               </Link>

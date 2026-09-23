@@ -371,6 +371,31 @@ export default function AdminTransactionsPage() {
     () => new Set(allowedHostels.map((h) => h.name)),
     [allowedHostels],
   );
+  const isHostelRestricted =
+    !!adminProfile?.hostels?.length && !adminProfile.isSuperAdmin;
+  /**
+   * Whether a row's hostel is one this admin may see.
+   *
+   * The backend has already scoped every response — `list_transactions`
+   * narrows the Firestore query itself to `admin.hostels`, and that is the
+   * check that actually enforces anything, since nothing in the browser can
+   * be trusted to. What follows is a second, belt-and-braces pass.
+   *
+   * It must therefore never be the reason the page looks empty. The names it
+   * compares against come from `/api/hostels`, which loads separately and is
+   * allowed to fail quietly — and an empty set used as a filter hides every
+   * single row. A superadmin never saw that, because the check is skipped
+   * for them; a hostel-restricted subadmin saw an empty ledger. So: when we
+   * do not yet know the allowed names, defer to the server rather than hide
+   * everything.
+   */
+  const withinHostelScope = useCallback(
+    (name: string) =>
+      !isHostelRestricted ||
+      allowedHostelNames.size === 0 ||
+      allowedHostelNames.has(name),
+    [isHostelRestricted, allowedHostelNames],
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<
@@ -742,12 +767,7 @@ export default function AdminTransactionsPage() {
   // the exact same rules to freshly-fetched rows the page never loaded.
   const matchesClientFilters = useCallback(
     (t: TransactionRow): boolean => {
-      if (
-        adminProfile?.hostels?.length &&
-        !adminProfile.isSuperAdmin &&
-        !allowedHostelNames.has(t.hostel ?? "")
-      )
-        return false;
+      if (!withinHostelScope(t.hostel ?? "")) return false;
       if (filterHostel !== "all" && (t.hostel ?? "Unknown") !== filterHostel)
         return false;
       if (filterPlanType !== "all" && t.planType !== filterPlanType)
@@ -785,8 +805,7 @@ export default function AdminTransactionsPage() {
       filterDateFrom,
       filterDateTo,
       searchTerm,
-      adminProfile,
-      allowedHostelNames,
+      withinHostelScope,
     ],
   );
 
@@ -915,12 +934,7 @@ export default function AdminTransactionsPage() {
     return botTxns.filter((t) => {
       const h = t.hostel || "Unknown";
       // Hostel-level access for restricted admins.
-      if (
-        adminProfile?.hostels?.length &&
-        !adminProfile.isSuperAdmin &&
-        !allowedHostelNames.has(t.hostel || "")
-      )
-        return false;
+      if (!withinHostelScope(t.hostel || "")) return false;
       if (botHostel !== "all" && h !== botHostel) return false;
       // Period narrowing (local dates, matching the payouts view).
       if (botPeriodMode !== "all") {
@@ -940,8 +954,7 @@ export default function AdminTransactionsPage() {
     botMonth,
     botYear,
     botHostel,
-    adminProfile,
-    allowedHostelNames,
+    withinHostelScope,
   ]);
 
   const botTotals = useMemo(() => {
@@ -1341,12 +1354,7 @@ export default function AdminTransactionsPage() {
   const filteredSplits = useMemo(() => {
     return splitRecords.filter((s) => {
       // Enforce hostel-level access on splits
-      if (
-        adminProfile?.hostels?.length &&
-        !adminProfile.isSuperAdmin &&
-        !allowedHostelNames.has(s.hostel)
-      )
-        return false;
+      if (!withinHostelScope(s.hostel)) return false;
       if (splitFilterHostel !== "all" && s.hostel !== splitFilterHostel)
         return false;
       if (splitFilterMonth) {
@@ -1373,8 +1381,7 @@ export default function AdminTransactionsPage() {
     splitFilterFrom,
     splitFilterTo,
     splitFilterMonth,
-    adminProfile,
-    allowedHostelNames,
+    withinHostelScope,
   ]);
 
   // Grouped once per data refresh so `getSplitTransactions` below never scans
@@ -1555,14 +1562,14 @@ export default function AdminTransactionsPage() {
     <ProtectedRoute module='transactions'>
       <div className="min-h-screen analytics-shell">
         <header className="glass-header">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <Logo variant="dark" />
             <div>
               <p className="eyebrow">TRANSACTIONS &amp; PAYOUTS</p>
               <h1 className="text-xl font-semibold sm:text-2xl">Transaction audit</h1>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => {
                 fetchAll();

@@ -21,11 +21,8 @@ import {
   Database,
   LayoutGrid,
   LineChart,
-  LogOut,
-  Menu,
   RefreshCw,
 } from "lucide-react";
-import AdminDrawer from "@/components/admin/AdminDrawer";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
 import Logo from "@/components/Logo";
 import { adminFetch } from "@/lib/apiClient";
@@ -233,7 +230,7 @@ function Meter({ parts }: { parts: [number, string][] }) {
 }
 
 export default function AdminDashboardPage() {
-  const { logout, adminProfile, canAccess } = useAuthStore();
+  const { adminProfile, canAccess } = useAuthStore();
 
   // The login page and every "Back to Dashboard" button aim admins at this
   // overview, but it is super-admin-only. A module admin is sent to their own
@@ -243,7 +240,6 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [rebuilding, setRebuilding] = useState(false);
   const [error, setError] = useState("");
-  const [drawer, setDrawer] = useState(false);
   const [view, setView] = useState<"analytics" | "tiles">("analytics");
 
   // Remember the last view, so someone who prefers the launcher gets it back.
@@ -337,10 +333,7 @@ export default function AdminDashboardPage() {
     <ProtectedRoute requireSuperAdmin>
       <div className="min-h-screen analytics-shell">
         <header className="glass-header">
-          <div className="flex items-center gap-3">
-            <button aria-label="Open navigation" onClick={() => setDrawer(true)} className="glass-icon">
-              <Menu size={20} />
-            </button>
+          <div className="flex min-w-0 items-center gap-3">
             <Logo variant="dark" />
             <div>
               <p className="eyebrow">SUPERADMIN CONTROL CENTRE</p>
@@ -350,7 +343,7 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span
               className={freshness === "live" ? "live-pill" : "live-pill bg-amber-100/80 text-amber-700"}
               title={data ? `Snapshot age ${data.ageSeconds ?? 0}s` : undefined}
@@ -399,16 +392,6 @@ export default function AdminDashboardPage() {
               </button>
             </div>
 
-            <button
-              onClick={() => {
-                logout();
-                window.location.href = "/admin/login";
-              }}
-              className="glass-button hidden lg:inline-flex"
-            >
-              <LogOut size={16} />
-              Logout
-            </button>
           </div>
         </header>
 
@@ -766,7 +749,6 @@ export default function AdminDashboardPage() {
           )}
         </main>
 
-        <AdminDrawer open={drawer} onClose={() => setDrawer(false)} attention={badges} />
       </div>
     </ProtectedRoute>
   );
