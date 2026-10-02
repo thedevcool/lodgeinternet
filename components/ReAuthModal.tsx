@@ -1,11 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  EmailAuthProvider,
-  reauthenticateWithCredential,
-} from "firebase/auth";
-import { getAuthInstance } from "@/lib/firebase";
+import { EmailAuthProvider, getAuthInstance, reauthenticateWithCredential } from "@/lib/customerAuth";
 import { ShieldCheck } from "lucide-react";
 import Sheet from "@/components/ui/Sheet";
 import Button from "@/components/ui/Button";

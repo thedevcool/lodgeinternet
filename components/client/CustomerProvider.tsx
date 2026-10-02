@@ -1,11 +1,10 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { getAuthInstance } from "@/lib/firebase";
+import { getAuthInstance, onAuthStateChanged, type User } from "@/lib/customerAuth";
 
 /**
- * One Firebase auth subscription for the shared chrome (nav bar "Sign in" vs
+ * One sign-in subscription for the shared chrome (nav bar "Sign in" vs
  * "Account", the Account tab target). Pages keep their own auth logic — this
  * only drives what the chrome shows.
  */
@@ -20,7 +19,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
     try {
       return onAuthStateChanged(getAuthInstance(), (user) => setState({ user, ready: true }));
     } catch {
-      // Firebase not configured — behave as signed out.
+      // Sign-in unavailable — behave as signed out.
       setState({ user: null, ready: true });
       return undefined;
     }

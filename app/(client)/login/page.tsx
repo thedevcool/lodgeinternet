@@ -2,8 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { getAuthInstance } from "@/lib/firebase";
+import { getAuthInstance, signInWithEmailAndPassword } from "@/lib/customerAuth";
 import { apiFetch } from "@/lib/apiClient";
 import Link from "next/link";
 import AuthShell, { AuthFallback } from "@/components/client/AuthShell";

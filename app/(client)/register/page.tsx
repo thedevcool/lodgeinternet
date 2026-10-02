@@ -3,8 +3,7 @@ import { apiFetch } from "@/lib/apiClient";
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createUserWithEmailAndPassword, onAuthStateChanged, type User } from "firebase/auth";
-import { getAuthInstance } from "@/lib/firebase";
+import { createUserWithEmailAndPassword, getAuthInstance, onAuthStateChanged, type User } from "@/lib/customerAuth";
 import { Building2, Check, CheckCircle2, ChevronLeft, Mail } from "lucide-react";
 import Link from "next/link";
 import { displayName } from "@/lib/hostelSlug";

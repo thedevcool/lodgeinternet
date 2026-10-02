@@ -30,8 +30,7 @@ import { apiFetch } from "@/lib/apiClient";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAuthInstance } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { getAuthInstance, onAuthStateChanged } from "@/lib/customerAuth";
 import { useToast } from "@/components/Toast";
 import { generatePaymentRef } from "@/lib/generateRef";
 import { planTotal } from "@/lib/pricing";
@@ -1148,9 +1147,9 @@ export function usePlansCheckout(params: PlansParams) {
     setPurchasing(true);
 
     try {
-      // Create Firebase Auth account on client side
+      // Create the account (our own sign-in, as Firebase's used to)
       const auth = getAuthInstance();
-      const { createUserWithEmailAndPassword } = await import("firebase/auth");
+      const { createUserWithEmailAndPassword } = await import("@/lib/customerAuth");
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email.trim().toLowerCase(),

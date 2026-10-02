@@ -3,8 +3,7 @@ import { apiFetch } from "@/lib/apiClient";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { getAuthInstance } from "@/lib/firebase";
+import { getAuthInstance, onAuthStateChanged, signOut } from "@/lib/customerAuth";
 import { Check, Clock, Copy, Eye, EyeOff, KeyRound, LogOut, Mail, Pencil, RefreshCw, ShoppingBag, Tv, Wifi } from "lucide-react";
 import { toHostelSlug } from "@/lib/hostelSlug";
 import UpdateMacModal from "@/components/UpdateMacModal";
