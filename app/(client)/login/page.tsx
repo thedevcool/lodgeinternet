@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getAuthInstance, signInWithEmailAndPassword } from "@/lib/customerAuth";
+import { signIn } from "@/lib/customerAuth";
 import { apiFetch } from "@/lib/apiClient";
 import Link from "next/link";
 import AuthShell, { AuthFallback } from "@/components/client/AuthShell";
@@ -40,23 +40,12 @@ function LoginContent() {
     setError("");
 
     try {
-      const auth = getAuthInstance();
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email.trim().toLowerCase(),
-        password,
-      );
+      const customer = await signIn(email.trim().toLowerCase(), password);
 
       // Check if user has a profile (verified account).
       // apiFetch (not fetch): /api/* is served by the backend. A plain fetch
       // hit this site, 404'd, and silently skipped the verification check.
-      const idToken = await userCredential.user.getIdToken().catch(() => "");
-      const res = await apiFetch(
-        `/api/auth/user?userId=${userCredential.user.uid}`,
-        {
-          headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
-        },
-      );
+      const res = await apiFetch(`/api/auth/user?userId=${customer.uid}`);
 
       if (res.ok) {
         const data = await res.json();

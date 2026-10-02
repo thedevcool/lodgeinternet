@@ -36,7 +36,7 @@ export interface OrderItem {
 
 export interface Order {
   id: string;
-  userId?: string; // User ID from Firebase Auth
+  userId?: string; // The customer's account ID
   items: OrderItem[];
   total: number;
   deliveryMethod: "door-to-door" | "station-pickup"; // New delivery option
@@ -57,7 +57,7 @@ export interface Order {
 }
 
 export interface User {
-  id: string; // Firebase Auth UID
+  id: string; // The customer's account ID
   email: string;
   displayName: string;
   photoURL?: string;
@@ -175,7 +175,7 @@ export interface DataCode {
 
 export interface TVSubscription {
   id: string;
-  userId: string; // Firebase Auth user ID
+  userId: string; // The customer's account ID
   name: string;
   email: string;
   macAddressHash: string; // Encrypted TV MAC address for admin viewing
@@ -198,7 +198,7 @@ export interface TVSubscription {
 // ─── User Accounts ───────────────────────────────────────────────────────────
 
 export interface UserProfile {
-  id: string; // Firebase Auth UID
+  id: string; // The customer's account ID
   email: string;
   displayName: string;
   hostelId: string; // Hostel name — locked to profile

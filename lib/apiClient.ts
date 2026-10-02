@@ -3,7 +3,7 @@
  *
  * The backend now lives in a standalone FastAPI service (all routes ported).
  * This helper is the single place the frontend decides WHERE an `/api/...` call
- * goes and, for admin calls, attaches the signed admin session token.
+ * goes, and says which part of the site it comes from.
  *
  * Routing:
  * - Set `NEXT_PUBLIC_API_BASE_URL` to the FastAPI origin (e.g.
@@ -14,18 +14,19 @@
  *   route is ported, so it's simply `/api`. To roll back to the old same-origin
  *   route for a group during the switch, remove/narrow the prefix here.
  *
- * Two clients, deliberately separate:
- * - `apiFetch`  — customer side. NEVER sends the admin token. It used to
- *   attach it to "public but sometimes admin" paths, which meant a browser
- *   with an admin session received hostel Wi-Fi passwords on the customer
- *   registration page.
- * - `adminFetch` — admin screens. Always sends the token, and turns a 401
- *   into one app-wide "session ended" signal so no page is left silently
- *   empty. Neither overwrites an `Authorization` header the caller set (e.g.
- *   a customer call carrying a Firebase ID token).
+ * Sign-ins are HttpOnly cookies the backend sets (backend/app/core/cookies.py):
+ * both clients send them (`credentials: "include"`), and no script here ever
+ * holds a token. A cookie only counts with the `X-Lodge-Client` header saying
+ * which part of the site a request came from. Two clients, deliberately
+ * separate:
+ * - `apiFetch`  — customer side (`site`). It NEVER acts as an admin, even in a
+ *   browser where an admin is signed in: it once did, which meant such a
+ *   browser received hostel Wi-Fi passwords on the customer registration page.
+ * - `adminFetch` — admin screens (`admin`). Turns a 401 into one app-wide
+ *   "session ended" signal so no page is left silently empty.
  */
 
-import { announceSessionEnded, getAdminToken } from "./adminSession";
+import { announceSessionEnded } from "./adminSession";
 
 const BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/+$/, "");
 
@@ -51,13 +52,28 @@ export function apiUrl(path: string): string {
   return BASE && isMigrated(path) ? BASE + path : path;
 }
 
-/** Customer-side fetch. Carries no admin credentials, ever. */
-export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-  return fetch(apiUrl(path), init);
+/** Fired when a customer-side request is refused as not signed in, so the
+ * sign-in state can check whether the session ended (lib/customerAuth.ts). */
+export const CUSTOMER_REFUSED_EVENT = "lodge:customer-refused";
+
+/** The request, sent with the sign-in cookies and saying which part of the site sent it. */
+function from(client: "site" | "admin", init?: RequestInit): RequestInit {
+  const headers = new Headers(init?.headers);
+  headers.set("X-Lodge-Client", client);
+  return { ...init, headers, credentials: "include" };
+}
+
+/** Customer-side fetch. Never acts as an admin. */
+export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  const response = await fetch(apiUrl(path), from("site", init));
+  if (response.status === 401 && typeof window !== "undefined") {
+    window.dispatchEvent(new Event(CUSTOMER_REFUSED_EVENT));
+  }
+  return response;
 }
 
 /**
- * Admin-side fetch: attaches the session token and watches for a dead session.
+ * Admin-side fetch: carries the admin session and watches for a dead one.
  *
  * A 401 here means the session is over — every admin screen used to handle
  * that on its own, or (mostly) not at all, which is why an expired session
@@ -66,15 +82,7 @@ export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
  * session is fine, this admin simply may not do that.
  */
 export async function adminFetch(path: string, init?: RequestInit): Promise<Response> {
-  const token = getAdminToken();
-  let request = init;
-  if (token) {
-    const headers = new Headers(init?.headers);
-    if (!headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
-    request = { ...init, headers };
-  }
-
-  const response = await fetch(apiUrl(path), request);
+  const response = await fetch(apiUrl(path), from("admin", init));
 
   if (response.status === 401) {
     let code = "";

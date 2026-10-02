@@ -3,7 +3,7 @@ import { apiFetch } from "@/lib/apiClient";
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createUserWithEmailAndPassword, getAuthInstance, onAuthStateChanged, type User } from "@/lib/customerAuth";
+import { deleteUnfinishedAccount, onCustomerChange, signUp, type Customer } from "@/lib/customerAuth";
 import { Building2, Check, CheckCircle2, ChevronLeft, Mail } from "lucide-react";
 import Link from "next/link";
 import { displayName } from "@/lib/hostelSlug";
@@ -75,7 +75,9 @@ function RegisterContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [currentUserId, setCurrentUserId] = useState("");
-  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [signedIn, setSignedIn] = useState<Customer | null>(null);
+  // Whether we know yet who (if anyone) is signed in on this browser.
+  const [signInKnown, setSignInKnown] = useState(false);
   const [currentHostel, setCurrentHostel] = useState<string>("");
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resendNotice, setResendNotice] = useState("");
@@ -102,62 +104,51 @@ function RegisterContent() {
       .finally(() => setLoadingHostels(false));
   }, []);
 
-  // Always track Firebase Auth state — needed for verifyOnly, updateMode,
+  // Always track who is signed in — needed for verifyOnly, updateMode,
   // already-signed-in detection, and orphan-account recovery.
   useEffect(() => {
-    try {
-      const auth = getAuthInstance();
-      const unsub = onAuthStateChanged(auth, async (user) => {
-        setFirebaseUser(user);
-        if (!user) return;
+    return onCustomerChange(async (user) => {
+      setSignedIn(user);
+      setSignInKnown(true);
+      if (!user) return;
 
-        setCurrentUserId(user.uid);
-        if (!email) setEmail(user.email || prefillEmail);
+      setCurrentUserId(user.uid);
+      if (!email) setEmail(user.email || prefillEmail);
 
-        // Only auto-route at the start of the flow. Once the user has begun
-        // the credentials/verify steps, leave them alone.
-        if (verifyOnly || updateMode) return;
-        if (stepRef.current !== "hostel") return;
+      // Only auto-route at the start of the flow. Once the user has begun
+      // the credentials/verify steps, leave them alone.
+      if (verifyOnly || updateMode) return;
+      if (stepRef.current !== "hostel") return;
 
-        try {
-          const token = await user.getIdToken().catch(() => "");
-          const res = await apiFetch(`/api/auth/user?userId=${user.uid}`, {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.profile?.emailVerified) {
-              // Fully set up — bounce to the original destination or dashboard.
-              router.push(redirectTarget || "/dashboard");
-            } else {
-              // Profile exists but not verified — resume verification.
-              setSelectedHostel(data.profile?.hostelId || prefillHostel);
-              setStep("verify");
-            }
+      try {
+        const res = await apiFetch(`/api/auth/user?userId=${user.uid}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.profile?.emailVerified) {
+            // Fully set up — bounce to the original destination or dashboard.
+            router.push(redirectTarget || "/dashboard");
+          } else {
+            // Profile exists but not verified — resume verification.
+            setSelectedHostel(data.profile?.hostelId || prefillHostel);
+            setStep("verify");
           }
-          // 404 = Firebase Auth exists but no Firestore profile (orphan).
-          // We leave the user on the hostel step so they can finish onboarding;
-          // /api/auth/register is idempotent on existing UIDs.
-        } catch {
-          // Profile fetch failed — let them continue manually
         }
-      });
-      return () => unsub();
-    } catch {
-      // Auth not ready
-    }
+        // 404 = an account but no profile (orphan).
+        // We leave the user on the hostel step so they can finish onboarding;
+        // /api/auth/register is idempotent on existing UIDs.
+      } catch {
+        // Profile fetch failed — let them continue manually
+      }
+    });
   }, [verifyOnly, updateMode, prefillEmail, prefillHostel, email, redirectTarget, router]);
 
   // Fetch the user's current hostel for the update-mode marker
   useEffect(() => {
-    if (!updateMode || !firebaseUser) return;
+    if (!updateMode || !signedIn) return;
     let cancelled = false;
     (async () => {
       try {
-        const token = await firebaseUser.getIdToken();
-        const res = await apiFetch(`/api/auth/user?userId=${firebaseUser.uid}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await apiFetch(`/api/auth/user?userId=${signedIn.uid}`);
         if (!res.ok) return;
         const data = await res.json();
         if (!cancelled && data.profile?.hostelId) {
@@ -170,22 +161,17 @@ function RegisterContent() {
     return () => {
       cancelled = true;
     };
-  }, [updateMode, firebaseUser]);
+  }, [updateMode, signedIn]);
 
-  // verifyOnly grace period — if no Firebase Auth user shows up within 3s,
-  // bounce to /login so we don't spin forever.
+  // verifyOnly needs someone signed in: once we know nobody is, bounce to
+  // /login (and back here after) so we don't spin forever.
   useEffect(() => {
-    if (!verifyOnly) return;
-    if (firebaseUser) return;
-    const timer = setTimeout(() => {
-      if (firebaseUser) return;
-      const returnUrl = `/register?verify=1${
-        prefillEmail ? `&email=${encodeURIComponent(prefillEmail)}` : ""
-      }${redirectTarget ? `&redirect=${encodeURIComponent(redirectTarget)}` : ""}`;
-      router.push(`/login?redirect=${encodeURIComponent(returnUrl)}`);
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, [verifyOnly, firebaseUser, prefillEmail, redirectTarget, router]);
+    if (!verifyOnly || !signInKnown || signedIn) return;
+    const returnUrl = `/register?verify=1${
+      prefillEmail ? `&email=${encodeURIComponent(prefillEmail)}` : ""
+    }${redirectTarget ? `&redirect=${encodeURIComponent(redirectTarget)}` : ""}`;
+    router.push(`/login?redirect=${encodeURIComponent(returnUrl)}`);
+  }, [verifyOnly, signInKnown, signedIn, prefillEmail, redirectTarget, router]);
 
   // Resend cooldown ticker
   useEffect(() => {
@@ -200,7 +186,7 @@ function RegisterContent() {
 
     if (updateMode) {
       // Update mode: just patch the hostelId for the logged-in user
-      if (!firebaseUser) {
+      if (!signedIn) {
         // Not logged in — redirect to login, then come back
         const returnUrl = `/register?email=${encodeURIComponent(email)}&hostel=${encodeURIComponent(hostelName)}&update=1`;
         router.push(`/login?redirect=${encodeURIComponent(returnUrl)}`);
@@ -209,14 +195,10 @@ function RegisterContent() {
 
       setLoading(true);
       try {
-        const token = await firebaseUser.getIdToken();
         const res = await apiFetch("/api/auth/profile", {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ userId: firebaseUser.uid, hostelId: hostelName }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: signedIn.uid, hostelId: hostelName }),
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
@@ -261,24 +243,19 @@ function RegisterContent() {
 
     setLoading(true);
 
-    let createdUser: User | null = null;
+    let accountCreated = false;
     try {
-      // Create Firebase Auth account
-      const auth = getAuthInstance();
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email.trim().toLowerCase(),
-        password,
-      );
-      createdUser = userCredential.user;
-      setCurrentUserId(userCredential.user.uid);
+      // Create the account (signed in straight away)
+      const customer = await signUp(email.trim().toLowerCase(), password);
+      accountCreated = true;
+      setCurrentUserId(customer.uid);
 
       // Register profile + send verification code
       const res = await apiFetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: userCredential.user.uid,
+          userId: customer.uid,
           email: email.trim().toLowerCase(),
           hostel: selectedHostel,
           displayName: fullName.trim(),
@@ -324,15 +301,15 @@ function RegisterContent() {
       } else if (err.code === "auth/weak-password") {
         setError("Password is too weak. Please choose a stronger password.");
       } else {
-        // /api/auth/register failed AFTER Firebase Auth user was created.
+        // /api/auth/register failed AFTER the account was created.
         // Best-effort cleanup so the user can retry without hitting
         // "email-already-in-use" against an orphan.
-        if (createdUser) {
+        if (accountCreated) {
           try {
-            await createdUser.delete();
+            await deleteUnfinishedAccount();
             setCurrentUserId("");
           } catch (cleanupErr) {
-            console.error("Failed to clean up orphan Firebase Auth user:", cleanupErr);
+            console.error("Failed to clean up the unfinished account:", cleanupErr);
           }
         }
         setError(err.message || "Registration failed. Please try again.");
@@ -455,7 +432,7 @@ function RegisterContent() {
       )}
 
       {/* Back — hidden on verify/done where going "back" is unsafe (would
-          either lose verification progress or orphan a Firebase Auth account). */}
+          either lose verification progress or orphan an unfinished account). */}
       {step === "credentials" && (
         <button
           onClick={() => {
@@ -619,7 +596,7 @@ function RegisterContent() {
       {/* ── Step 3: verification code ──────────────────────────────────── */}
       {step === "verify" && (
         <>
-          {/* While verifyOnly waits for Firebase Auth to resolve currentUserId */}
+          {/* While verifyOnly waits to learn who is signed in (currentUserId) */}
           {verifyOnly && !currentUserId ? (
             <div className="ui-subhead flex items-center justify-center gap-3 py-8 text-ink-2">
               <Spinner /> Loading your account…

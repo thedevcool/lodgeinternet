@@ -11,10 +11,8 @@ import InlineAlert from "@/components/ui/InlineAlert";
 interface UpdateMacModalProps {
   subscriptionId: string;
   planName: string;
-  /** Called with the user's fresh ID token; modal sends the request itself */
-  getIdToken: () => Promise<string>;
   /** Show a re-auth modal so the user can refresh their session, then retry */
-  onSessionExpired: (retry: (freshToken: string) => Promise<void>) => void;
+  onSessionExpired: (retry: () => Promise<void>) => void;
   onSuccess: () => void;
   onCancel: () => void;
 }
@@ -24,7 +22,6 @@ const MAC_REGEX = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$|^([0-9A-Fa-f]{12})$
 export default function UpdateMacModal({
   subscriptionId,
   planName,
-  getIdToken,
   onSessionExpired,
   onSuccess,
   onCancel,
@@ -33,7 +30,7 @@ export default function UpdateMacModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const submit = async (overrideToken?: string) => {
+  const submit = async () => {
     const trimmed = macAddress.trim();
     if (!trimmed) {
       setError("Please enter your TV MAC address");
@@ -48,23 +45,16 @@ export default function UpdateMacModal({
     setError("");
 
     try {
-      const idToken = overrideToken || (await getIdToken());
-
       const res = await apiFetch("/api/tv/update-mac", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ subscriptionId, macAddress: trimmed }),
       });
 
       const result = await res.json();
 
       if (result.code === "SESSION_EXPIRED") {
-        onSessionExpired(async (freshToken: string) => {
-          await submit(freshToken);
-        });
+        onSessionExpired(submit);
         return;
       }
 

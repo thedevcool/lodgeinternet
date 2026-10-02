@@ -4,10 +4,10 @@ import { create } from "zustand";
 import { adminFetch, apiFetch } from "@/lib/apiClient";
 import {
   ADMIN_COOKIE_KEY as COOKIE_KEY,
+  ADMIN_EXPIRES_KEY as EXPIRES_KEY,
   ADMIN_PROFILE_KEY as PROFILE_KEY,
-  ADMIN_TOKEN_KEY as TOKEN_KEY,
-  getAdminToken,
-  isTokenLive,
+  OLD_ADMIN_TOKEN_KEY,
+  isSessionLive,
 } from "@/lib/adminSession";
 import { clearAttentionCache } from "@/lib/adminNav";
 import type { AdminModule, AdminProfile, ModulePermission } from "@/types";
@@ -67,16 +67,17 @@ function profileFrom(data: any, fallbackUsername: string): AdminProfile {
   };
 }
 
-/** Persist a session the backend just handed us (login or refresh). */
-function storeSession(profile: AdminProfile, token: string | undefined): void {
+/** Keep what the backend said about a session it just started or renewed
+ * (the session itself is in its HttpOnly cookie): who, and until when. */
+function storeSession(profile: AdminProfile, expiresAtSeconds: number | undefined): void {
   if (typeof window === "undefined") return;
   // The cookie is only a hint for the maintenance redirect; auth itself is
-  // decided by the token below.
+  // decided by the backend's session cookie.
   setCookie(COOKIE_KEY, "true", 12);
   try {
     localStorage.setItem(COOKIE_KEY, "true");
     localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-    if (token) localStorage.setItem(TOKEN_KEY, token);
+    if (expiresAtSeconds) localStorage.setItem(EXPIRES_KEY, String(expiresAtSeconds * 1000));
   } catch {
     // storage blocked — the session lives for this page only
   }
@@ -101,7 +102,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       if (data.success) {
         const profile = profileFrom(data, username);
         set({ isAuthenticated: true, adminProfile: profile });
-        storeSession(profile, data.token);
+        storeSession(profile, data.expiresAt);
         return true;
       }
       return false;
@@ -111,7 +112,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  logout: () => get().endSession(),
+  logout: () => {
+    // Clears the session cookie; nothing to wait for here.
+    adminFetch("/api/admin/logout", { method: "POST" }).catch(() => undefined);
+    get().endSession();
+  },
 
   endSession: () => {
     set({ isAuthenticated: false, adminProfile: null });
@@ -123,7 +128,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       try {
         localStorage.removeItem(COOKIE_KEY);
         localStorage.removeItem(PROFILE_KEY);
-        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(EXPIRES_KEY);
+        localStorage.removeItem(OLD_ADMIN_TOKEN_KEY);
       } catch {
         // nothing to clear
       }
@@ -139,7 +145,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       // Permissions come back fresh, so a revoked module applies from here on.
       const profile = profileFrom(data, get().adminProfile?.username ?? "");
       set({ isAuthenticated: true, adminProfile: profile });
-      storeSession(profile, data.token);
+      storeSession(profile, data.expiresAt);
       return true;
     } catch {
       // Offline or the backend is down — keep the session and try again later.
@@ -199,9 +205,9 @@ function readStoredProfile(): AdminProfile | null {
   }
 }
 
-/** Decide, from the token alone, whether this browser has a live session. */
+/** Decide, from when the session ends, whether this browser has a live one. */
 function restoreSession(): void {
-  if (isTokenLive(getAdminToken())) {
+  if (isSessionLive()) {
     useAuthStore.setState({ isAuthenticated: true, adminProfile: readStoredProfile() });
   } else {
     useAuthStore.getState().endSession();
@@ -213,6 +219,6 @@ if (typeof window !== "undefined") {
 
   // Signing out (or in) in one tab now applies to the others.
   window.addEventListener("storage", (event) => {
-    if (event.key === TOKEN_KEY || event.key === null) restoreSession();
+    if (event.key === EXPIRES_KEY || event.key === null) restoreSession();
   });
 }

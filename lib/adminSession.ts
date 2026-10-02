@@ -4,47 +4,41 @@
  * Admin session plumbing shared by the API client, the auth store and the
  * session keeper. Kept separate so `apiClient` can report an ended session
  * without importing the store (which imports `apiClient` itself).
+ *
+ * The session itself is an HttpOnly cookie the backend sets, which no script
+ * here can read (backend/app/core/cookies.py). What this page keeps is who is
+ * signed in and when the session ends, so it can renew it in time.
  */
 
 export const ADMIN_COOKIE_KEY = "Davo-Nexus Limited-admin";
 export const ADMIN_PROFILE_KEY = "Davo-Nexus Limited-admin-profile";
-/** Signed session token issued by the backend at login. */
-export const ADMIN_TOKEN_KEY = "Davo-Nexus Limited-admin-token";
+/** When the session ends, in epoch milliseconds, as the backend said at login or renewal. */
+export const ADMIN_EXPIRES_KEY = "Davo-Nexus Limited-admin-expires";
+/** Where the admin pages kept the session token itself, before the cookie. */
+export const OLD_ADMIN_TOKEN_KEY = "Davo-Nexus Limited-admin-token";
 
 /** Why a session stopped — shown to the admin on the login screen. */
 export type SessionEndReason = "expired" | "invalid" | "signed-out";
 export const SESSION_ENDED_EVENT = "lodge:admin-session-ended";
 
-export function getAdminToken(): string | null {
+/** When this browser's session ends, in epoch milliseconds (null = no session). */
+export function sessionExpiresAt(): number | null {
   if (typeof window === "undefined") return null;
   try {
-    return window.localStorage.getItem(ADMIN_TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-/** When this token stops being accepted, in epoch milliseconds (null = unreadable). */
-export function tokenExpiresAt(token: string | null): number | null {
-  if (!token) return null;
-  const payload = token.split(".")[1];
-  if (!payload) return null;
-  try {
-    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
-    const exp = JSON.parse(json)?.exp;
-    return typeof exp === "number" ? exp * 1000 : null;
+    const value = Number(window.localStorage.getItem(ADMIN_EXPIRES_KEY));
+    return value > 0 ? value : null;
   } catch {
     return null;
   }
 }
 
 /**
- * Is this token still good? `withinMs` asks the question early — "will it
+ * Is the session still good? `withinMs` asks the question early — "will it
  * still be valid in N milliseconds?" — which is how the keeper decides when
- * to renew. A token we can't read counts as dead.
+ * to renew. No session counts as dead.
  */
-export function isTokenLive(token: string | null, withinMs = 0): boolean {
-  const expiresAt = tokenExpiresAt(token);
+export function isSessionLive(withinMs = 0): boolean {
+  const expiresAt = sessionExpiresAt();
   return expiresAt !== null && expiresAt - withinMs > Date.now();
 }
 

@@ -2,15 +2,15 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { getAdminToken, isTokenLive, onSessionEnded, rememberSessionEnd } from "@/lib/adminSession";
+import { isSessionLive, onSessionEnded, rememberSessionEnd, sessionExpiresAt } from "@/lib/adminSession";
 import { useAuthStore } from "@/store/authStore";
 
 /**
  * Keeps an admin signed in while they are actually working, and makes the end
  * of a session obvious instead of silent.
  *
- * - While the tab is in use, the token is renewed shortly before it lapses, so
- *   a short-lived token never interrupts anyone mid-task.
+ * - While the tab is in use, the session is renewed shortly before it lapses,
+ *   so a short-lived session never interrupts anyone mid-task.
  * - Leave it alone for long enough and it simply lapses — no renewal happens
  *   without activity.
  * - When the backend says the session is over (any admin call returning 401,
@@ -19,9 +19,9 @@ import { useAuthStore } from "@/store/authStore";
  *   this, so an expired session looked like admin pages with empty tables.
  */
 
-/** Renew when the token has less than this left. */
+/** Renew when the session has less than this left. */
 const RENEW_WITHIN_MS = 10 * 60 * 1000;
-/** How often to check (cheap: reads a token, no network unless renewing). */
+/** How often to check (cheap: reads the stored expiry, no network unless renewing). */
 const CHECK_EVERY_MS = 60 * 1000;
 /** No interaction for this long → let the session lapse on its own. */
 const IDLE_LIMIT_MS = 45 * 60 * 1000;
@@ -46,9 +46,8 @@ export default function AdminSessionKeeper() {
 
   const check = useCallback(async () => {
     if (onLoginPage) return;
-    const token = getAdminToken();
-    if (!token) return; // never signed in on this browser
-    if (!isTokenLive(token)) {
+    if (sessionExpiresAt() === null) return; // never signed in on this browser
+    if (!isSessionLive()) {
       rememberSessionEnd("expired");
       endSession();
       router.replace(`/admin/login?reason=expired&next=${encodeURIComponent(pathname)}`);
@@ -56,7 +55,7 @@ export default function AdminSessionKeeper() {
     }
     const idle = Date.now() - lastActivity.current > IDLE_LIMIT_MS;
     if (idle) return; // lapses naturally
-    if (!isTokenLive(token, RENEW_WITHIN_MS)) await refresh();
+    if (!isSessionLive(RENEW_WITHIN_MS)) await refresh();
   }, [onLoginPage, endSession, refresh, router, pathname]);
 
   useEffect(() => {

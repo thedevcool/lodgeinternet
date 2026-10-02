@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { EmailAuthProvider, getAuthInstance, reauthenticateWithCredential } from "@/lib/customerAuth";
+import { confirmPassword } from "@/lib/customerAuth";
 import { ShieldCheck } from "lucide-react";
 import Sheet from "@/components/ui/Sheet";
 import Button from "@/components/ui/Button";
 import TextField from "@/components/ui/TextField";
 
 interface ReAuthModalProps {
-  /** Called with a fresh ID token after successful re-authentication */
-  onSuccess: (freshIdToken: string) => void;
+  /** Called once the password is confirmed: the session counts as signed in
+   * just now, so the request that needed it can simply be made again. */
+  onSuccess: () => void;
   onCancel: () => void;
 }
 
@@ -34,25 +35,13 @@ export default function ReAuthModal({ onSuccess, onCancel }: ReAuthModalProps) {
     setError("");
 
     try {
-      const auth = getAuthInstance();
-      const user = auth.currentUser;
-      if (!user || !user.email) {
-        setError("No user session found. Please sign in again.");
-        return;
-      }
-
-      const credential = EmailAuthProvider.credential(user.email, password);
-      await reauthenticateWithCredential(user, credential);
-
-      // Get a fresh token (auth_time is now updated)
-      const freshToken = await user.getIdToken(true);
-      onSuccess(freshToken);
+      await confirmPassword(password);
+      onSuccess();
     } catch (err: any) {
-      if (
-        err.code === "auth/wrong-password" ||
-        err.code === "auth/invalid-credential"
-      ) {
+      if (err.code === "auth/invalid-credential") {
         setError("Incorrect password. Please try again.");
+      } else if (err.code === "auth/user-token-expired") {
+        setError("No user session found. Please sign in again.");
       } else if (err.code === "auth/too-many-requests") {
         setError("Too many attempts. Please try again later.");
       } else {

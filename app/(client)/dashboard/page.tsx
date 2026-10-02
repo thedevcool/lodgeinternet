@@ -3,7 +3,7 @@ import { apiFetch } from "@/lib/apiClient";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAuthInstance, onAuthStateChanged, signOut } from "@/lib/customerAuth";
+import { onCustomerChange, signOut, type Customer } from "@/lib/customerAuth";
 import { Check, Clock, Copy, Eye, EyeOff, KeyRound, LogOut, Mail, Pencil, RefreshCw, ShoppingBag, Tv, Wifi } from "lucide-react";
 import { toHostelSlug } from "@/lib/hostelSlug";
 import UpdateMacModal from "@/components/UpdateMacModal";
@@ -120,7 +120,7 @@ function getTimeLeft(savedAt: number): string {
 export default function DashboardPage() {
   const router = useRouter();
   const { addToast } = useToast();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<Customer | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [tvSubscriptions, setTvSubscriptions] = useState<TVSubscription[]>([]);
@@ -130,9 +130,7 @@ export default function DashboardPage() {
   const [revealedCodes, setRevealedCodes] = useState<Set<number>>(new Set());
   const [, forceUpdate] = useState({});
   const [macModalSub, setMacModalSub] = useState<TVSubscription | null>(null);
-  const [reAuthRetry, setReAuthRetry] = useState<
-    ((freshToken: string) => Promise<void>) | null
-  >(null);
+  const [reAuthRetry, setReAuthRetry] = useState<(() => Promise<void>) | null>(null);
   // Codes revealed from the server, keyed by purchase.id
   const [revealedPurchaseCodes, setRevealedPurchaseCodes] = useState<
     Record<string, string>
@@ -141,18 +139,14 @@ export default function DashboardPage() {
   const [resendingId, setResendingId] = useState<string | null>(null);
 
   useEffect(() => {
-    const auth = getAuthInstance();
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        const idToken = await currentUser.getIdToken().catch(() => "");
-        await fetchUserData(currentUser.uid, idToken);
+    return onCustomerChange(async (customer) => {
+      if (customer) {
+        setUser(customer);
+        await fetchUserData(customer.uid);
       } else {
         router.push("/login");
       }
     });
-
-    return () => unsubscribe();
   }, [router]);
 
   // Refresh saved codes every minute (needs user UID for decryption)
@@ -167,15 +161,13 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, [user?.uid]);
 
-  const fetchUserData = async (userId: string, idToken: string = "") => {
+  const fetchUserData = async (userId: string) => {
     setLoading(true);
     try {
-      const res = await apiFetch(`/api/auth/user?userId=${userId}`, {
-        headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
-      });
+      const res = await apiFetch(`/api/auth/user?userId=${userId}`);
       if (!res.ok) {
         if (res.status === 404) {
-          // User has Firebase Auth but no profile — redirect to register
+          // An account but no profile — redirect to register
           router.push("/register?verify=1");
           return;
         }
@@ -194,7 +186,7 @@ export default function DashboardPage() {
       }
 
       // Fetch TV subscriptions for this user (scoped server-side to caller)
-      await fetchTvSubscriptions(idToken);
+      await fetchTvSubscriptions();
     } catch (err) {
       console.error("Error fetching user data:", err);
     } finally {
@@ -202,11 +194,9 @@ export default function DashboardPage() {
     }
   };
 
-  const fetchTvSubscriptions = async (idToken: string) => {
+  const fetchTvSubscriptions = async () => {
     try {
-      const res = await apiFetch("/api/tv/subscriptions", {
-        headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
-      });
+      const res = await apiFetch("/api/tv/subscriptions");
       if (!res.ok) return;
       const data = await res.json();
       setTvSubscriptions(data.subscriptions || []);
@@ -217,21 +207,7 @@ export default function DashboardPage() {
 
   const refreshTvSubscriptions = async () => {
     if (!user) return;
-    try {
-      const idToken = await user.getIdToken();
-      await fetchTvSubscriptions(idToken);
-    } catch {
-      // ignore
-    }
-  };
-
-  const getFreshIdToken = async (): Promise<string> => {
-    if (!user) return "";
-    try {
-      return await user.getIdToken();
-    } catch {
-      return "";
-    }
+    await fetchTvSubscriptions();
   };
 
   const revealPurchaseCode = async (purchase: Purchase) => {
@@ -247,13 +223,9 @@ export default function DashboardPage() {
 
     setRevealingId(purchase.id);
     try {
-      const idToken = await getFreshIdToken();
       const res = await apiFetch("/api/data-codes/reveal", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ purchaseId: purchase.id }),
       });
       const data = await res.json();
@@ -273,13 +245,9 @@ export default function DashboardPage() {
   const resendPurchaseEmail = async (purchase: Purchase) => {
     setResendingId(purchase.id);
     try {
-      const idToken = await getFreshIdToken();
       const res = await apiFetch("/api/data-codes/resend-email", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ purchaseId: purchase.id }),
       });
       const data = await res.json();
@@ -302,8 +270,7 @@ export default function DashboardPage() {
 
   const handleLogout = async () => {
     try {
-      const auth = getAuthInstance();
-      await signOut(auth);
+      await signOut();
       router.push("/");
     } catch (err) {
       console.error("Error logging out:", err);
@@ -707,7 +674,6 @@ export default function DashboardPage() {
         <UpdateMacModal
           subscriptionId={macModalSub.id}
           planName={macModalSub.planName}
-          getIdToken={getFreshIdToken}
           onSessionExpired={(retry) => {
             setMacModalSub(null);
             setReAuthRetry(() => retry);
@@ -728,10 +694,10 @@ export default function DashboardPage() {
 
       {reAuthRetry && (
         <ReAuthModal
-          onSuccess={async (freshToken) => {
+          onSuccess={async () => {
             const retry = reAuthRetry;
             setReAuthRetry(null);
-            await retry(freshToken);
+            await retry();
             refreshTvSubscriptions();
           }}
           onCancel={() => setReAuthRetry(null)}

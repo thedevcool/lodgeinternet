@@ -58,10 +58,7 @@ export default function HomePage() {
     setProfileChecked(false);
     (async () => {
       try {
-        const idToken = await user.getIdToken().catch(() => "");
-        const res = await apiFetch(`/api/auth/user?userId=${user.uid}`, {
-          headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
-        });
+        const res = await apiFetch(`/api/auth/user?userId=${user.uid}`);
         if (res.ok) {
           const data = await res.json();
           if (!cancelled) setProfile(data.profile?.emailVerified ? data.profile : null);

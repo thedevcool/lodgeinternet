@@ -30,7 +30,7 @@ import { apiFetch } from "@/lib/apiClient";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAuthInstance, onAuthStateChanged } from "@/lib/customerAuth";
+import { onCustomerChange, signUp, type Customer } from "@/lib/customerAuth";
 import { useToast } from "@/components/Toast";
 import { generatePaymentRef } from "@/lib/generateRef";
 import { planTotal } from "@/lib/pricing";
@@ -89,7 +89,7 @@ export function usePlansCheckout(params: PlansParams) {
   const [planView, setPlanView] = useState<PlanView>("device");
   const [selectedDeviceCount, setSelectedDeviceCount] = useState<number>(3);
   const [email, setEmail] = useState<string>("");
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<Customer | null>(null);
 
   // TV Purchase flow states
   const [tvPurchaseStep, setTvPurchaseStep] = useState<
@@ -106,9 +106,7 @@ export function usePlansCheckout(params: PlansParams) {
 
   // Re-auth state (for session expired)
   const [showReAuth, setShowReAuth] = useState(false);
-  const [pendingAction, setPendingAction] = useState<
-    ((freshToken: string) => void) | null
-  >(null);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
   // Feedback states
   const [feedbackName, setFeedbackName] = useState<string>("");
@@ -237,44 +235,32 @@ export function usePlansCheckout(params: PlansParams) {
     fetchPlans();
 
     // Check if user is logged in (for TV users)
-    try {
-      const auth = getAuthInstance();
-      const unsubscribe = onAuthStateChanged(auth, (user) => {
-        if (user) {
-          setCurrentUser(user);
-          setEmail(user.email || "");
-          // Fetch profile to power hostel gate
-          user
-            .getIdToken()
-            .then((token) =>
-              apiFetch(`/api/auth/user?userId=${user.uid}`, {
-                headers: { Authorization: `Bearer ${token}` },
-              }).then((r) => r.json()),
-            )
-            .then((data) => {
-              if (data.profile) {
-                setUserProfile({
-                  hostelId: data.profile.hostelId || "",
-                  emailVerified: data.profile.emailVerified ?? false,
-                });
-                // Suggest hostel from most recent purchase
-                const latestHostel = (data.purchases as any[])?.[0]?.hostel;
-                if (latestHostel && latestHostel !== "N/A") {
-                  setSuggestedHostel(latestHostel);
-                }
+    return onCustomerChange((user) => {
+      if (user) {
+        setCurrentUser(user);
+        setEmail(user.email || "");
+        // Fetch profile to power hostel gate
+        apiFetch(`/api/auth/user?userId=${user.uid}`)
+          .then((r) => r.json())
+          .then((data) => {
+            if (data.profile) {
+              setUserProfile({
+                hostelId: data.profile.hostelId || "",
+                emailVerified: data.profile.emailVerified ?? false,
+              });
+              // Suggest hostel from most recent purchase
+              const latestHostel = (data.purchases as any[])?.[0]?.hostel;
+              if (latestHostel && latestHostel !== "N/A") {
+                setSuggestedHostel(latestHostel);
               }
-            })
-            .catch(() => {});
-        } else {
-          setCurrentUser(null);
-          setUserProfile(null);
-        }
-      });
-
-      return () => unsubscribe();
-    } catch (error) {
-      console.error("Auth initialization error:", error);
-    }
+            }
+          })
+          .catch(() => {});
+      } else {
+        setCurrentUser(null);
+        setUserProfile(null);
+      }
+    });
   }, [hostelReady, selectedHostel]);
 
   const selectedPlan = plans.find((plan) => plan.id === selectedPlanId);
@@ -508,13 +494,9 @@ export function usePlansCheckout(params: PlansParams) {
   const handleHostelConfirmed = async () => {
     if (!confirmedHostel || !currentUser) return;
     try {
-      const token = await currentUser.getIdToken();
       const res = await apiFetch("/api/auth/profile", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: currentUser.uid, hostelId: confirmedHostel }),
       });
       if (!res.ok) throw new Error("Failed to update hostel");
@@ -621,13 +603,9 @@ export function usePlansCheckout(params: PlansParams) {
       // exclusive access to one code while the user pays — concurrent buyers
       // racing for the last code will get a clean "no codes" response here
       // instead of taking each other's code mid-payment.
-      const idToken = await currentUser.getIdToken().catch(() => "");
       const reserveRes = await apiFetch("/api/data-codes/reserve", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           planId: selectedPlan.id,
           hostel: selectedHostel,
@@ -708,13 +686,9 @@ export function usePlansCheckout(params: PlansParams) {
   const releaseReservation = async (reservationId: string) => {
     if (!reservationId || !currentUser) return;
     try {
-      const idToken = await currentUser.getIdToken().catch(() => "");
       await apiFetch("/api/data-codes/release", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reservationId }),
       });
       // Refresh inventory count after release so the UI shows it's free again
@@ -752,15 +726,9 @@ export function usePlansCheckout(params: PlansParams) {
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       await new Promise((r) => setTimeout(r, attempt === 0 ? 2000 : 4000));
       try {
-        const idToken = currentUser
-          ? await currentUser.getIdToken().catch(() => "")
-          : "";
         const res = await apiFetch("/api/data-codes/claim-status", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             paymentRef: reference,
             planId: selectedPlanId,
@@ -793,21 +761,8 @@ export function usePlansCheckout(params: PlansParams) {
     );
   };
 
-  const handlePaymentSuccess = async (
-    reference: string,
-    overrideToken?: string,
-  ) => {
+  const handlePaymentSuccess = async (reference: string) => {
     try {
-      // Get a fresh ID token to send with the claim request.
-      let idToken = overrideToken || "";
-      if (!idToken && currentUser) {
-        try {
-          idToken = await currentUser.getIdToken();
-        } catch {
-          // Token fetch failed — recovery still covers us.
-        }
-      }
-
       try {
         // Abort a hung claim after 15s so we fall through to recovery rather
         // than spin forever on a bad connection.
@@ -817,10 +772,7 @@ export function usePlansCheckout(params: PlansParams) {
         try {
           response = await apiFetch("/api/data-codes/claim", {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               planId: selectedPlanId,
               email: email,
@@ -838,8 +790,8 @@ export function usePlansCheckout(params: PlansParams) {
 
         // Session too old — re-auth, then retry the claim (unchanged flow).
         if (result.code === "SESSION_EXPIRED") {
-          setPendingAction(() => (freshToken: string) => {
-            handlePaymentSuccess(reference, freshToken);
+          setPendingAction(() => () => {
+            handlePaymentSuccess(reference);
           });
           setShowReAuth(true);
           return;
@@ -905,10 +857,7 @@ export function usePlansCheckout(params: PlansParams) {
     // First-time TV buyer? Ask for MAC before payment.
     setCheckingTvMac(true);
     try {
-      const idToken = await currentUser.getIdToken().catch(() => "");
-      const res = await apiFetch("/api/tv/subscriptions", {
-        headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
-      });
+      const res = await apiFetch("/api/tv/subscriptions");
       const data = await res.json().catch(() => ({ subscriptions: [] }));
       const hasMac = (data.subscriptions || []).some(
         (s: any) => s.hasMacAddress === true,
@@ -1061,31 +1010,14 @@ export function usePlansCheckout(params: PlansParams) {
     }
   };
 
-  const handleTvPaymentSuccess = async (
-    response: any,
-    isExisting: boolean,
-    overrideToken?: string,
-  ) => {
+  const handleTvPaymentSuccess = async (response: any, isExisting: boolean) => {
     const reference = response.reference || tvPaymentRef;
     setTvPaymentRef(reference);
 
     try {
-      // Get ID token for server-side verification
-      let idToken = overrideToken || "";
-      if (!idToken && currentUser) {
-        try {
-          idToken = await currentUser.getIdToken();
-        } catch {
-          // Token fetch failed
-        }
-      }
-
       const purchaseResponse = await apiFetch("/api/tv/purchase", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
           name: isExisting ? "" : tvName.trim(),
@@ -1101,8 +1033,8 @@ export function usePlansCheckout(params: PlansParams) {
 
       // Handle session expired
       if (result.code === "SESSION_EXPIRED") {
-        setPendingAction(() => (freshToken: string) => {
-          handleTvPaymentSuccess(response, isExisting, freshToken);
+        setPendingAction(() => () => {
+          handleTvPaymentSuccess(response, isExisting);
         });
         setShowReAuth(true);
         return;
@@ -1147,26 +1079,14 @@ export function usePlansCheckout(params: PlansParams) {
     setPurchasing(true);
 
     try {
-      // Create the account (our own sign-in, as Firebase's used to)
-      const auth = getAuthInstance();
-      const { createUserWithEmailAndPassword } = await import("@/lib/customerAuth");
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email.trim().toLowerCase(),
-        tvPassword,
-      );
-      const user = userCredential.user;
-
-      // Fetch a fresh ID token so the server can verify ownership
-      const idToken = await user.getIdToken().catch(() => "");
+      // Create the account (signed in straight away, so the server knows
+      // whose it is when linking)
+      await signUp(email.trim().toLowerCase(), tvPassword);
 
       // Link user to subscription
       const response = await apiFetch("/api/tv/create-account", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           subscriptionId: tvSubscriptionId,
         }),
@@ -1189,7 +1109,7 @@ export function usePlansCheckout(params: PlansParams) {
       window.location.href = "/dashboard";
     } catch (err: any) {
       console.error("Error creating account:", err);
-      // Handle specific Firebase Auth errors
+      // Handle specific sign-up errors
       if (err.code === "auth/email-already-in-use") {
         setError(
           "An account with this email already exists. Please use the login page.",
@@ -1301,10 +1221,10 @@ export function usePlansCheckout(params: PlansParams) {
     setShowHostelConfirm(false);
     setPendingPurchaseType(null);
   };
-  const completeReAuth = (freshToken: string) => {
+  const completeReAuth = () => {
     setShowReAuth(false);
     if (pendingAction) {
-      pendingAction(freshToken);
+      pendingAction();
       setPendingAction(null);
     }
   };

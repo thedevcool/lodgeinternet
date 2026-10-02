@@ -965,7 +965,7 @@ export default function AdminUsersPage() {
                 Will be wiped:
               </p>
               <ul className='text-xs text-red-700 space-y-1 list-disc pl-5'>
-                <li>Firebase Auth account (immediate sign-out)</li>
+                <li>Sign-in account (immediate sign-out)</li>
                 <li>User profile (hostel, name, verification)</li>
                 <li>All TV subscriptions for this email</li>
                 <li>All data plan purchases for this email</li>
