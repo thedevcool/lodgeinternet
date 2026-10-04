@@ -12,6 +12,7 @@
 import {
   Activity,
   BarChart3,
+  HandCoins,
   Building2,
   Database,
   Grid2X2,
@@ -37,7 +38,14 @@ export type AdminNavItem = {
   description: string;
   /** Superadmin-only links stay hidden from module admins entirely. */
   superAdminOnly?: boolean;
+  /** The attention badge to show, when it isn't the module's own. */
+  attentionKey?: string;
 };
+
+/** The attention badge count for a nav item. */
+export function badgeFor(item: AdminNavItem, counts: AttentionCounts): number {
+  return counts[item.attentionKey ?? item.module] || 0;
+}
 
 export const ADMIN_NAV: AdminNavItem[] = [
   { label: "Data Codes", href: "/admin/data-codes", icon: KeyRound, module: "data-codes",
@@ -46,6 +54,8 @@ export const ADMIN_NAV: AdminNavItem[] = [
     description: "Omada controllers, member hostels and pool metadata." },
   { label: "Transactions", href: "/admin/transactions", icon: BarChart3, module: "transactions",
     description: "Purchases, revenue splits and partner statements." },
+  { label: "Owed orders", href: "/admin/owed-orders", icon: HandCoins, module: "transactions", superAdminOnly: true, attentionKey: "owed-orders",
+    description: "Paid for but not delivered: settle them by hand." },
   { label: "Bot Analytics", href: "/admin/bot-analytics", icon: Activity, module: "bot-analytics", superAdminOnly: true,
     description: "WhatsApp checkouts, payment methods and drop-off." },
   { label: "TV Users", href: "/admin/tv-users", icon: Tv, module: "tv-users",

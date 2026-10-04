@@ -30,6 +30,7 @@ import {
   Loader2,
   Users,
   Phone,
+  ShieldOff,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import type {
@@ -224,6 +225,14 @@ export default function AdminManagementPage() {
   const handleLogout = () => {
     logout();
     router.push("/admin/login");
+  };
+
+  // Ends every admin's sessions on every device, this one included: for
+  // example after the superadmin password changed, or a lost phone.
+  const signEveryoneOut = async () => {
+    if (!window.confirm("Sign every admin out on every device, including you?")) return;
+    const res = await adminFetch("/api/admin/sessions/end-all", { method: "POST" });
+    if (res.ok) handleLogout();
   };
 
   const fetchAdmins = useCallback(async () => {
@@ -531,6 +540,12 @@ export default function AdminManagementPage() {
                   className='inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity shadow-md'>
                   <Plus className='w-4 h-4' />
                   Add Admin
+                </button>
+                <button
+                  onClick={signEveryoneOut}
+                  className='flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors'>
+                  <ShieldOff className='w-4 h-4' />
+                  Sign everyone out
                 </button>
                 <button
                   onClick={handleLogout}

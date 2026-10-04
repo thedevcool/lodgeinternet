@@ -10,6 +10,7 @@ import Monogram from "@/components/ui/Monogram";
 import WhatsAppCard from "@/components/ui/WhatsAppCard";
 import { GroupedList, ListRow } from "@/components/ui/GroupedList";
 import { EmptyState, ErrorState } from "@/components/ui/States";
+import { LockedToYourHostel } from "@/components/client/YourHostel";
 import LocationView, { LocationSkeleton } from "@/components/hostels/LocationView";
 import { GraduationCap } from "lucide-react";
 
@@ -21,6 +22,14 @@ import { GraduationCap } from "lucide-react";
  *   4. anything else → redirect home
  */
 export default function LocationPage({ params }: { params: { slug: string } }) {
+  return (
+    <LockedToYourHostel>
+      <LocationPageContent params={params} />
+    </LockedToYourHostel>
+  );
+}
+
+function LocationPageContent({ params }: { params: { slug: string } }) {
   const router = useRouter();
   const dir = useHostelDirectory();
 

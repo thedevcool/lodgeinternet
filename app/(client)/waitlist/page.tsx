@@ -1,5 +1,6 @@
 "use client";
 import { apiFetch } from "@/lib/apiClient";
+import { checkoutTotal } from "@/lib/pricing";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -29,17 +30,18 @@ type Affordability = "yes" | "manage";
 
 interface PlanRow {
   label: string;
-  price: string;
+  /** The plan price; shown as the checkout total, like the real plan list. */
+  price: number;
 }
 
 const PLAN_TABLE: PlanRow[] = [
-  { label: "1 GB", price: "₦300" },
-  { label: "20 GB", price: "₦3,000" },
-  { label: "40 GB", price: "₦5,000" },
-  { label: "90 GB", price: "₦10,000" },
-  { label: "150 GB", price: "₦15,000" },
-  { label: "250 GB", price: "₦20,000" },
-  { label: "Unlimited (3 Devices)", price: "₦40,000" },
+  { label: "1 GB", price: 300 },
+  { label: "20 GB", price: 3000 },
+  { label: "40 GB", price: 5000 },
+  { label: "90 GB", price: 10000 },
+  { label: "150 GB", price: 15000 },
+  { label: "250 GB", price: 20000 },
+  { label: "Unlimited (3 Devices)", price: 40000 },
 ];
 
 const STEP_ORDER: Step[] = ["email", "audience", "details", "pricing", "whatsapp"];
@@ -329,7 +331,9 @@ export default function WaitlistPage() {
               {PLAN_TABLE.map((row) => (
                 <div key={row.label} className="relative flex items-center justify-between px-4 py-3">
                   <span className="ui-callout text-ink">{row.label}</span>
-                  <span className="ui-callout font-semibold tabular-nums text-ink">{row.price}</span>
+                  <span className="ui-callout font-semibold tabular-nums text-ink">
+                    ₦{checkoutTotal(row.price).toLocaleString()}
+                  </span>
                 </div>
               ))}
             </GroupedList>

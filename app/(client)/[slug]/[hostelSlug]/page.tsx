@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { displayName, toHostelSlug } from "@/lib/hostelSlug";
 import { useHostelDirectory } from "@/lib/useHostelDirectory";
 import { ErrorState } from "@/components/ui/States";
+import { LockedToYourHostel } from "@/components/client/YourHostel";
 import LocationView, { LocationSkeleton } from "@/components/hostels/LocationView";
 
 /**
@@ -15,6 +16,14 @@ import LocationView, { LocationSkeleton } from "@/components/hostels/LocationVie
  * dynamic segment, and Next requires one name per level.
  */
 export default function CollegePage({ params }: { params: { slug: string; hostelSlug: string } }) {
+  return (
+    <LockedToYourHostel>
+      <CollegePageContent params={params} />
+    </LockedToYourHostel>
+  );
+}
+
+function CollegePageContent({ params }: { params: { slug: string; hostelSlug: string } }) {
   const router = useRouter();
   const dir = useHostelDirectory();
 

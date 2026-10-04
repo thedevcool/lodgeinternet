@@ -18,7 +18,7 @@ import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
 import { BarChart3, ChevronRight, LogOut, X } from "lucide-react";
 import Logo from "@/components/Logo";
-import { ADMIN_NAV, clearAttentionCache, type AttentionCounts } from "@/lib/adminNav";
+import { ADMIN_NAV, badgeFor, clearAttentionCache, type AttentionCounts } from "@/lib/adminNav";
 import { useAuthStore } from "@/store/authStore";
 
 const DASHBOARD = "/admin/dashboard";
@@ -83,8 +83,9 @@ export default function AdminDrawer({
           </Link>
         )}
 
-        {links.map(({ label, href, icon: Icon, module }) => {
-          const badge = attention[module] || 0;
+        {links.map((item) => {
+          const { label, href, icon: Icon } = item;
+          const badge = badgeFor(item, attention);
           const current = pathname === href || pathname.startsWith(`${href}/`);
           return (
             <Link

@@ -12,15 +12,25 @@ import Badge from "@/components/ui/Badge";
 import { Chip, ChipRow } from "@/components/ui/Chips";
 import { EmptyState, ErrorState, ListSkeleton } from "@/components/ui/States";
 import HostelList from "@/components/hostels/HostelList";
+import { LockedToYourHostel } from "@/components/client/YourHostel";
 import type { Hostel } from "@/types";
 
 /**
  * /hostels — every hostel, grouped by location (Figma "Select hostel").
  * Chips filter by location; search matches hostel and location names.
+ * A customer locked to a hostel sees only theirs.
  */
 type Group = { id: string; title: string; href?: string; hostels: Hostel[] };
 
 export default function HostelsPage() {
+  return (
+    <LockedToYourHostel>
+      <AllHostels />
+    </LockedToYourHostel>
+  );
+}
+
+function AllHostels() {
   const dir = useHostelDirectory();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");

@@ -5,7 +5,7 @@ import Button from "@/components/ui/Button";
 import TextField from "@/components/ui/TextField";
 import InlineAlert from "@/components/ui/InlineAlert";
 import WhatsAppCard from "@/components/ui/WhatsAppCard";
-import { planCharges, planTotal } from "@/lib/pricing";
+import { planTotal } from "@/lib/pricing";
 import type { DataPlan } from "@/types";
 import { planTypeLine } from "./checkout";
 import type { PlansCheckout } from "./usePlansCheckout";
@@ -100,20 +100,14 @@ function OrderSummary({ plan }: { plan: DataPlan }) {
       <p className="ui-subhead mt-1 flex items-center gap-1.5 text-ink-2">
         <Icon className="h-4 w-4" /> {planTypeLine(plan)}
       </p>
-      <dl className="ui-subhead mt-4 space-y-2 border-t border-hairline pt-4">
-        <div className="flex justify-between text-ink-2">
-          <dt>Plan Price</dt>
-          <dd className="tabular-nums">₦{plan.price.toLocaleString()}</dd>
-        </div>
-        <div className="flex justify-between text-ink-2">
-          <dt>Bank Charges</dt>
-          <dd className="tabular-nums">₦{planCharges(plan).toLocaleString()}</dd>
-        </div>
-        <div className="flex justify-between border-t border-hairline pt-3 text-[17px] font-semibold text-ink">
+      {/* One figure only: the same total the plan list showed, all charges in. */}
+      <div className="mt-4 border-t border-hairline pt-4">
+        <dl className="flex justify-between text-[17px] font-semibold text-ink">
           <dt>Total to Pay</dt>
           <dd className="tabular-nums">₦{planTotal(plan).toLocaleString()}</dd>
-        </div>
-      </dl>
+        </dl>
+        <p className="ui-footnote mt-1 text-ink-2">All charges included</p>
+      </div>
     </div>
   );
 }

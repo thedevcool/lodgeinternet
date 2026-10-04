@@ -12,6 +12,7 @@ import { GroupedList, ListRow } from "@/components/ui/GroupedList";
 import { EmptyState, Skeleton } from "@/components/ui/States";
 import { displayName } from "@/lib/hostelSlug";
 import { useHostelDirectory } from "@/lib/useHostelDirectory";
+import { LockedToYourHostel, useMyHostel } from "@/components/client/YourHostel";
 import { usePlansCheckout, type PlansParams } from "./usePlansCheckout";
 import { PlanList, PlanListSkeleton, PlanTypeTabs } from "./PlanPicker";
 import CheckoutPanel, { CheckoutBar } from "./CheckoutPanel";
@@ -34,6 +35,7 @@ import {
 export default function PlansScreen({ params }: { params: PlansParams }) {
   const c = usePlansCheckout(params);
   const dir = useHostelDirectory(); // only for the breadcrumb / back link
+  const mine = useMyHostel();
 
   // Mobile checkout sheet. It stays open (locked) while paying so errors show
   // in place; it closes once Paystack reports success and the code sheet
@@ -58,6 +60,15 @@ export default function PlansScreen({ params }: { params: PlansParams }) {
       : c.planView === "unlimited"
         ? "No unlimited plans available at the moment."
         : "No TV plans available at the moment.";
+
+  // A customer locked to another hostel can't buy here: point them to theirs.
+  if (mine.hostel && c.hostelObj && c.hostelObj.id !== mine.hostel.id) {
+    return (
+      <LockedToYourHostel note={`Your account belongs to ${mine.hostel.name}, so plans for ${c.hostelObj.name} aren’t available to you.`}>
+        {null}
+      </LockedToYourHostel>
+    );
+  }
 
   return (
     <>

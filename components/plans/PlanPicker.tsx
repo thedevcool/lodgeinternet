@@ -5,6 +5,7 @@ import SegmentedControl, { type Segment } from "@/components/ui/SegmentedControl
 import Badge from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/States";
 import { cx } from "@/components/ui/cx";
+import { planTotal } from "@/lib/pricing";
 import type { DataPlan } from "@/types";
 import { planTypeLine, type PlanView } from "./checkout";
 import type { PlansCheckout } from "./usePlansCheckout";
@@ -101,7 +102,7 @@ function PlanCard({
 
       <span className="shrink-0 text-right">
         <span className="block text-[22px] font-bold tabular-nums tracking-[-0.02em] text-ink">
-          ₦{plan.price.toLocaleString()}
+          ₦{planTotal(plan).toLocaleString()}
         </span>
       </span>
     </button>

@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
 import { Building2, Check, Search } from "lucide-react";
 import { cx } from "@/components/ui/cx";
+import { checkoutTotal } from "@/lib/pricing";
+
+/** Like the real plan list: the total, never the bare price. */
+const naira = (price: number) => `₦${checkoutTotal(price).toLocaleString()}`;
 
 /**
  * The Figma hero's three phones — find your hostel → choose a plan → you're
@@ -37,20 +41,16 @@ export default function HeroPhones({ className }: { className?: string }) {
         <Phone className="scale-110">
           <p className="text-center text-[8px] font-semibold text-ink">Choose Plan</p>
           <div className="mt-3 grid grid-cols-3 gap-1">
-            <MiniPlan label="3 Devices" price="₦1,500" per="/day" />
-            <MiniPlan label="5 Devices" price="₦2,500" per="/day" featured />
-            <MiniPlan label="TV Unlimited" price="₦5,000" per="/week" />
+            <MiniPlan label="3 Devices" price={naira(1500)} per="/day" />
+            <MiniPlan label="5 Devices" price={naira(2500)} per="/day" featured />
+            <MiniPlan label="TV Unlimited" price={naira(5000)} per="/week" />
           </div>
           <div className="mt-3 rounded-lg bg-surface p-1.5 shadow-card">
-            <div className="flex justify-between text-[6px] text-ink-2">
-              <span>Plan price</span>
-              <span>₦2,500</span>
-            </div>
-            <div className="mt-1 flex justify-between text-[6.5px] font-semibold text-ink">
+            <div className="flex justify-between text-[6.5px] font-semibold text-ink">
               <span>Total</span>
-              <span>₦2,771</span>
+              <span>{naira(2500)}</span>
             </div>
-            <div className="mt-1.5 rounded-full bg-accent py-1 text-center text-[6.5px] font-semibold text-white">Pay ₦2,771</div>
+            <div className="mt-1.5 rounded-full bg-accent py-1 text-center text-[6.5px] font-semibold text-white">Pay {naira(2500)}</div>
           </div>
         </Phone>
 

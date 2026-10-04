@@ -31,6 +31,7 @@ import { apiFetch } from "@/lib/apiClient";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onCustomerChange, signUp, type Customer } from "@/lib/customerAuth";
+import { profileChanged } from "@/components/client/CustomerProvider";
 import { useToast } from "@/components/Toast";
 import { generatePaymentRef } from "@/lib/generateRef";
 import { planTotal } from "@/lib/pricing";
@@ -504,6 +505,7 @@ export function usePlansCheckout(params: PlansParams) {
       setUserProfile((prev) =>
         prev ? { ...prev, hostelId: confirmedHostel } : prev,
       );
+      profileChanged(); // the account is now locked to this hostel
       hostelJustConfirmed.current = true;
       setShowHostelConfirm(false);
 

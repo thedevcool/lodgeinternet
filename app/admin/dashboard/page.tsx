@@ -27,7 +27,7 @@ import ProtectedRoute from "@/components/admin/ProtectedRoute";
 import Logo from "@/components/Logo";
 import { adminFetch } from "@/lib/apiClient";
 import { adminHome } from "@/lib/adminHome";
-import { ADMIN_NAV, primeAttention } from "@/lib/adminNav";
+import { ADMIN_NAV, badgeFor, primeAttention } from "@/lib/adminNav";
 import { useAuthStore } from "@/store/authStore";
 
 type CountMap = Record<string, number>;
@@ -430,18 +430,22 @@ export default function AdminDashboardPage() {
               </section>
 
               <div className="tile-grid">
-                {tiles.map(({ label, href, icon: Icon, module, description }) => (
-                  <Link key={href} href={href} className="tile">
-                    <span className="tile-icon">
-                      <Icon size={22} />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="tile-title">{label}</span>
-                      <span className="tile-desc block">{description}</span>
-                    </span>
-                    {(badges[module] || 0) > 0 && <span className="tile-badge">{fmt(badges[module])}</span>}
-                  </Link>
-                ))}
+                {tiles.map((item) => {
+                  const { label, href, icon: Icon, description } = item;
+                  const badge = badgeFor(item, badges);
+                  return (
+                    <Link key={href} href={href} className="tile">
+                      <span className="tile-icon">
+                        <Icon size={22} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="tile-title">{label}</span>
+                        <span className="tile-desc block">{description}</span>
+                      </span>
+                      {badge > 0 && <span className="tile-badge">{fmt(badge)}</span>}
+                    </Link>
+                  );
+                })}
               </div>
             </>
           ) : (

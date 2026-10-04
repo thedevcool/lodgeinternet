@@ -4,13 +4,13 @@ import { apiFetch } from "@/lib/apiClient";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { deleteUnfinishedAccount, onCustomerChange, signUp, type Customer } from "@/lib/customerAuth";
+import { profileChanged } from "@/components/client/CustomerProvider";
 import { Building2, Check, CheckCircle2, ChevronLeft, Mail } from "lucide-react";
 import Link from "next/link";
 import { displayName } from "@/lib/hostelSlug";
 import AuthShell, { AuthFallback } from "@/components/client/AuthShell";
 import TextField from "@/components/ui/TextField";
 import Button from "@/components/ui/Button";
-import Badge from "@/components/ui/Badge";
 import Monogram from "@/components/ui/Monogram";
 import Spinner from "@/components/ui/Spinner";
 import InlineAlert from "@/components/ui/InlineAlert";
@@ -54,8 +54,6 @@ function RegisterContent() {
   const prefillEmail = searchParams.get("email") || "";
   const verifyOnly = searchParams.get("verify") === "1";
   const prefillHostel = searchParams.get("hostel") || "";
-  // update=1 means the user already has a verified account — just update their hostelId
-  const updateMode = searchParams.get("update") === "1";
   const redirectTarget = safeRedirectPath(searchParams.get("redirect"));
 
   const [step, setStep] = useState<Step>(verifyOnly ? "verify" : "hostel");
@@ -78,7 +76,6 @@ function RegisterContent() {
   const [signedIn, setSignedIn] = useState<Customer | null>(null);
   // Whether we know yet who (if anyone) is signed in on this browser.
   const [signInKnown, setSignInKnown] = useState(false);
-  const [currentHostel, setCurrentHostel] = useState<string>("");
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resendNotice, setResendNotice] = useState("");
   // Track which step the user has actually entered, so the auto-redirect
@@ -104,7 +101,7 @@ function RegisterContent() {
       .finally(() => setLoadingHostels(false));
   }, []);
 
-  // Always track who is signed in — needed for verifyOnly, updateMode,
+  // Always track who is signed in — needed for verifyOnly,
   // already-signed-in detection, and orphan-account recovery.
   useEffect(() => {
     return onCustomerChange(async (user) => {
@@ -117,7 +114,7 @@ function RegisterContent() {
 
       // Only auto-route at the start of the flow. Once the user has begun
       // the credentials/verify steps, leave them alone.
-      if (verifyOnly || updateMode) return;
+      if (verifyOnly) return;
       if (stepRef.current !== "hostel") return;
 
       try {
@@ -140,28 +137,7 @@ function RegisterContent() {
         // Profile fetch failed — let them continue manually
       }
     });
-  }, [verifyOnly, updateMode, prefillEmail, prefillHostel, email, redirectTarget, router]);
-
-  // Fetch the user's current hostel for the update-mode marker
-  useEffect(() => {
-    if (!updateMode || !signedIn) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await apiFetch(`/api/auth/user?userId=${signedIn.uid}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled && data.profile?.hostelId) {
-          setCurrentHostel(data.profile.hostelId);
-        }
-      } catch {
-        // ignore
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [updateMode, signedIn]);
+  }, [verifyOnly, prefillEmail, prefillHostel, email, redirectTarget, router]);
 
   // verifyOnly needs someone signed in: once we know nobody is, bounce to
   // /login (and back here after) so we don't spin forever.
@@ -180,40 +156,9 @@ function RegisterContent() {
     return () => clearTimeout(t);
   }, [resendCooldown]);
 
-  const handleHostelSelect = async (hostelName: string) => {
+  const handleHostelSelect = (hostelName: string) => {
     setSelectedHostel(hostelName);
     setError("");
-
-    if (updateMode) {
-      // Update mode: just patch the hostelId for the logged-in user
-      if (!signedIn) {
-        // Not logged in — redirect to login, then come back
-        const returnUrl = `/register?email=${encodeURIComponent(email)}&hostel=${encodeURIComponent(hostelName)}&update=1`;
-        router.push(`/login?redirect=${encodeURIComponent(returnUrl)}`);
-        return;
-      }
-
-      setLoading(true);
-      try {
-        const res = await apiFetch("/api/auth/profile", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: signedIn.uid, hostelId: hostelName }),
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || "Failed to update hostel");
-        }
-        setStep("done");
-        setTimeout(() => router.push("/dashboard"), 2000);
-      } catch (err: any) {
-        setError(err.message || "Failed to update hostel. Please try again.");
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
     setStep("credentials");
   };
 
@@ -347,6 +292,7 @@ function RegisterContent() {
       }
 
       setStep("done");
+      profileChanged(); // verified: the account is now locked to its hostel
 
       // Bounce to the original destination if one was passed in, else dashboard
       const dest = redirectTarget || "/dashboard";
@@ -403,24 +349,24 @@ function RegisterContent() {
   // Everything above is the original registration logic, unchanged.
 
   const titles: Record<Step, string> = {
-    hostel: updateMode ? "Update Your Hostel" : "Select Your Hostel",
+    hostel: "Select Your Hostel",
     credentials: "Create your account",
     verify: "Verify Email",
     done: "You're All Set!",
   };
   const subtitles: Record<Step, string> = {
-    hostel: updateMode ? "Choose the hostel linked to your account" : "Choose the hostel where you stay",
+    hostel: "Choose the hostel where you stay",
     credentials: `Create your account for ${selectedHostel}`,
     verify: `Enter the 6-digit code sent to ${email}`,
-    done: updateMode ? "Your hostel has been updated" : "Your account has been verified",
+    done: "Your account has been verified",
   };
-  const showTabs = !updateMode && (step === "hostel" || step === "credentials");
+  const showTabs = step === "hostel" || step === "credentials";
   const stepIndex = { hostel: 0, credentials: 1, verify: 2, done: 3 }[step];
 
   return (
     <AuthShell tabs={showTabs ? "register" : undefined} title={titles[step]} subtitle={subtitles[step]}>
       {/* Progress (hostel → account → verify) */}
-      {!updateMode && step !== "done" && (
+      {step !== "done" && (
         <div className="-mt-3 mb-6 flex gap-1.5" aria-label={`Step ${stepIndex + 1} of 3`}>
           {[0, 1, 2].map((i) => (
             <span
@@ -455,16 +401,7 @@ function RegisterContent() {
       {/* ── Step 1: hostel ─────────────────────────────────────────────── */}
       {step === "hostel" && (
         <div className="space-y-4">
-          {updateMode && (
-            <InlineAlert tone="info">
-              Select your hostel below — your account will be linked and you can purchase plans straight away.
-            </InlineAlert>
-          )}
-          {loading ? (
-            <div className="ui-subhead flex items-center justify-center gap-3 py-8 text-ink-2">
-              <Spinner /> Updating…
-            </div>
-          ) : loadingHostels ? (
+          {loadingHostels ? (
             <ListSkeleton rows={4} />
           ) : hostels.length === 0 ? (
             <EmptyState icon={<Building2 />} title="No hostels available" />
@@ -513,18 +450,14 @@ function RegisterContent() {
                   <GroupedList header="Your hostel">
                     {hostels
                       .filter((hostel) => !selectedCollege || hostel.collageId === selectedCollege)
-                      .map((hostel) => {
-                        const isCurrent = updateMode && currentHostel && hostel.name === currentHostel;
-                        return (
-                          <ListRow
-                            key={hostel.id}
-                            onClick={() => handleHostelSelect(hostel.name)}
-                            leading={<Monogram name={hostel.name} />}
-                            title={hostel.name}
-                            trailing={isCurrent ? <Badge tone="accent">Current</Badge> : undefined}
-                          />
-                        );
-                      })}
+                      .map((hostel) => (
+                        <ListRow
+                          key={hostel.id}
+                          onClick={() => handleHostelSelect(hostel.name)}
+                          leading={<Monogram name={hostel.name} />}
+                          title={hostel.name}
+                        />
+                      ))}
                   </GroupedList>
                 </>
               )}
@@ -639,7 +572,7 @@ function RegisterContent() {
           <span className="mx-auto flex h-16 w-16 animate-check-pop items-center justify-center rounded-full bg-success text-white">
             <Check className="h-8 w-8" strokeWidth={3} />
           </span>
-          <h2 className="ui-title-2 mt-4 text-ink">{updateMode ? "Hostel Updated!" : "Account Verified!"}</h2>
+          <h2 className="ui-title-2 mt-4 text-ink">Account Verified!</h2>
           <p className="ui-subhead mt-1 text-ink-2">Redirecting to your dashboard...</p>
           <Spinner className="mx-auto mt-5 h-7 w-7 text-ink-3" />
         </div>

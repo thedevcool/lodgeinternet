@@ -1,13 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { MapPinOff } from "lucide-react";
-import { apiFetch } from "@/lib/apiClient";
 import { displayName } from "@/lib/hostelSlug";
 import { useHostelDirectory } from "@/lib/useHostelDirectory";
 import { whatsappBotUrl } from "@/lib/whatsapp";
-import { useCustomer } from "@/components/client/CustomerProvider";
+import { useMyHostel, YourHostelCard } from "@/components/client/YourHostel";
 import Container from "@/components/ui/Container";
 import SearchField from "@/components/ui/SearchField";
 import Monogram from "@/components/ui/Monogram";
@@ -26,8 +25,6 @@ import type { Hostel } from "@/types";
  * only their own hostel, exactly as before.
  */
 
-type VerifiedProfile = { hostelId: string; hostelSlug: string; emailVerified: boolean };
-
 /** A row in the locations list: a school, a location, or a standalone hostel. */
 type Entry = {
   key: string;
@@ -40,41 +37,9 @@ type Entry = {
 
 export default function HomePage() {
   const dir = useHostelDirectory();
-  const { user, ready } = useCustomer();
-  const [profile, setProfile] = useState<VerifiedProfile | null>(null);
-  const [profileChecked, setProfileChecked] = useState(false);
+  const mine = useMyHostel();
   const [query, setQuery] = useState("");
   const wa = whatsappBotUrl("Hi Lodge Internet");
-
-  // ── Signed-in customers: load the profile (only verified ones are "locked in")
-  useEffect(() => {
-    if (!ready) return;
-    if (!user) {
-      setProfile(null);
-      setProfileChecked(true);
-      return;
-    }
-    let cancelled = false;
-    setProfileChecked(false);
-    (async () => {
-      try {
-        const res = await apiFetch(`/api/auth/user?userId=${user.uid}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (!cancelled) setProfile(data.profile?.emailVerified ? data.profile : null);
-        }
-      } catch {
-        // Profile fetch failed — show the normal directory.
-      } finally {
-        if (!cancelled) setProfileChecked(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user, ready]);
-
-  const myHostel: Hostel | undefined = profile ? dir.data?.hostels.find((h) => h.name === profile.hostelId) : undefined;
 
   // ── Top-level list: schools, standalone locations, standalone hostels ─────
   const entries = useMemo<Entry[]>(() => {
@@ -119,8 +84,6 @@ export default function HomePage() {
     return { locations, hostels };
   }, [q, dir, entries]);
 
-  const waitingForProfile = Boolean(user) && !profileChecked;
-
   return (
     <Container wide>
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
@@ -146,12 +109,12 @@ export default function HomePage() {
 
       {/* ── Find your connection ─────────────────────────────────────────── */}
       <section id="find" className="scroll-mt-20 pt-8 md:pt-24">
-        {dir.loading || waitingForProfile ? (
+        {dir.loading || mine.checking ? (
           <ListSkeleton rows={5} />
         ) : dir.error ? (
           <ErrorState onRetry={dir.retry} />
-        ) : myHostel ? (
-          <YourHostelCard hostel={myHostel} href={dir.plansPathFor(myHostel)} location={locationName(myHostel, dir.collageById)} />
+        ) : mine.hostel ? (
+          <YourHostelCard hostel={mine.hostel} />
         ) : (
           <>
             <SectionTitle eyebrow="Find your connection" title="Select your hostel" />
@@ -250,32 +213,6 @@ function SearchResults({ locations, hostels, query }: { locations: Entry[]; host
       )}
     </div>
   );
-}
-
-function YourHostelCard({ hostel, href, location }: { hostel: Hostel; href: string; location?: string }) {
-  return (
-    <div className="rounded-card bg-surface p-6 shadow-card sm:p-8 md:max-w-xl">
-      <p className="ui-eyebrow text-accent-ink">Your hostel</p>
-      <div className="mt-4 flex items-center gap-4">
-        <Monogram name={hostel.name} size="lg" />
-        <div className="min-w-0">
-          <p className="ui-title-2 truncate text-ink">{hostel.name}</p>
-          <p className="ui-subhead mt-0.5 text-ink-2">{location ?? "You’re locked in — tap to view your plans"}</p>
-        </div>
-      </div>
-      <div className="mt-6 grid grid-cols-2 gap-3">
-        <ButtonLink href={href}>Buy data</ButtonLink>
-        <ButtonLink href="/dashboard" variant="gray">
-          My codes
-        </ButtonLink>
-      </div>
-    </div>
-  );
-}
-
-function locationName(hostel: Hostel, collageById: Map<string, { name: string }>) {
-  const parent = hostel.collageId ? collageById.get(hostel.collageId) : undefined;
-  return parent ? displayName(parent.name) : undefined;
 }
 
 function plural(n: number, word: string) {
