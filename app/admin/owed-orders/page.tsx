@@ -30,6 +30,8 @@ type Order = {
 };
 
 function describe(order: Order): string {
+  if (order.kind === "purchase" && order.state === "unmatched")
+    return "Payment received with no order to match it to: give them a code, or refund them";
   if (order.kind === "purchase") return "Paid on checkout, no code was available";
   if (order.state === "partially_paid") return `Part paid by transfer: ₦${order.amountOwed.toLocaleString()} still to pay`;
   return "Paid by transfer to the bot, no code was sent";
