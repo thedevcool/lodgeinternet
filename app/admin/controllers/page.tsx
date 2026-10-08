@@ -40,6 +40,17 @@ interface Controller {
   createdAt: string;
   poolMetadata: Record<string, PoolMetadata>;
   lastSync?: { added?: number; skipped?: number; status?: string; ranAt?: string } | null;
+  /** How the backend reaches it: Omada Cloud, or the self-hosted controller's Open API. */
+  omadaConnection?: OmadaConnection;
+  /** For a self-hosted one: its site's name on that controller. */
+  omadaSiteName?: string;
+}
+
+type OmadaConnection = "cloud" | "self_hosted";
+
+interface ConnectionDraft {
+  connection: OmadaConnection;
+  siteName: string;
 }
 
 interface PoolMetadata {
@@ -113,6 +124,11 @@ export default function AdminControllersPage() {
   const [syncingController, setSyncingController] = useState<string | null>(null);
   const [syncingAll, setSyncingAll] = useState(false);
   const [newPoolDrafts, setNewPoolDrafts] = useState<Record<string, PoolMetadata & { poolKey?: string }>>({});
+  // Connection (Omada Cloud or the self-hosted controller)
+  const [selfHostedConfigured, setSelfHostedConfigured] = useState(false);
+  const [connectionDrafts, setConnectionDrafts] = useState<Record<string, ConnectionDraft>>({});
+  const [connectionTarget, setConnectionTarget] = useState<Controller | null>(null);
+  const [savingConnection, setSavingConnection] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -130,6 +146,7 @@ export default function AdminControllersPage() {
       const hostelData = await hostelRes.json();
       if (!ctrlRes.ok) throw new Error(ctrlData.error || "Failed to fetch controllers");
       setControllers(ctrlData.controllers ?? []);
+      setSelfHostedConfigured(ctrlData.selfHostedConfigured === true);
       setAllHostels(hostelData.hostels ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load data");
@@ -224,6 +241,54 @@ export default function AdminControllersPage() {
       await fetchData();
     } catch (err) {
       showError(err instanceof Error ? err.message : "Failed to toggle");
+    }
+  };
+
+  // ─── Connection ──────────────────────────────────────────────────────────
+
+  const connectionDraft = (ctrl: Controller): ConnectionDraft =>
+    connectionDrafts[ctrl.id] ?? {
+      connection: ctrl.omadaConnection ?? "cloud",
+      siteName: ctrl.omadaSiteName ?? "",
+    };
+
+  const connectionChanged = (ctrl: Controller) => {
+    const draft = connectionDraft(ctrl);
+    return (
+      draft.connection !== (ctrl.omadaConnection ?? "cloud") ||
+      draft.siteName.trim() !== (ctrl.omadaSiteName ?? "")
+    );
+  };
+
+  const handleSaveConnection = async () => {
+    if (!connectionTarget) return;
+    const draft = connectionDraft(connectionTarget);
+    setSavingConnection(true);
+    setError("");
+    try {
+      const res = await adminFetch(`/api/admin/controllers/${connectionTarget.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ omadaConnection: draft.connection, omadaSiteName: draft.siteName.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to change the connection");
+      setConnectionDrafts((d) => {
+        const next = { ...d };
+        delete next[connectionTarget.id];
+        return next;
+      });
+      showSuccess(
+        draft.connection === "self_hosted"
+          ? `${connectionTarget.name} now uses the self-hosted controller (site "${draft.siteName.trim()}")`
+          : `${connectionTarget.name} now uses Omada Cloud`,
+      );
+      setConnectionTarget(null);
+      await fetchData();
+    } catch (err) {
+      showError(err instanceof Error ? err.message : "Failed to change the connection");
+    } finally {
+      setSavingConnection(false);
     }
   };
 
@@ -681,6 +746,21 @@ export default function AdminControllersPage() {
                                     <PowerOff className="w-3 h-3" /> Inactive
                                   </span>
                                 )}
+                                {ctrl.omadaConnection === "self_hosted" ? (
+                                  <span
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700"
+                                    title={`Self-hosted controller, site "${ctrl.omadaSiteName ?? ""}"`}
+                                  >
+                                    <Server className="w-3 h-3" /> Self-hosted
+                                  </span>
+                                ) : (
+                                  <span
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-apple-gray-100 text-apple-gray-500"
+                                    title="Reached through Omada Cloud"
+                                  >
+                                    <Globe className="w-3 h-3" /> Omada Cloud
+                                  </span>
+                                )}
                               </div>
                               <div className="flex flex-wrap gap-1.5 mt-1.5">
                                 {ctrl.memberHostels.length === 0 ? (
@@ -753,6 +833,59 @@ export default function AdminControllersPage() {
                       {/* Expanded detail — member hostels */}
                       {isExpanded && !editingId && (
                         <div className="mt-4 ml-11 space-y-3">
+                          {isSuperAdmin && (() => {
+                            const draft = connectionDraft(ctrl);
+                            const setDraft = (change: Partial<ConnectionDraft>) =>
+                              setConnectionDrafts((d) => ({ ...d, [ctrl.id]: { ...draft, ...change } }));
+                            const selfHosted = draft.connection === "self_hosted";
+                            const canSave =
+                              connectionChanged(ctrl) && (!selfHosted || (selfHostedConfigured && draft.siteName.trim() !== ""));
+                            return (
+                              <div className="rounded-2xl border border-purple-100 bg-purple-50/50 p-4 space-y-3">
+                                <div className="flex items-center gap-2">
+                                  <Server className="w-4 h-4 text-purple-600" />
+                                  <h3 className="text-sm font-semibold text-apple-gray-900">Connection</h3>
+                                </div>
+                                <p className="text-xs text-apple-gray-500">
+                                  How the backend reaches this controller for vouchers, balances and TV access. Switching
+                                  takes effect within a minute, and can be switched back the same way.
+                                </p>
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                  <select
+                                    value={draft.connection}
+                                    onChange={(e) => setDraft({ connection: e.target.value as OmadaConnection })}
+                                    className="rounded-lg border border-apple-gray-200 px-2 py-2 text-xs"
+                                  >
+                                    <option value="cloud">Omada Cloud</option>
+                                    <option value="self_hosted" disabled={!selfHostedConfigured && ctrl.omadaConnection !== "self_hosted"}>
+                                      Self-hosted controller
+                                    </option>
+                                  </select>
+                                  <input
+                                    value={draft.siteName}
+                                    onChange={(e) => setDraft({ siteName: e.target.value })}
+                                    placeholder="Site name on the controller, e.g. Ayoni Lodge"
+                                    disabled={!selfHosted}
+                                    maxLength={64}
+                                    className="rounded-lg border border-apple-gray-200 px-2 py-2 text-xs disabled:bg-apple-gray-50 disabled:text-apple-gray-400"
+                                  />
+                                  <button
+                                    onClick={() => setConnectionTarget(ctrl)}
+                                    disabled={!canSave}
+                                    className="inline-flex items-center justify-center gap-1 rounded-lg bg-purple-600 px-3 py-2 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+                                  >
+                                    <Save className="w-3 h-3" /> Save connection
+                                  </button>
+                                </div>
+                                {!selfHostedConfigured && (
+                                  <p className="text-[11px] text-apple-gray-500">
+                                    The self-hosted controller isn&apos;t configured on the server yet (OMADA_SH_*), so it
+                                    can&apos;t be chosen.
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })()}
                           <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4 space-y-3">
                             <div className="flex flex-wrap items-center gap-2">
                               <SlidersHorizontal className="w-4 h-4 text-blue-600" />
@@ -923,6 +1056,23 @@ export default function AdminControllersPage() {
         type="danger"
         onConfirm={handleDelete}
         onClose={() => setDeleteTarget(null)}
+      />
+
+      {/* Connection change confirmation */}
+      <ConfirmationModal
+        isOpen={!!connectionTarget}
+        title="Change how this controller is reached"
+        message={
+          connectionTarget
+            ? connectionDraft(connectionTarget).connection === "self_hosted"
+              ? `Switch "${connectionTarget.name}" to the self-hosted controller, site "${connectionDraft(connectionTarget).siteName.trim()}"? Voucher syncs, balance checks and TV access for its ${connectionTarget.memberHostels.length} hostels will go to that site. Run a sync afterwards.`
+              : `Switch "${connectionTarget.name}" back to Omada Cloud? Voucher syncs, balance checks and TV access for its ${connectionTarget.memberHostels.length} hostels will go to the cloud controller again.`
+            : ""
+        }
+        confirmText={savingConnection ? "Saving\u2026" : "Switch"}
+        type="warning"
+        onConfirm={handleSaveConnection}
+        onClose={() => setConnectionTarget(null)}
       />
 
       {/* Unassign confirmation */}

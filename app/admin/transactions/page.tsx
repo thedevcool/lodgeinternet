@@ -451,6 +451,9 @@ export default function AdminTransactionsPage() {
   // capped by TRANSACTIONS_PAGE_SIZE (see fetchTransactions).
   const [totalMatching, setTotalMatching] = useState(0);
   const [hasMoreTransactions, setHasMoreTransactions] = useState(false);
+  // Null means there is nothing after what is on screen.
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   // Partner-only — their true total share across every matching transaction,
   // not just the loaded page (see `totalPartnerShare` below for when this is
   // actually used vs. the page-scoped fallback).
@@ -541,6 +544,8 @@ export default function AdminTransactionsPage() {
       filtersMounted.current = true;
       return;
     }
+    // A filter change starts a new walk; the old cursor described the old set.
+    setNextCursor(null);
     void fetchTransactions();
   }, [filterHostel, controllerFilter, filterPlanType, filterPaymentSource, filterDateFrom, filterDateTo]);
 
@@ -677,7 +682,7 @@ export default function AdminTransactionsPage() {
   /** Query string for the current filter selections. `unbounded` drops the
    * page-size cap — used only for Export, which must cover every matching
    * transaction, not just what's currently on screen. */
-  const buildTransactionsQuery = (opts: { unbounded?: boolean } = {}) => {
+  const buildTransactionsQuery = (opts: { unbounded?: boolean; cursor?: string } = {}) => {
     const params = new URLSearchParams();
     if (filterHostel !== "all") params.set("hostel", filterHostel);
     if (controllerFilter !== "all") params.set("controllerId", controllerFilter);
@@ -686,21 +691,44 @@ export default function AdminTransactionsPage() {
     if (filterDateFrom) params.set("dateFrom", filterDateFrom);
     if (filterDateTo) params.set("dateTo", filterDateTo);
     if (!opts.unbounded) params.set("limit", String(TRANSACTIONS_PAGE_SIZE));
+    // Opaque: whatever the last response handed back, echoed verbatim. The
+    // browser never builds one, so its shape stays the server's business.
+    if (opts.cursor) params.set("cursor", opts.cursor);
     const qs = params.toString();
     return qs ? `?${qs}` : "";
   };
 
-  const fetchTransactions = async () => {
+  const loadMoreTransactions = async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      await fetchTransactions({ cursor: nextCursor });
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const fetchTransactions = async (opts: { cursor?: string } = {}) => {
+    const appending = Boolean(opts.cursor);
     try {
       // The backend does the filtering now (hostel/controller/plan type/
       // payment source/date), so it only ever has to stream what's actually
       // relevant — and `limit` caps the row list at the Firestore query
       // level, which is what keeps this fast even against a growing ledger.
-      const res = await adminFetch(`/api/admin/transactions${buildTransactionsQuery()}`);
+      const res = await adminFetch(
+        `/api/admin/transactions${buildTransactionsQuery({ cursor: opts.cursor })}`,
+      );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load transactions");
       const parsed = parseTransactionsResponse(data);
-      setTransactions(parsed.valid);
+      // Appending, not replacing — and de-duplicated by id, so a row that
+      // straddles a page boundary cannot be listed twice.
+      setTransactions((prev) => {
+        if (!appending) return parsed.valid;
+        const seen = new Set(prev.map((t) => t.id));
+        return [...prev, ...parsed.valid.filter((t) => !seen.has(t.id))];
+      });
+      setNextCursor(typeof data.nextCursor === "string" ? data.nextCursor : null);
       // Absent from the partner response by design (see admin_transactions.py)
       // — defaulting to [] there is what keeps the panels below hidden for them.
       setByController(parsed.byController);
@@ -1268,50 +1296,18 @@ export default function AdminTransactionsPage() {
     }
     setSendingEmail(true);
     setSplitsError("");
-    const mPct = s.maintenancePct ?? maintenancePct;
-    const grossRev = txns.reduce((a, t) => a + t.price, 0);
-    const mainDed = Math.round((grossRev * mPct) / 100);
-    const paystackDed = Math.round((grossRev * paystackPct) / 100);
-    const splittableRev = grossRev - mainDed - paystackDed;
-    const aShr = Math.round((splittableRev * s.adminPercent) / 100);
-    const pShr = Math.round((splittableRev * s.partnerPercent) / 100);
-    const splitPayload = {
-      hostel: s.hostel,
-      dateFrom: s.dateFrom,
-      dateTo: s.dateTo,
-      isOpen: s.isOpen ?? false,
-      adminPercent: s.adminPercent,
-      partnerPercent: s.partnerPercent,
-      totalRevenue: grossRev,
-      maintenancePct: mPct,
-      paystackPct: paystackPct,
-      maintenanceDeduction: mainDed,
-      paystackDeduction: paystackDed,
-      splittableRevenue: splittableRev,
-      adminShare: aShr,
-      partnerShare: pShr,
-      transactionCount: txns.length,
-      notes: s.notes,
-      createdAt: s.createdAt.toISOString(),
-    };
-    const transactionsPayload = txns.map((t) => ({
-      date: t.purchasedAt.toLocaleString("en-NG"),
-      planName: t.planName,
-      planType: t.planType,
-      email: t.customerEmail ?? "",
-      ref: t.paymentRef ?? "",
-      price: t.price,
-      adminShare: Math.round((t.price * s.adminPercent) / 100),
-      partnerShare: Math.round((t.price * s.partnerPercent) / 100),
-    }));
     try {
+      // Only the record id goes up. The figures and the transaction list are
+      // rebuilt on the server from the stored split record — the browser used
+      // to recompute them from its own copy of the ledger and post them back,
+      // which meant a partner's statement could carry numbers that were never
+      // the ones written into the payout record.
       const res = await adminFetch("/api/admin/send-split-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           to: toEmail.trim(),
-          split: splitPayload,
-          transactions: transactionsPayload,
+          splitId: s.id,
           periodLabel,
         }),
       });
@@ -1856,10 +1852,21 @@ export default function AdminTransactionsPage() {
                         : `${totalTransactionsCount.toLocaleString()} transaction${totalTransactionsCount !== 1 ? "s" : ""} • ₦${totalRevenue.toLocaleString()} total`}
                       {hasMoreTransactions && (
                         <span className="ml-1 text-slate-400">
-                          — showing the most recent {filtered.length.toLocaleString()} below
+                          — showing {filtered.length.toLocaleString()} below
                         </span>
                       )}
                     </p>
+                    {/* Until now this count sat beside no control at all: the
+                        only ways past the newest page were narrowing the date
+                        filter or exporting the whole ledger. */}
+                    {nextCursor && (
+                      <button
+                        onClick={() => void loadMoreTransactions()}
+                        disabled={loadingMore}
+                        className="flex items-center gap-2 rounded-xl border border-white/90 bg-white/70 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:bg-white hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50">
+                        {loadingMore ? "Loading…" : "Load more"}
+                      </button>
+                    )}
                     <button
                       onClick={() => void exportToExcel()}
                       disabled={filtered.length === 0 || exporting}
