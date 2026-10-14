@@ -15,6 +15,8 @@ import {
   ChevronDown,
   ChevronUp,
   Download,
+  Landmark,
+  LockKeyhole,
   LogOut,
   Mail,
   Plus,
@@ -146,6 +148,39 @@ interface BotScenario {
   amountRemaining: number;
   fallbackReason: string;
   createdAt: string | null;
+}
+
+interface ReserveAllocation {
+  id: string;
+  source: string;
+  transactionId: string;
+  planName: string;
+  hostel: string;
+  grossNaira: number;
+  reserveKobo: number;
+  occurredAt: string | null;
+}
+
+interface WithdrawalRecord {
+  id: string;
+  amountKobo: number;
+  provider: string;
+  status: string;
+  reference: string;
+  createdAt: string;
+  error?: string;
+}
+
+interface ReserveState {
+  reservePercent: number;
+  allocations: ReserveAllocation[];
+  totalAllocatedKobo: number;
+  totalWithdrawnKobo: number;
+  availableKobo: number;
+  bank: { accountName: string; bankName: string; bankCode: string; accountNumberMasked: string } | null;
+  provider: string;
+  pinConfigured: boolean;
+  withdrawals: WithdrawalRecord[];
 }
 
 /** Row-list page size sent as `?limit=` to `/api/admin/transactions`. Caps
@@ -399,8 +434,17 @@ export default function AdminTransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<
-    "transactions" | "splits" | "payouts" | "bot"
+    "transactions" | "splits" | "payouts" | "bot" | "reserve"
   >("transactions");
+
+  const [reserveState, setReserveState] = useState<ReserveState | null>(null);
+  const [reserveLoading, setReserveLoading] = useState(false);
+  const [reserveError, setReserveError] = useState("");
+  const [pin, setPin] = useState("");
+  const [bankForm, setBankForm] = useState({ accountName: "", accountNumber: "", bankName: "", bankCode: "" });
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawPin, setWithdrawPin] = useState("");
+  const [reserveActionLoading, setReserveActionLoading] = useState(false);
 
   // ── Partner Payouts view (admin-only) ──────────────────────────────────────
   const [partners, setPartners] = useState<PartnerRow[]>([]);
@@ -533,6 +577,10 @@ export default function AdminTransactionsPage() {
     void fetchAllTransactions();
   }, [activeTab, isPartner]);
 
+  useEffect(() => {
+    if (activeTab === "reserve" && isSuperAdmin) void fetchReserve();
+  }, [activeTab, isSuperAdmin]);
+
   // Re-fetch whenever a structured filter changes — the backend does the
   // filtering now, so a change here means different data to ask for, not
   // just a different client-side view of what's already loaded. Skips its
@@ -596,6 +644,67 @@ export default function AdminTransactionsPage() {
       setBotScenarios(data.scenarios ?? []);
     } catch {
       // non-critical
+    }
+  };
+
+  const fetchReserve = async () => {
+    setReserveLoading(true);
+    setReserveError("");
+    try {
+      const res = await adminFetch("/api/admin/reserve");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to load reserve");
+      setReserveState(data);
+      if (data.bank) setBankForm({ accountName: data.bank.accountName, accountNumber: "", bankName: data.bank.bankName, bankCode: data.bank.bankCode });
+    } catch (err) {
+      setReserveError(err instanceof Error ? err.message : "Failed to load reserve");
+    } finally {
+      setReserveLoading(false);
+    }
+  };
+
+  const saveReserveBank = async () => {
+    setReserveActionLoading(true);
+    try {
+      const res = await adminFetch("/api/admin/reserve/bank", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(bankForm) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not save bank details");
+      await fetchReserve();
+    } catch (err) {
+      setReserveError(err instanceof Error ? err.message : "Could not save bank details");
+    } finally {
+      setReserveActionLoading(false);
+    }
+  };
+
+  const setReservePin = async () => {
+    setReserveActionLoading(true);
+    try {
+      const res = await adminFetch("/api/admin/reserve/pin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not set PIN");
+      setPin("");
+      await fetchReserve();
+    } catch (err) {
+      setReserveError(err instanceof Error ? err.message : "Could not set PIN");
+    } finally {
+      setReserveActionLoading(false);
+    }
+  };
+
+  const submitWithdrawal = async () => {
+    setReserveActionLoading(true);
+    try {
+      const res = await adminFetch("/api/admin/withdrawals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amountNaira: Number(withdrawAmount), pin: withdrawPin, provider: "paystack" }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not submit withdrawal");
+      setWithdrawAmount("");
+      setWithdrawPin("");
+      await fetchReserve();
+    } catch (err) {
+      setReserveError(err instanceof Error ? err.message : "Could not submit withdrawal");
+    } finally {
+      setReserveActionLoading(false);
     }
   };
 
@@ -1655,6 +1764,16 @@ export default function AdminTransactionsPage() {
                       )}
                     </button>
                   )}
+                  {isSuperAdmin && (
+                    <button
+                      onClick={() => setActiveTab("reserve")}
+                      className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition sm:px-6 ${
+                        activeTab === "reserve" ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:bg-white"
+                      }`}>
+                      <Landmark size={16} />
+                      Platform Reserve
+                    </button>
+                  )}
                 </>
               )}
             </div>
@@ -2286,6 +2405,79 @@ export default function AdminTransactionsPage() {
                 </>
               )}
             </>
+          )}
+
+          {isSuperAdmin && activeTab === "reserve" && (
+            <section className="space-y-5">
+              {reserveError && <div className="glass-alert"><AlertTriangle size={18} />{reserveError}</div>}
+              {reserveLoading || !reserveState ? (
+                <div className="glass-panel p-8 text-center text-sm text-slate-500">Loading platform reserve…</div>
+              ) : (
+                <>
+                  <div className="kpi-grid lg:grid-cols-4">
+                    <Kpi label="Reserve rate" value={`${reserveState.reservePercent}%`} tone="blue" />
+                    <Kpi label="Total allocated" value={`₦${(reserveState.totalAllocatedKobo / 100).toLocaleString()}`} tone="green" />
+                    <Kpi label="Withdrawn" value={`₦${(reserveState.totalWithdrawnKobo / 100).toLocaleString()}`} tone="violet" />
+                    <Kpi label="Available" value={`₦${(reserveState.availableKobo / 100).toLocaleString()}`} tone="teal" />
+                  </div>
+
+                  <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
+                    <div className="glass-panel p-5">
+                      <div className="mb-4 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="eyebrow">WITHDRAWAL ACCOUNT</p>
+                          <h2 className="text-lg font-bold text-slate-900">Superadmin bank details</h2>
+                        </div>
+                        <Landmark className="text-blue-500" size={20} />
+                      </div>
+                      {reserveState.bank && <p className="mb-4 rounded-2xl bg-blue-50 px-4 py-3 text-sm text-blue-800">{reserveState.bank.accountName} · {reserveState.bank.bankName} · {reserveState.bank.accountNumberMasked}</p>}
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <input className={GLASS_INPUT} placeholder="Account name" value={bankForm.accountName} onChange={(e) => setBankForm({ ...bankForm, accountName: e.target.value })} />
+                        <input className={GLASS_INPUT} placeholder="Account number" inputMode="numeric" value={bankForm.accountNumber} onChange={(e) => setBankForm({ ...bankForm, accountNumber: e.target.value })} />
+                        <input className={GLASS_INPUT} placeholder="Bank name" value={bankForm.bankName} onChange={(e) => setBankForm({ ...bankForm, bankName: e.target.value })} />
+                        <input className={GLASS_INPUT} placeholder="Bank code" inputMode="numeric" value={bankForm.bankCode} onChange={(e) => setBankForm({ ...bankForm, bankCode: e.target.value })} />
+                      </div>
+                      <button onClick={saveReserveBank} disabled={reserveActionLoading} className="glass-button mt-4">Save bank details</button>
+                    </div>
+
+                    <div className="glass-panel p-5">
+                      <div className="mb-4 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="eyebrow">PROVIDER · {reserveState.provider.toUpperCase()}</p>
+                          <h2 className="text-lg font-bold text-slate-900">Withdraw reserve</h2>
+                        </div>
+                        <LockKeyhole className="text-amber-500" size={20} />
+                      </div>
+                      {!reserveState.pinConfigured ? (
+                        <div className="rounded-2xl bg-amber-50 p-4">
+                          <p className="mb-3 text-sm text-amber-900">Set your withdrawal PIN once. It is hashed and never returned to the browser.</p>
+                          <div className="flex gap-2">
+                            <input className={GLASS_INPUT} type="password" inputMode="numeric" placeholder="4–6 digit PIN" value={pin} onChange={(e) => setPin(e.target.value)} />
+                            <button onClick={setReservePin} disabled={reserveActionLoading} className="glass-button whitespace-nowrap">Set PIN</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <input className={GLASS_INPUT} type="number" min="1" placeholder="Amount in naira" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} />
+                          <input className={GLASS_INPUT} type="password" inputMode="numeric" placeholder="Withdrawal PIN" value={withdrawPin} onChange={(e) => setWithdrawPin(e.target.value)} />
+                          <button onClick={submitWithdrawal} disabled={reserveActionLoading || !reserveState.bank} className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50">Submit withdrawal</button>
+                          {!reserveState.bank && <p className="text-xs text-amber-700">Save bank details before withdrawing.</p>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="glass-panel overflow-hidden">
+                    <div className="panel-heading"><div><p className="eyebrow">AUDIT TRAIL</p><h2 className="text-lg font-bold text-slate-900">Reserve allocations</h2></div></div>
+                    <div className="overflow-x-auto"><table className="w-full"><thead><tr><Th>Transaction</Th><Th>Plan</Th><Th>Hostel</Th><Th align="right">Gross</Th><Th align="right">2.5% reserve</Th><Th>Date</Th></tr></thead><tbody>
+                      {reserveState.allocations.slice(0, 200).map((row) => <tr key={row.id} className="border-t border-slate-100 hover:bg-white/50"><Td>{row.source.toUpperCase()} · {row.transactionId.slice(0, 10)}</Td><Td>{row.planName}</Td><Td>{row.hostel || "—"}</Td><Td align="right">₦{row.grossNaira.toLocaleString()}</Td><Td align="right" className="font-semibold text-emerald-700">₦{(row.reserveKobo / 100).toLocaleString()}</Td><Td>{row.occurredAt ? new Date(row.occurredAt).toLocaleDateString() : "—"}</Td></tr>)}
+                    </tbody></table></div>
+                  </div>
+
+                  <div className="glass-panel overflow-hidden"><div className="panel-heading"><div><p className="eyebrow">WITHDRAWALS</p><h2 className="text-lg font-bold text-slate-900">Withdrawal history</h2></div></div><div className="overflow-x-auto"><table className="w-full"><thead><tr><Th>Reference</Th><Th>Provider</Th><Th>Status</Th><Th align="right">Amount</Th><Th>Date</Th></tr></thead><tbody>{reserveState.withdrawals.slice().reverse().map((row) => <tr key={row.id} className="border-t border-slate-100"><Td>{row.reference}</Td><Td>{row.provider}</Td><Td>{row.status}</Td><Td align="right">₦{(row.amountKobo / 100).toLocaleString()}</Td><Td>{new Date(row.createdAt).toLocaleDateString()}</Td></tr>)}</tbody></table></div></div>
+                </>
+              )}
+            </section>
           )}
 
           {/* ── SPLITS TAB ───────────────────────────────────────────────── */}
