@@ -864,7 +864,7 @@ export default function AdminControllersPage() {
                                   <input
                                     value={draft.siteName}
                                     onChange={(e) => setDraft({ siteName: e.target.value })}
-                                    placeholder="Site name on the controller, e.g. Ayoni Lodge"
+                                    placeholder="Site name, e.g. Ayoni (finds “Ekiti - Ayoni”)"
                                     disabled={!selfHosted}
                                     maxLength={64}
                                     className="rounded-lg border border-apple-gray-200 px-2 py-2 text-xs disabled:bg-apple-gray-50 disabled:text-apple-gray-400"

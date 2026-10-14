@@ -41,6 +41,21 @@ interface Purchase {
   emailSent?: boolean;
 }
 
+interface VoucherBalance {
+  purchaseId: string;
+  code: string;
+  planName: string;
+  hostel: string;
+  status: string;
+  dataRemainingGb?: number | null;
+  dataTotalGb?: number | null;
+  dataUsedGb?: number;
+  dataUsedPercent?: number | null;
+  daysRemaining?: number;
+  checkedAt?: string;
+  error?: string;
+}
+
 interface UserProfile {
   id: string;
   email: string;
@@ -123,6 +138,8 @@ export default function DashboardPage() {
   const [user, setUser] = useState<Customer | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [balances, setBalances] = useState<VoucherBalance[]>([]);
+  const [balancesLoading, setBalancesLoading] = useState(false);
   const [tvSubscriptions, setTvSubscriptions] = useState<TVSubscription[]>([]);
   const [savedCodes, setSavedCodes] = useState<StoredCode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,12 +202,29 @@ export default function DashboardPage() {
         return;
       }
 
-      // Fetch TV subscriptions for this user (scoped server-side to caller)
+      // TV data keeps the existing dashboard flow. Live Omada balances are
+      // fetched in the background so a slow controller never hides the rest
+      // of the account page.
       await fetchTvSubscriptions();
+      void fetchBalances();
     } catch (err) {
       console.error("Error fetching user data:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBalances = async () => {
+    setBalancesLoading(true);
+    try {
+      const res = await apiFetch("/api/account/balances");
+      if (!res.ok) return;
+      const data = await res.json();
+      setBalances(data.balances || []);
+    } catch (err) {
+      console.error("Error fetching voucher balances:", err);
+    } finally {
+      setBalancesLoading(false);
     }
   };
 
@@ -363,6 +397,82 @@ export default function DashboardPage() {
       </GroupedList>
 
       {/* ── Active codes (saved on this device) ─────────────────────────── */}
+      {balances.length > 0 && (
+        <GroupedList
+          header={
+            <span className="flex items-center justify-between gap-3">
+              <span>Your balances</span>
+              <button
+                onClick={fetchBalances}
+                disabled={balancesLoading}
+                className="ui-footnote inline-flex items-center gap-1.5 font-medium text-accent-ink disabled:opacity-50"
+              >
+                <RefreshCw className={cx("h-3.5 w-3.5", balancesLoading && "animate-spin")} />
+                Refresh
+              </button>
+            </span>
+          }
+          footer="Balances are checked live from your internet controller"
+          className="mt-8"
+        >
+          {balances.map((balance) => {
+            const unavailable = balance.status === "unavailable";
+            const finished = balance.status === "finished";
+            const used = balance.dataUsedPercent;
+            const progress = used === null || used === undefined ? null : Math.min(Math.max(used, 0), 100);
+            return (
+              <div key={balance.purchaseId} className="px-4 py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="ui-headline truncate text-ink">{balance.planName}</p>
+                    <p className="ui-footnote mt-1 text-ink-2">
+                      Code <span className="font-mono font-semibold text-ink">{balance.code}</span>
+                      {balance.hostel ? ` · ${balance.hostel}` : ""}
+                    </p>
+                  </div>
+                  <Badge tone={unavailable || finished ? "danger" : "success"} dot>
+                    {unavailable ? "Unavailable" : finished ? "Finished" : "Active"}
+                  </Badge>
+                </div>
+
+                {unavailable ? (
+                  <p className="ui-footnote mt-3 text-danger">{balance.error || "Could not check this code right now."}</p>
+                ) : (
+                  <div className="mt-3">
+                    {balance.dataRemainingGb === null || balance.dataRemainingGb === undefined ? (
+                      <p className="ui-subhead text-ink">Data: <strong>Unlimited</strong></p>
+                    ) : (
+                      <>
+                        <div className="flex items-baseline justify-between gap-3">
+                          <p className="ui-subhead text-ink">
+                            <strong>{balance.dataRemainingGb.toLocaleString(undefined, { maximumFractionDigits: 2 })} GB</strong> left
+                          </p>
+                          <span className="ui-footnote text-ink-2">
+                            {balance.dataTotalGb?.toLocaleString(undefined, { maximumFractionDigits: 2 })} GB total
+                          </span>
+                        </div>
+                        {progress !== null && (
+                          <div className="mt-2 h-2 overflow-hidden rounded-full bg-ink/10">
+                            <div
+                              className={cx("h-full rounded-full", progress >= 90 ? "bg-danger" : progress >= 70 ? "bg-warning" : "bg-success")}
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
+                    <p className="ui-footnote mt-2 text-ink-2">
+                      {finished ? "No time or data remains" : `${balance.daysRemaining ?? 0} day${balance.daysRemaining === 1 ? "" : "s"} left`}
+                      {balance.checkedAt ? ` · Checked ${new Date(balance.checkedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </GroupedList>
+      )}
+
       {savedCodes.length > 0 && (
         <GroupedList
           header="Your active codes"
