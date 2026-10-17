@@ -171,6 +171,11 @@ interface WithdrawalRecord {
   error?: string;
 }
 
+interface Bank {
+  name: string;
+  code: string;
+}
+
 interface ReserveState {
   reservePercent: number;
   allocations: ReserveAllocation[];
@@ -444,6 +449,15 @@ export default function AdminTransactionsPage() {
   const [reserveError, setReserveError] = useState("");
   const [pin, setPin] = useState("");
   const [bankForm, setBankForm] = useState({ accountName: "", accountNumber: "", bankName: "", bankCode: "" });
+  const [banks, setBanks] = useState<Bank[]>([]);
+  const [banksLoading, setBanksLoading] = useState(false);
+  // Account name comes from Paystack's own records, not the keyboard: "idle"
+  // before a bank + 10-digit number are both in, "checking"/"resolved" while
+  // and after that lookup runs, "failed" only if Paystack couldn't verify it,
+  // in which case the name field opens up for manual entry as a last resort.
+  const [resolveStatus, setResolveStatus] = useState<"idle" | "checking" | "resolved" | "failed">("idle");
+  const [resolveError, setResolveError] = useState("");
+  const [manualName, setManualName] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawPin, setWithdrawPin] = useState("");
   const [reserveActionLoading, setReserveActionLoading] = useState(false);
@@ -583,6 +597,47 @@ export default function AdminTransactionsPage() {
     if (activeTab === "reserve" && isSuperAdmin) void fetchReserve(reservePeriod);
   }, [activeTab, isSuperAdmin, reservePeriod]);
 
+  // The bank list is loaded once per visit to the tab — it changes about as
+  // often as new banks join Nigeria's clearing system.
+  useEffect(() => {
+    if (activeTab !== "reserve" || !isSuperAdmin || banks.length > 0) return;
+    setBanksLoading(true);
+    adminFetch("/api/admin/reserve/banks")
+      .then((res) => res.json())
+      .then((data) => setBanks(data.banks ?? []))
+      .catch(() => {})
+      .finally(() => setBanksLoading(false));
+  }, [activeTab, isSuperAdmin, banks.length]);
+
+  // Resolves the account name from Paystack as soon as a bank is chosen and
+  // the account number looks like a complete NUBAN — debounced so it fires
+  // once typing settles, not on every keystroke.
+  useEffect(() => {
+    if (manualName) return;
+    if (!bankForm.bankCode || !/^\d{10}$/.test(bankForm.accountNumber)) {
+      setResolveStatus("idle");
+      return;
+    }
+    setResolveStatus("checking");
+    setResolveError("");
+    const accountNumber = bankForm.accountNumber;
+    const bankCode = bankForm.bankCode;
+    const timer = setTimeout(() => {
+      adminFetch(`/api/admin/reserve/resolve-account?accountNumber=${accountNumber}&bankCode=${bankCode}`)
+        .then(async (res) => {
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Could not verify that account number.");
+          setBankForm((f) => (f.accountNumber === accountNumber && f.bankCode === bankCode ? { ...f, accountName: data.accountName } : f));
+          setResolveStatus("resolved");
+        })
+        .catch((err) => {
+          setResolveStatus("failed");
+          setResolveError(err instanceof Error ? err.message : "Could not verify that account number.");
+        });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [bankForm.bankCode, bankForm.accountNumber, manualName]);
+
   // Re-fetch whenever a structured filter changes — the backend does the
   // filtering now, so a change here means different data to ask for, not
   // just a different client-side view of what's already loaded. Skips its
@@ -665,12 +720,18 @@ export default function AdminTransactionsPage() {
     }
   };
 
+  // Enabled once the account name is either verified by Paystack or (when
+  // verification itself failed) typed in by hand.
+  const canSaveBank = Boolean(bankForm.bankCode && /^\d{10}$/.test(bankForm.accountNumber) && bankForm.accountName && (resolveStatus === "resolved" || manualName));
+
   const saveReserveBank = async () => {
     setReserveActionLoading(true);
     try {
       const res = await adminFetch("/api/admin/reserve/bank", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(bankForm) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not save bank details");
+      setManualName(false);
+      setResolveStatus("idle");
       await fetchReserve();
     } catch (err) {
       setReserveError(err instanceof Error ? err.message : "Could not save bank details");
@@ -2446,12 +2507,52 @@ export default function AdminTransactionsPage() {
                       </div>
                       {reserveState.bank && <p className="mb-4 rounded-2xl bg-blue-50 px-4 py-3 text-sm text-blue-800">{reserveState.bank.accountName} · {reserveState.bank.bankName} · {reserveState.bank.accountNumberMasked}</p>}
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <input className={GLASS_INPUT} placeholder="Account name" value={bankForm.accountName} onChange={(e) => setBankForm({ ...bankForm, accountName: e.target.value })} />
-                        <input className={GLASS_INPUT} placeholder="Account number" inputMode="numeric" value={bankForm.accountNumber} onChange={(e) => setBankForm({ ...bankForm, accountNumber: e.target.value })} />
-                        <input className={GLASS_INPUT} placeholder="Bank name" value={bankForm.bankName} onChange={(e) => setBankForm({ ...bankForm, bankName: e.target.value })} />
-                        <input className={GLASS_INPUT} placeholder="Bank code" inputMode="numeric" value={bankForm.bankCode} onChange={(e) => setBankForm({ ...bankForm, bankCode: e.target.value })} />
+                        <select
+                          className={GLASS_INPUT}
+                          value={bankForm.bankCode}
+                          onChange={(e) => {
+                            const bank = banks.find((b) => b.code === e.target.value);
+                            setBankForm({ ...bankForm, bankCode: e.target.value, bankName: bank?.name ?? "", accountName: "" });
+                            setManualName(false);
+                          }}
+                        >
+                          <option value="">{banksLoading ? "Loading banks…" : "Select bank"}</option>
+                          {banks.map((b) => (
+                            <option key={b.code} value={b.code}>{b.name}</option>
+                          ))}
+                        </select>
+                        <input
+                          className={GLASS_INPUT}
+                          placeholder="Account number"
+                          inputMode="numeric"
+                          maxLength={10}
+                          value={bankForm.accountNumber}
+                          onChange={(e) => setBankForm({ ...bankForm, accountNumber: e.target.value.replace(/\D/g, ""), accountName: manualName ? bankForm.accountName : "" })}
+                        />
                       </div>
-                      <button onClick={saveReserveBank} disabled={reserveActionLoading} className="glass-button mt-4">Save bank details</button>
+                      <div className="mt-3">
+                        {resolveStatus === "checking" && <p className="text-sm text-slate-500">Verifying account name…</p>}
+                        {resolveStatus === "resolved" && (
+                          <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">{bankForm.accountName}</p>
+                        )}
+                        {resolveStatus === "failed" && !manualName && (
+                          <div className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                            <p>{resolveError}</p>
+                            <button type="button" className="mt-1 font-semibold underline" onClick={() => setManualName(true)}>
+                              Enter the account name myself
+                            </button>
+                          </div>
+                        )}
+                        {manualName && (
+                          <input
+                            className={GLASS_INPUT}
+                            placeholder="Account name"
+                            value={bankForm.accountName}
+                            onChange={(e) => setBankForm({ ...bankForm, accountName: e.target.value })}
+                          />
+                        )}
+                      </div>
+                      <button onClick={saveReserveBank} disabled={reserveActionLoading || !canSaveBank} className="glass-button mt-4">Save bank details</button>
                     </div>
 
                     <div className="glass-panel p-5">
