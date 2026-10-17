@@ -177,6 +177,7 @@ interface ReserveState {
   totalAllocatedKobo: number;
   totalWithdrawnKobo: number;
   availableKobo: number;
+  withdrawableKobo: number;
   bank: { accountName: string; bankName: string; bankCode: string; accountNumberMasked: string } | null;
   provider: string;
   pinConfigured: boolean;
@@ -438,6 +439,7 @@ export default function AdminTransactionsPage() {
   >("transactions");
 
   const [reserveState, setReserveState] = useState<ReserveState | null>(null);
+  const [reservePeriod, setReservePeriod] = useState<"all" | "day" | "month" | "year">("month");
   const [reserveLoading, setReserveLoading] = useState(false);
   const [reserveError, setReserveError] = useState("");
   const [pin, setPin] = useState("");
@@ -578,8 +580,8 @@ export default function AdminTransactionsPage() {
   }, [activeTab, isPartner]);
 
   useEffect(() => {
-    if (activeTab === "reserve" && isSuperAdmin) void fetchReserve();
-  }, [activeTab, isSuperAdmin]);
+    if (activeTab === "reserve" && isSuperAdmin) void fetchReserve(reservePeriod);
+  }, [activeTab, isSuperAdmin, reservePeriod]);
 
   // Re-fetch whenever a structured filter changes — the backend does the
   // filtering now, so a change here means different data to ask for, not
@@ -647,11 +649,11 @@ export default function AdminTransactionsPage() {
     }
   };
 
-  const fetchReserve = async () => {
+  const fetchReserve = async (period = reservePeriod) => {
     setReserveLoading(true);
     setReserveError("");
     try {
-      const res = await adminFetch("/api/admin/reserve");
+      const res = await adminFetch(`/api/admin/reserve?period=${period}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load reserve");
       setReserveState(data);
@@ -2418,7 +2420,19 @@ export default function AdminTransactionsPage() {
                     <Kpi label="Reserve rate" value={`${reserveState.reservePercent}%`} tone="blue" />
                     <Kpi label="Total allocated" value={`₦${(reserveState.totalAllocatedKobo / 100).toLocaleString()}`} tone="green" />
                     <Kpi label="Withdrawn" value={`₦${(reserveState.totalWithdrawnKobo / 100).toLocaleString()}`} tone="violet" />
-                    <Kpi label="Available" value={`₦${(reserveState.availableKobo / 100).toLocaleString()}`} tone="teal" />
+                    <Kpi label="Available in period" value={`₦${(reserveState.availableKobo / 100).toLocaleString()}`} tone="teal" />
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="eyebrow">RESERVE PERIOD</p>
+                      <p className="text-sm text-slate-500">Withdrawals are always limited to the current month.</p>
+                    </div>
+                    <SegToggle
+                      value={reservePeriod}
+                      onChange={setReservePeriod}
+                      options={[{ value: "day", label: "Day" }, { value: "month", label: "Month" }, { value: "year", label: "Year" }, { value: "all", label: "All time" }]}
+                    />
                   </div>
 
                   <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
@@ -2458,6 +2472,7 @@ export default function AdminTransactionsPage() {
                         </div>
                       ) : (
                         <div className="space-y-3">
+                          <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">Current-month withdrawable: ₦{(reserveState.withdrawableKobo / 100).toLocaleString()}</p>
                           <input className={GLASS_INPUT} type="number" min="1" placeholder="Amount in naira" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} />
                           <input className={GLASS_INPUT} type="password" inputMode="numeric" placeholder="Withdrawal PIN" value={withdrawPin} onChange={(e) => setWithdrawPin(e.target.value)} />
                           <button onClick={submitWithdrawal} disabled={reserveActionLoading || !reserveState.bank} className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50">Submit withdrawal</button>
