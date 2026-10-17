@@ -445,6 +445,12 @@ export default function AdminTransactionsPage() {
 
   const [reserveState, setReserveState] = useState<ReserveState | null>(null);
   const [reservePeriod, setReservePeriod] = useState<"all" | "day" | "month" | "year">("month");
+  // Which month "month" means, when it isn't the current one — lets an admin
+  // browse the reserve as it stood in a past month, same control as Payouts.
+  const [reserveMonth, setReserveMonth] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
   const [reserveLoading, setReserveLoading] = useState(false);
   const [reserveError, setReserveError] = useState("");
   const [pin, setPin] = useState("");
@@ -595,7 +601,7 @@ export default function AdminTransactionsPage() {
 
   useEffect(() => {
     if (activeTab === "reserve" && isSuperAdmin) void fetchReserve(reservePeriod);
-  }, [activeTab, isSuperAdmin, reservePeriod]);
+  }, [activeTab, isSuperAdmin, reservePeriod, reserveMonth]);
 
   // The bank list is loaded once per visit to the tab — it changes about as
   // often as new banks join Nigeria's clearing system.
@@ -708,7 +714,8 @@ export default function AdminTransactionsPage() {
     setReserveLoading(true);
     setReserveError("");
     try {
-      const res = await adminFetch(`/api/admin/reserve?period=${period}`);
+      const monthParam = period === "month" ? `&month=${reserveMonth}` : "";
+      const res = await adminFetch(`/api/admin/reserve?period=${period}${monthParam}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load reserve");
       setReserveState(data);
@@ -2489,11 +2496,22 @@ export default function AdminTransactionsPage() {
                       <p className="eyebrow">RESERVE PERIOD</p>
                       <p className="text-sm text-slate-500">Withdrawals are always limited to the current month.</p>
                     </div>
-                    <SegToggle
-                      value={reservePeriod}
-                      onChange={setReservePeriod}
-                      options={[{ value: "day", label: "Day" }, { value: "month", label: "Month" }, { value: "year", label: "Year" }, { value: "all", label: "All time" }]}
-                    />
+                    <div className="flex items-center gap-3">
+                      {reservePeriod === "month" && (
+                        <input
+                          type="month"
+                          value={reserveMonth}
+                          onChange={(e) => setReserveMonth(e.target.value)}
+                          className={`${GLASS_INPUT} w-auto`}
+                          aria-label="Reserve month"
+                        />
+                      )}
+                      <SegToggle
+                        value={reservePeriod}
+                        onChange={setReservePeriod}
+                        options={[{ value: "day", label: "Day" }, { value: "month", label: "Month" }, { value: "year", label: "Year" }, { value: "all", label: "All time" }]}
+                      />
+                    </div>
                   </div>
 
                   <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
