@@ -41,6 +41,21 @@ import { saveCodeToLocalStorage, type PendingPayment, type PlanView } from "./ch
 
 export type PlansParams = { slug: string; hostelSlug?: string };
 
+/** The platform-reserve subaccount + exact kobo amount for one checkout's
+ * price, from the backend (so the 2.5% formula lives in one place). Never
+ * blocks a sale: a failure here just means this payment goes through without
+ * the automatic split, same as before this feature existed. */
+async function fetchReserveSplit(priceNaira: number): Promise<{ subaccountCode: string | null; transactionChargeKobo: number }> {
+  try {
+    const res = await apiFetch(`/api/checkout/reserve-split?priceNaira=${priceNaira}`);
+    if (!res.ok) return { subaccountCode: null, transactionChargeKobo: 0 };
+    const data = await res.json();
+    return { subaccountCode: data.subaccountCode ?? null, transactionChargeKobo: data.transactionChargeKobo ?? 0 };
+  } catch {
+    return { subaccountCode: null, transactionChargeKobo: 0 };
+  }
+}
+
 export function usePlansCheckout(params: PlansParams) {
   // Where /register sends the customer back to after signing in.
   const plansPath = params.hostelSlug
@@ -640,6 +655,11 @@ export function usePlansCheckout(params: PlansParams) {
 
       // Proceed with payment now that the code is held.
       const totalAmount = planTotal(selectedPlan);
+      // The platform's 2.5% reserve, split off by Paystack itself at the
+      // moment of payment rather than tracked only in the ledger for a later
+      // manual withdrawal. Computed server-side (same formula the money
+      // ledger posts from) so this can never drift from what gets recorded.
+      const split = await fetchReserveSplit(selectedPlan.price);
       let paymentSucceeded = false;
       const handler = window.PaystackPop.setup({
         key: paystackKey,
@@ -647,6 +667,9 @@ export function usePlansCheckout(params: PlansParams) {
         amount: totalAmount * 100, // Paystack expects amount in kobo
         currency: "NGN",
         ref: generatePaymentRef(selectedHostel, selectedPlan.planType),
+        ...(split.subaccountCode && split.transactionChargeKobo > 0
+          ? { subaccount: split.subaccountCode, transaction_charge: split.transactionChargeKobo, bearer: "account" }
+          : {}),
         metadata: {
           planId: selectedPlan.id,
           planName: selectedPlan.name,
@@ -964,6 +987,7 @@ export function usePlansCheckout(params: PlansParams) {
       }
 
       const totalAmount = planTotal(selectedPlan);
+      const split = await fetchReserveSplit(selectedPlan.price);
       let paymentSucceeded = false;
       const handler = window.PaystackPop.setup({
         key: paystackKey,
@@ -971,6 +995,9 @@ export function usePlansCheckout(params: PlansParams) {
         amount: totalAmount * 100,
         currency: "NGN",
         ref: generatePaymentRef(selectedHostel, "tv"),
+        ...(split.subaccountCode && split.transactionChargeKobo > 0
+          ? { subaccount: split.subaccountCode, transaction_charge: split.transactionChargeKobo, bearer: "account" }
+          : {}),
         metadata: {
           planId: selectedPlan.id,
           planName: selectedPlan.name,
