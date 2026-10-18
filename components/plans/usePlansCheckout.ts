@@ -667,8 +667,13 @@ export function usePlansCheckout(params: PlansParams) {
         amount: totalAmount * 100, // Paystack expects amount in kobo
         currency: "NGN",
         ref: generatePaymentRef(selectedHostel, selectedPlan.planType),
+        // Paystack's `transaction_charge` is what the MAIN account receives,
+        // not the subaccount — confirmed from a real transaction where this
+        // was backwards and sent nearly the whole sale to the subaccount.
+        // The subaccount gets the remainder, so hand Paystack the main
+        // account's share (total minus the reserve), not the reserve itself.
         ...(split.subaccountCode && split.transactionChargeKobo > 0
-          ? { subaccount: split.subaccountCode, transaction_charge: split.transactionChargeKobo, bearer: "account" }
+          ? { subaccount: split.subaccountCode, transaction_charge: totalAmount * 100 - split.transactionChargeKobo, bearer: "account" }
           : {}),
         metadata: {
           planId: selectedPlan.id,
@@ -995,8 +1000,10 @@ export function usePlansCheckout(params: PlansParams) {
         amount: totalAmount * 100,
         currency: "NGN",
         ref: generatePaymentRef(selectedHostel, "tv"),
+        // See the device/unlimited checkout above: `transaction_charge` is
+        // the MAIN account's share, not the subaccount's.
         ...(split.subaccountCode && split.transactionChargeKobo > 0
-          ? { subaccount: split.subaccountCode, transaction_charge: split.transactionChargeKobo, bearer: "account" }
+          ? { subaccount: split.subaccountCode, transaction_charge: totalAmount * 100 - split.transactionChargeKobo, bearer: "account" }
           : {}),
         metadata: {
           planId: selectedPlan.id,
