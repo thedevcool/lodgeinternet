@@ -7,10 +7,9 @@
  * added later. Every place that charges or displays a price must go through
  * here: the figure quoted has to equal the figure charged.
  *
- * This deliberately differs from `bot_checkout_total` in the backend
- * (app/routers/bot_plans.py): the WhatsApp bot adds the 5% but not the 1.5%,
- * so the same plan costs slightly less there. Change one and the other does
- * not follow.
+ * The WhatsApp bot charges the same total: `bot_checkout_total` in the
+ * backend (app/routers/bot_plans.py) delegates to the backend's
+ * `site_checkout_total`. Change this formula and that one must change too.
  */
 
 export const BANK_CHARGE_NAIRA = 100;

@@ -10,7 +10,6 @@ import Logo from "@/components/Logo";
 import {
   AlertTriangle,
   BarChart3,
-  Bot,
   Building2,
   ChevronDown,
   ChevronUp,
@@ -124,32 +123,6 @@ interface PartnerRow {
   partnerHostelSplits: Record<string, number>;
 }
 
-/** A completed WhatsApp-bot transaction from /api/admin/bot-transactions. */
-interface BotTxn {
-  id: string;
-  planName: string;
-  planType: string;
-  hostel: string;
-  gross: number; // total charged, ₦
-  fee: number; // platform 5% service fee, ₦
-  paymentMethod: string;
-  paymentRef: string;
-  completedAt: string | null; // ISO
-}
-
-interface BotScenario {
-  id: string;
-  status: string;
-  planName: string;
-  hostel: string;
-  paymentMethod: string;
-  amount: number;
-  amountPaid: number;
-  amountRemaining: number;
-  fallbackReason: string;
-  createdAt: string | null;
-}
-
 interface ReserveAllocation {
   id: string;
   source: string;
@@ -187,6 +160,18 @@ interface ReserveState {
   provider: string;
   pinConfigured: boolean;
   withdrawals: WithdrawalRecord[];
+  /** The Paystack subaccount bot payments split the reserve to. "admin" when
+      created from this tab; "env" when set by PAYSTACK_BOT_RESERVE_SUBACCOUNT_CODE. */
+  reserveSubaccount: {
+    code: string;
+    source: "admin" | "env";
+    bankName?: string;
+    accountName?: string;
+    accountNumberMasked?: string;
+    percentageCharge?: number;
+    createdAt?: string;
+    matchesSavedBank: boolean | null;
+  } | null;
 }
 
 /** Row-list page size sent as `?limit=` to `/api/admin/transactions`. Caps
@@ -440,7 +425,7 @@ export default function AdminTransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<
-    "transactions" | "splits" | "payouts" | "bot" | "reserve"
+    "transactions" | "splits" | "payouts" | "reserve"
   >("transactions");
 
   const [reserveState, setReserveState] = useState<ReserveState | null>(null);
@@ -464,8 +449,7 @@ export default function AdminTransactionsPage() {
   const [resolveStatus, setResolveStatus] = useState<"idle" | "checking" | "resolved" | "failed">("idle");
   const [resolveError, setResolveError] = useState("");
   const [manualName, setManualName] = useState(false);
-  const [withdrawAmount, setWithdrawAmount] = useState("");
-  const [withdrawPin, setWithdrawPin] = useState("");
+  const [subaccountPin, setSubaccountPin] = useState("");
   const [reserveActionLoading, setReserveActionLoading] = useState(false);
 
   // ── Partner Payouts view (admin-only) ──────────────────────────────────────
@@ -476,25 +460,6 @@ export default function AdminTransactionsPage() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   });
-
-  // ── Bot Transactions view (admin-only) ─────────────────────────────────────
-  const [botTxns, setBotTxns] = useState<BotTxn[]>([]);
-  const [botScenarios, setBotScenarios] = useState<BotScenario[]>([]);
-  // Period filter: all-time, a specific day, month, or year — plus a hostel.
-  const [botPeriodMode, setBotPeriodMode] = useState<
-    "all" | "day" | "month" | "year"
-  >("all");
-  const [botDay, setBotDay] = useState<string>(() =>
-    new Date().toISOString().slice(0, 10),
-  );
-  const [botMonth, setBotMonth] = useState<string>(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  });
-  const [botYear, setBotYear] = useState<string>(() =>
-    String(new Date().getFullYear()),
-  );
-  const [botHostel, setBotHostel] = useState("all");
 
   // Transaction filters — hostel/controller/planType/paymentSource/date are
   // sent to the backend (it does the filtering; see fetchTransactions), so
@@ -581,9 +546,6 @@ export default function AdminTransactionsPage() {
       // on the Transactions tab (already fast via fetchAll above) should
       // wait on it.
       // (loaded lazily — see the Payouts/Splits effect below)
-    }
-    if (isSuperAdmin) {
-      fetchBotTransactions();
     }
   }, []);
 
@@ -696,20 +658,6 @@ export default function AdminTransactionsPage() {
     }
   };
 
-  // Completed WhatsApp-bot transactions drive the admin-only bot audit view.
-  // Non-critical: on any failure the view just stays empty.
-  const fetchBotTransactions = async () => {
-    try {
-      const res = await adminFetch("/api/admin/bot-transactions");
-      const data = await res.json();
-      if (!res.ok) return;
-      setBotTxns(data.transactions ?? []);
-      setBotScenarios(data.scenarios ?? []);
-    } catch {
-      // non-critical
-    }
-  };
-
   const fetchReserve = async (period = reservePeriod) => {
     setReserveLoading(true);
     setReserveError("");
@@ -762,17 +710,21 @@ export default function AdminTransactionsPage() {
     }
   };
 
-  const submitWithdrawal = async () => {
+  // Creates the Paystack subaccount the reserve is split to on bot payments,
+  // for the saved bank account — or moves the existing one onto it. The
+  // backend does the Paystack work with its own key and keeps the code, so
+  // nothing needs setting by hand. PIN-confirmed: it decides where money goes.
+  const saveReserveSubaccount = async () => {
     setReserveActionLoading(true);
+    setReserveError("");
     try {
-      const res = await adminFetch("/api/admin/withdrawals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amountNaira: Number(withdrawAmount), pin: withdrawPin, provider: "paystack" }) });
+      const res = await adminFetch("/api/admin/reserve/subaccount", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin: subaccountPin }) });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not submit withdrawal");
-      setWithdrawAmount("");
-      setWithdrawPin("");
+      if (!res.ok) throw new Error(data.error || "Could not create the reserve subaccount");
+      setSubaccountPin("");
       await fetchReserve();
     } catch (err) {
-      setReserveError(err instanceof Error ? err.message : "Could not submit withdrawal");
+      setReserveError(err instanceof Error ? err.message : "Could not create the reserve subaccount");
     } finally {
       setReserveActionLoading(false);
     }
@@ -1133,82 +1085,6 @@ export default function AdminTransactionsPage() {
     const adminTotal = partnerPayouts.reduce((s, p) => s + p.adminGain, 0);
     return { partnerTotal, adminTotal };
   }, [partnerPayouts]);
-
-  // ── Bot Transactions (admin-only) ──────────────────────────────────────────
-  // Filter completed bot transactions by the selected period + hostel (and the
-  // admin's hostel scope), then total the 5% and group by hostel + by month.
-  const botFiltered = useMemo(() => {
-    return botTxns.filter((t) => {
-      const h = t.hostel || "Unknown";
-      // Hostel-level access for restricted admins.
-      if (!withinHostelScope(t.hostel || "")) return false;
-      if (botHostel !== "all" && h !== botHostel) return false;
-      // Period narrowing (local dates, matching the payouts view).
-      if (botPeriodMode !== "all") {
-        if (!t.completedAt) return false;
-        const d = new Date(t.completedAt);
-        const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        if (botPeriodMode === "day" && ymd !== botDay) return false;
-        if (botPeriodMode === "month" && ymd.slice(0, 7) !== botMonth) return false;
-        if (botPeriodMode === "year" && ymd.slice(0, 4) !== botYear) return false;
-      }
-      return true;
-    });
-  }, [
-    botTxns,
-    botPeriodMode,
-    botDay,
-    botMonth,
-    botYear,
-    botHostel,
-    withinHostelScope,
-  ]);
-
-  const botTotals = useMemo(() => {
-    let gross = 0;
-    let fee = 0;
-    for (const t of botFiltered) {
-      gross += t.gross || 0;
-      fee += t.fee || 0;
-    }
-    return { count: botFiltered.length, gross, fee };
-  }, [botFiltered]);
-
-  const botByHostel = useMemo(() => {
-    const m: Record<string, { count: number; gross: number; fee: number }> = {};
-    for (const t of botFiltered) {
-      const h = t.hostel || "Unknown";
-      if (!m[h]) m[h] = { count: 0, gross: 0, fee: 0 };
-      m[h].count += 1;
-      m[h].gross += t.gross || 0;
-      m[h].fee += t.fee || 0;
-    }
-    return Object.entries(m).sort((a, b) => b[1].fee - a[1].fee);
-  }, [botFiltered]);
-
-  const botByMonth = useMemo(() => {
-    const m: Record<string, { count: number; gross: number; fee: number }> = {};
-    for (const t of botFiltered) {
-      const d = t.completedAt ? new Date(t.completedAt) : null;
-      const key = d
-        ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-        : "Unknown";
-      if (!m[key]) m[key] = { count: 0, gross: 0, fee: 0 };
-      m[key].count += 1;
-      m[key].gross += t.gross || 0;
-      m[key].fee += t.fee || 0;
-    }
-    return Object.entries(m).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [botFiltered]);
-
-  const botPeriodLabel =
-    botPeriodMode === "all"
-      ? "All time"
-      : botPeriodMode === "day"
-        ? botDay
-        : botPeriodMode === "month"
-          ? botMonth
-          : botYear;
 
   const knownHostels = useMemo(() => {
     const names = new Set<string>();
@@ -1818,24 +1694,6 @@ export default function AdminTransactionsPage() {
                   </button>
                   {isSuperAdmin && (
                     <button
-                      onClick={() => setActiveTab("bot")}
-                      className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition sm:px-6 ${
-                        activeTab === "bot" ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:bg-white"
-                      }`}>
-                      <Bot size={16} />
-                      Bot Transactions
-                      {botTxns.length > 0 && (
-                        <span
-                          className={`rounded-full px-1.5 py-0.5 text-xs font-semibold ${
-                            activeTab === "bot" ? "bg-white/20 text-white" : "slate-chip"
-                          }`}>
-                          {botTxns.length}
-                        </span>
-                      )}
-                    </button>
-                  )}
-                  {isSuperAdmin && (
-                    <button
                       onClick={() => setActiveTab("reserve")}
                       className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition sm:px-6 ${
                         activeTab === "reserve" ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:bg-white"
@@ -2266,217 +2124,6 @@ export default function AdminTransactionsPage() {
             </>
           )}
 
-          {/* ── BOT TRANSACTIONS TAB ─────────────────────────────────────── */}
-          {isSuperAdmin && activeTab === "bot" && (
-            <>
-              {/* Filters: period + hostel */}
-              <div className="flex flex-wrap items-center gap-3">
-                <SegToggle
-                  value={botPeriodMode}
-                  onChange={setBotPeriodMode}
-                  options={(["all", "day", "month", "year"] as const).map((m) => ({
-                    value: m,
-                    label: m === "all" ? "All time" : m[0].toUpperCase() + m.slice(1),
-                  }))}
-                />
-                {botPeriodMode === "day" && (
-                  <input
-                    type="date"
-                    value={botDay}
-                    onChange={(e) => setBotDay(e.target.value)}
-                    className={`${GLASS_INPUT} w-auto`}
-                    aria-label="Day"
-                  />
-                )}
-                {botPeriodMode === "month" && (
-                  <input
-                    type="month"
-                    value={botMonth}
-                    onChange={(e) => setBotMonth(e.target.value)}
-                    className={`${GLASS_INPUT} w-auto`}
-                    aria-label="Month"
-                  />
-                )}
-                {botPeriodMode === "year" && (
-                  <input
-                    type="number"
-                    value={botYear}
-                    onChange={(e) => setBotYear(e.target.value)}
-                    min="2020"
-                    max="2100"
-                    className={`${GLASS_INPUT} w-28`}
-                    aria-label="Year"
-                  />
-                )}
-                <select value={botHostel} onChange={(e) => setBotHostel(e.target.value)} className={`${GLASS_INPUT} w-auto`} aria-label="Hostel">
-                  <option value="all">All hostels</option>
-                  {knownHostels.map((h) => (
-                    <option key={h} value={h}>
-                      {h}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Headline cards */}
-              <div className="kpi-grid lg:grid-cols-4">
-                <Kpi label="Live 5% total" tone="green" value={loading ? "—" : `₦${botTotals.fee.toLocaleString()}`} note={botPeriodLabel} />
-                <Kpi label="Gross collected" tone="slate" value={loading ? "—" : `₦${botTotals.gross.toLocaleString()}`} />
-                <Kpi label="Transactions" tone="blue" value={loading ? "—" : botTotals.count.toLocaleString()} />
-              </div>
-
-              <section className="glass-panel !p-0">
-                <div className="border-b border-white/70 px-5 py-3">
-                  <h3 className="font-semibold text-slate-900">Payment scenarios</h3>
-                  <p className="mt-1 text-xs text-slate-500">Partial payments, cancelled checkouts, and DVA/card fallback cases.</p>
-                </div>
-                {botScenarios.length === 0 ? (
-                  <p className="p-5 text-sm text-slate-500">No unresolved bot payment scenarios recorded.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-white/70">
-                          <Th>Plan / Hostel</Th>
-                          <Th>Status</Th>
-                          <Th align="right">Paid / Required</Th>
-                          <Th>Reason</Th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/60">
-                        {botScenarios.slice(0, 100).map((s) => (
-                          <tr key={s.id}>
-                            <Td className="text-slate-900">
-                              {s.planName}
-                              <span className="block text-xs text-slate-500">{s.hostel}</span>
-                            </Td>
-                            <Td>
-                              <span className="warning-chip">{s.status}</span>
-                            </Td>
-                            <Td align="right">
-                              ₦{s.amountPaid.toLocaleString()} / ₦{s.amount.toLocaleString()}
-                            </Td>
-                            <Td>{s.fallbackReason || (s.amountRemaining ? `Remaining ₦${s.amountRemaining.toLocaleString()}` : "—")}</Td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </section>
-
-              {botFiltered.length === 0 ? (
-                <section className="glass-panel text-center text-sm text-slate-500">
-                  No completed bot transactions for this filter yet.
-                </section>
-              ) : (
-                <>
-                  {/* Summaries: by hostel + by month */}
-                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                    <section className="glass-panel !p-0">
-                      <div className="border-b border-white/70 px-5 py-3 font-semibold text-slate-900">By hostel</div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-white/70">
-                              <Th>Hostel</Th>
-                              <Th align="right">Txns</Th>
-                              <Th align="right">Gross</Th>
-                              <Th align="right">5% total</Th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-white/60">
-                            {botByHostel.map(([name, v]) => (
-                              <tr key={name}>
-                                <Td className="text-slate-900">{name}</Td>
-                                <Td align="right">{v.count}</Td>
-                                <Td align="right">₦{v.gross.toLocaleString()}</Td>
-                                <Td align="right" className="font-semibold text-green-600">
-                                  ₦{v.fee.toLocaleString()}
-                                </Td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot>
-                            <tr className="border-t border-white/70 font-semibold text-slate-900">
-                              <Td>Total</Td>
-                              <Td align="right">{botTotals.count}</Td>
-                              <Td align="right">₦{botTotals.gross.toLocaleString()}</Td>
-                              <Td align="right" className="text-green-600">
-                                ₦{botTotals.fee.toLocaleString()}
-                              </Td>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    </section>
-
-                    <section className="glass-panel !p-0">
-                      <div className="border-b border-white/70 px-5 py-3 font-semibold text-slate-900">By month</div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-white/70">
-                              <Th>Month</Th>
-                              <Th align="right">Txns</Th>
-                              <Th align="right">Gross</Th>
-                              <Th align="right">5% total</Th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-white/60">
-                            {botByMonth.map(([month, v]) => (
-                              <tr key={month}>
-                                <Td className="text-slate-900">{month}</Td>
-                                <Td align="right">{v.count}</Td>
-                                <Td align="right">₦{v.gross.toLocaleString()}</Td>
-                                <Td align="right" className="font-semibold text-green-600">
-                                  ₦{v.fee.toLocaleString()}
-                                </Td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </section>
-                  </div>
-
-                  {/* Transaction list */}
-                  <section className="glass-panel !p-0">
-                    <div className="border-b border-white/70 px-5 py-3 font-semibold text-slate-900">Transactions</div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-white/70">
-                            <Th>Date</Th>
-                            <Th>Plan</Th>
-                            <Th>Hostel</Th>
-                            <Th>Method</Th>
-                            <Th align="right">Gross</Th>
-                            <Th align="right">5% charge</Th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/60">
-                          {botFiltered.map((t) => (
-                            <tr key={t.id}>
-                              <Td className="whitespace-nowrap">{t.completedAt ? new Date(t.completedAt).toLocaleString() : "—"}</Td>
-                              <Td className="text-slate-900">{t.planName}</Td>
-                              <Td>{t.hostel || "—"}</Td>
-                              <Td className="text-xs uppercase text-slate-500">{t.paymentMethod || "—"}</Td>
-                              <Td align="right">₦{t.gross.toLocaleString()}</Td>
-                              <Td align="right" className="font-semibold text-green-600">
-                                ₦{t.fee.toLocaleString()}
-                              </Td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </section>
-                </>
-              )}
-            </>
-          )}
-
           {isSuperAdmin && activeTab === "reserve" && (
             <section className="space-y-5">
               {reserveError && <div className="glass-alert"><AlertTriangle size={18} />{reserveError}</div>}
@@ -2494,7 +2141,7 @@ export default function AdminTransactionsPage() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="eyebrow">RESERVE PERIOD</p>
-                      <p className="text-sm text-slate-500">Withdrawals are always limited to the current month.</p>
+                      <p className="text-sm text-slate-500">2.5% of every sale, split to the reserve account at payment.</p>
                     </div>
                     <div className="flex items-center gap-3">
                       {reservePeriod === "month" && (
@@ -2518,7 +2165,7 @@ export default function AdminTransactionsPage() {
                     <div className="glass-panel p-5">
                       <div className="mb-4 flex items-center justify-between gap-3">
                         <div>
-                          <p className="eyebrow">WITHDRAWAL ACCOUNT</p>
+                          <p className="eyebrow">RESERVE ACCOUNT</p>
                           <h2 className="text-lg font-bold text-slate-900">Superadmin bank details</h2>
                         </div>
                         <Landmark className="text-blue-500" size={20} />
@@ -2576,26 +2223,44 @@ export default function AdminTransactionsPage() {
                     <div className="glass-panel p-5">
                       <div className="mb-4 flex items-center justify-between gap-3">
                         <div>
-                          <p className="eyebrow">PROVIDER · {reserveState.provider.toUpperCase()}</p>
-                          <h2 className="text-lg font-bold text-slate-900">Withdraw reserve</h2>
+                          <p className="eyebrow">PAYSTACK SUBACCOUNT · BOT PAYMENTS</p>
+                          <h2 className="text-lg font-bold text-slate-900">Reserve subaccount</h2>
                         </div>
                         <LockKeyhole className="text-amber-500" size={20} />
                       </div>
+                      {reserveState.reserveSubaccount && (
+                        <div className="mb-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                          <p className="font-semibold">{reserveState.reserveSubaccount.code}</p>
+                          {reserveState.reserveSubaccount.source === "admin" ? (
+                            <p>{reserveState.reserveSubaccount.accountName} · {reserveState.reserveSubaccount.bankName} · {reserveState.reserveSubaccount.accountNumberMasked}</p>
+                          ) : (
+                            <p>Set from the server&apos;s environment. Create one here to manage it from this page.</p>
+                          )}
+                          <p className="mt-1 text-xs">Card payments send exactly 2.5% of the plan price; bank transfers send 2.3% of the amount paid (the same reserve, measured on the larger total).</p>
+                        </div>
+                      )}
                       {!reserveState.pinConfigured ? (
                         <div className="rounded-2xl bg-amber-50 p-4">
-                          <p className="mb-3 text-sm text-amber-900">Set your withdrawal PIN once. It is hashed and never returned to the browser.</p>
+                          <p className="mb-3 text-sm text-amber-900">Set your reserve PIN once. It confirms changes to where the reserve is paid, is hashed, and is never returned to the browser.</p>
                           <div className="flex gap-2">
                             <input className={GLASS_INPUT} type="password" inputMode="numeric" placeholder="4–6 digit PIN" value={pin} onChange={(e) => setPin(e.target.value)} />
                             <button onClick={setReservePin} disabled={reserveActionLoading} className="glass-button whitespace-nowrap">Set PIN</button>
                           </div>
                         </div>
+                      ) : reserveState.reserveSubaccount?.source === "admin" && reserveState.reserveSubaccount.matchesSavedBank ? (
+                        <p className="text-sm text-slate-500">Bot payments split the reserve to this account. To change it, save different bank details, then confirm with your PIN here.</p>
                       ) : (
                         <div className="space-y-3">
-                          <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">Current-month withdrawable: ₦{(reserveState.withdrawableKobo / 100).toLocaleString()}</p>
-                          <input className={GLASS_INPUT} type="number" min="1" placeholder="Amount in naira" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} />
-                          <input className={GLASS_INPUT} type="password" inputMode="numeric" placeholder="Withdrawal PIN" value={withdrawPin} onChange={(e) => setWithdrawPin(e.target.value)} />
-                          <button onClick={submitWithdrawal} disabled={reserveActionLoading || !reserveState.bank} className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50">Submit withdrawal</button>
-                          {!reserveState.bank && <p className="text-xs text-amber-700">Save bank details before withdrawing.</p>}
+                          <p className="text-sm text-slate-600">
+                            {reserveState.reserveSubaccount?.source === "admin"
+                              ? "The saved bank details differ from the subaccount's. Confirm to move the subaccount onto them."
+                              : "Creates the Paystack subaccount for the saved bank details. Bot payments start splitting the reserve to it straight away."}
+                          </p>
+                          <input className={GLASS_INPUT} type="password" inputMode="numeric" placeholder="Reserve PIN" value={subaccountPin} onChange={(e) => setSubaccountPin(e.target.value)} />
+                          <button onClick={saveReserveSubaccount} disabled={reserveActionLoading || !reserveState.bank || !subaccountPin} className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50">
+                            {reserveState.reserveSubaccount?.source === "admin" ? "Move subaccount to saved bank" : "Create reserve subaccount"}
+                          </button>
+                          {!reserveState.bank && <p className="text-xs text-amber-700">Save bank details first.</p>}
                         </div>
                       )}
                     </div>
@@ -2608,7 +2273,7 @@ export default function AdminTransactionsPage() {
                     </tbody></table></div>
                   </div>
 
-                  <div className="glass-panel overflow-hidden"><div className="panel-heading"><div><p className="eyebrow">WITHDRAWALS</p><h2 className="text-lg font-bold text-slate-900">Withdrawal history</h2></div></div><div className="overflow-x-auto"><table className="w-full"><thead><tr><Th>Reference</Th><Th>Provider</Th><Th>Status</Th><Th align="right">Amount</Th><Th>Date</Th></tr></thead><tbody>{reserveState.withdrawals.slice().reverse().map((row) => <tr key={row.id} className="border-t border-slate-100"><Td>{row.reference}</Td><Td>{row.provider}</Td><Td>{row.status}</Td><Td align="right">₦{(row.amountKobo / 100).toLocaleString()}</Td><Td>{new Date(row.createdAt).toLocaleDateString()}</Td></tr>)}</tbody></table></div></div>
+                  {reserveState.withdrawals.length > 0 && <div className="glass-panel overflow-hidden"><div className="panel-heading"><div><p className="eyebrow">WITHDRAWALS</p><h2 className="text-lg font-bold text-slate-900">Withdrawal history</h2></div></div><div className="overflow-x-auto"><table className="w-full"><thead><tr><Th>Reference</Th><Th>Provider</Th><Th>Status</Th><Th align="right">Amount</Th><Th>Date</Th></tr></thead><tbody>{reserveState.withdrawals.slice().reverse().map((row) => <tr key={row.id} className="border-t border-slate-100"><Td>{row.reference}</Td><Td>{row.provider}</Td><Td>{row.status}</Td><Td align="right">₦{(row.amountKobo / 100).toLocaleString()}</Td><Td>{new Date(row.createdAt).toLocaleDateString()}</Td></tr>)}</tbody></table></div></div>}
                 </>
               )}
             </section>
