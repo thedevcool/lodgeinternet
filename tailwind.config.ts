@@ -37,6 +37,10 @@ const config: Config = {
           DEFAULT: "rgb(var(--wa) / <alpha-value>)",
           ink: "rgb(var(--wa-ink) / <alpha-value>)",
         },
+        tg: {
+          DEFAULT: "rgb(var(--tg) / <alpha-value>)",
+          ink: "rgb(var(--tg-ink) / <alpha-value>)",
+        },
         // ── Admin palette (unchanged) ─────────────────────────────────────
         "apple-gray": {
           50: "#fafafa",

@@ -72,6 +72,7 @@ export default function LocationView({
       )}
 
       <WhatsAppCard
+        telegramSource="location"
         className="mt-10 md:max-w-xl"
         title="Get Lodge Internet faster on WhatsApp"
         message="We’re here to help — pick a plan and get your code right in the chat."

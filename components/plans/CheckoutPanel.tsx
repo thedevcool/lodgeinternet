@@ -81,6 +81,7 @@ export default function CheckoutPanel({ c }: { c: PlansCheckout }) {
       )}
 
       <WhatsAppCard
+        telegramSource="checkout"
         compact
         title="Prefer WhatsApp?"
         message="Select your plan, pay securely and receive your access code directly in WhatsApp."

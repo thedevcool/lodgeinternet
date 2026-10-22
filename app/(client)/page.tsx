@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { MapPinOff } from "lucide-react";
 import { displayName } from "@/lib/hostelSlug";
 import { useHostelDirectory } from "@/lib/useHostelDirectory";
+import { telegramBotUrl } from "@/lib/telegram";
 import { whatsappBotUrl } from "@/lib/whatsapp";
 import { useMyHostel, YourHostelCard } from "@/components/client/YourHostel";
 import Container from "@/components/ui/Container";
@@ -12,6 +13,7 @@ import SearchField from "@/components/ui/SearchField";
 import Monogram from "@/components/ui/Monogram";
 import WhatsAppCard from "@/components/ui/WhatsAppCard";
 import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
+import TelegramIcon from "@/components/ui/TelegramIcon";
 import { ButtonLink } from "@/components/ui/Button";
 import { GroupedList, ListRow } from "@/components/ui/GroupedList";
 import { EmptyState, ErrorState, ListSkeleton } from "@/components/ui/States";
@@ -40,6 +42,7 @@ export default function HomePage() {
   const mine = useMyHostel();
   const [query, setQuery] = useState("");
   const wa = whatsappBotUrl("Hi Lodge Internet");
+  const tg = telegramBotUrl("home");
 
   // ── Top-level list: schools, standalone locations, standalone hostels ─────
   const entries = useMemo<Entry[]>(() => {
@@ -102,6 +105,11 @@ export default function HomePage() {
                 <WhatsAppIcon className="h-5 w-5 text-wa-ink" /> Talk on WhatsApp
               </ButtonLink>
             )}
+            {tg && (
+              <ButtonLink href={tg} external variant="gray">
+                <TelegramIcon className="h-5 w-5 text-tg-ink" /> Telegram
+              </ButtonLink>
+            )}
           </div>
         </div>
         <HeroPhones className="hidden md:block" />
@@ -138,7 +146,7 @@ export default function HomePage() {
       </section>
 
       <section className="pt-14 md:hidden">
-        <WhatsAppCard title="Get Lodge Internet faster on WhatsApp" prefill="Hi Lodge Internet, I'd like to check available plans" />
+        <WhatsAppCard title="Get Lodge Internet faster on WhatsApp" prefill="Hi Lodge Internet, I'd like to check available plans" telegramSource="home" />
       </section>
 
       <section className="pt-14 md:pt-28">

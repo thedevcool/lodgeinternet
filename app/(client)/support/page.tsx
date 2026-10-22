@@ -53,6 +53,7 @@ export default function SupportPage() {
 
       <div className="mt-10">
         <WhatsAppCard
+          telegramSource="support"
           title="Quick Help"
           message="Still need help? Our support team is available on WhatsApp."
           prefill="Hi Lodge Internet, I need help"

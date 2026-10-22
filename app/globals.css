@@ -226,6 +226,8 @@
   --danger: 220 38 38;        /* #DC2626 */
   --wa: 21 128 61;            /* WhatsApp fill, darkened so white text passes 4.5:1 */
   --wa-ink: 21 128 61;
+  --tg: 0 119 182;            /* Telegram fill, darkened from #229ED9 so white text passes 4.5:1 */
+  --tg-ink: 0 119 182;
   --glass: 255 255 255;
   --glass-edge: rgb(0 0 0 / 0.08);
   --glass-highlight: rgb(255 255 255 / 0.75);
@@ -258,6 +260,8 @@
     --danger: 248 113 113;
     --wa: 21 128 61;
     --wa-ink: 74 222 128;
+    --tg: 0 119 182;
+    --tg-ink: 56 189 248;
     --glass: 30 30 32;
     --glass-edge: rgb(255 255 255 / 0.12);
     --glass-highlight: rgb(255 255 255 / 0.1);
@@ -282,6 +286,8 @@
   --danger: 248 113 113;
   --wa: 21 128 61;
   --wa-ink: 74 222 128;
+  --tg: 0 119 182;
+  --tg-ink: 56 189 248;
   --glass: 30 30 32;
   --glass-edge: rgb(255 255 255 / 0.12);
   --glass-highlight: rgb(255 255 255 / 0.1);

@@ -761,6 +761,7 @@ export default function DashboardPage() {
 
       {/* ── Help + sign out ─────────────────────────────────────────────── */}
       <WhatsAppCard
+        telegramSource="dashboard"
         className="mt-8"
         title="Need a hand?"
         message="Chat with Lodge Internet on WhatsApp — buy plans or get help with a code."

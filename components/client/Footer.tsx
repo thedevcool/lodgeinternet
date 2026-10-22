@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BrandGlyph } from "@/components/ui/BrandMark";
+import { telegramBotUrl } from "@/lib/telegram";
 import { whatsappBotUrl } from "@/lib/whatsapp";
 import ThemeToggle from "./ThemeToggle";
 
@@ -9,6 +10,7 @@ import ThemeToggle from "./ThemeToggle";
  */
 export default function Footer() {
   const wa = whatsappBotUrl("Hi Lodge Internet");
+  const tg = telegramBotUrl("footer");
   const year = new Date().getFullYear();
 
   return (
@@ -37,6 +39,11 @@ export default function Footer() {
           {wa && (
             <a href={wa} target="_blank" rel="noopener noreferrer" className="ui-subhead text-ink-2 hover:text-ink">
               WhatsApp
+            </a>
+          )}
+          {tg && (
+            <a href={tg} target="_blank" rel="noopener noreferrer" className="ui-subhead text-ink-2 hover:text-ink">
+              Telegram
             </a>
           )}
         </FooterColumn>
