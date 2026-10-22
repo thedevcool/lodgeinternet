@@ -5,10 +5,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
 import ConfirmationModal from "@/components/ConfirmationModal";
-import Logo from "@/components/Logo";
+import { AdminPage, EmptyState, GLASS_INPUT, GLASS_INPUT_ICON, IconButton, Panel } from "@/components/admin/ui";
 import {
-  LogOut,
-  ArrowLeft,
   ShieldCheck,
   Plus,
   Pencil,
@@ -184,7 +182,7 @@ function ModulePermissionBadge({ mp }: { mp: ModulePermission }) {
   const meta = ALL_MODULES.find((m) => m.id === mp.module);
   const badge = PERMISSION_BADGE[mp.permission];
   return (
-    <span className='inline-flex items-center gap-1 px-2 py-0.5 bg-apple-gray-100 text-apple-gray-700 text-xs rounded-lg font-medium'>
+    <span className='inline-flex items-center gap-1 rounded-full border border-white/85 bg-white/70 px-2.5 py-1 text-xs font-medium text-slate-700'>
       {meta?.icon}
       <span>{meta?.label ?? mp.module}</span>
       <span
@@ -513,805 +511,644 @@ export default function AdminManagementPage() {
 
   return (
     <ProtectedRoute requireSuperAdmin>
-      <div className='min-h-screen bg-apple-gray-50'>
-        {/* Header */}
-        <header className='bg-white shadow-sm sticky top-0 z-10'>
-          <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4'>
-            <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
-              <div className='flex items-center gap-3'>
-                <button
-                  onClick={() => router.push("/admin/dashboard")}
-                  className='p-2 hover:bg-apple-gray-100 rounded-lg transition-colors'>
-                  <ArrowLeft className='w-5 h-5 text-apple-gray-600' />
-                </button>
-                <Logo variant='dark' />
-                <div>
-                  <h1 className='text-2xl font-bold bg-gradient-to-r from-blue-400 via-blue-500 to-white-500 bg-clip-text text-transparent'>
-                    Admin Management
-                  </h1>
-                  <p className='text-sm text-apple-gray-600'>
-                    Add admins, assign roles and permissions
-                  </p>
-                </div>
-              </div>
-              <div className='flex items-center gap-3'>
-                <button
-                  onClick={openAdd}
-                  className='inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity shadow-md'>
-                  <Plus className='w-4 h-4' />
-                  Add Admin
-                </button>
-                <button
-                  onClick={signEveryoneOut}
-                  className='flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors'>
-                  <ShieldOff className='w-4 h-4' />
-                  Sign everyone out
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className='flex items-center gap-2 px-4 py-2 text-sm font-medium text-apple-gray-700 hover:bg-apple-gray-100 rounded-lg transition-colors'>
-                  <LogOut className='w-4 h-4' />
-                  Logout
-                </button>
-              </div>
+      <AdminPage
+        eyebrow='ADMINS'
+        title='Admin Management'
+        subtitle='Add admins, assign roles and permissions'
+        actions={
+          <>
+            <button onClick={openAdd} className='glass-primary'>
+              <Plus className='w-4 h-4' />
+              Add Admin
+            </button>
+            <button onClick={signEveryoneOut} className='glass-button text-rose-600'>
+              <ShieldOff className='w-4 h-4' />
+              Sign everyone out
+            </button>
+          </>
+        }>
+        {/* Super Admin notice */}
+        <section className='glass-panel'>
+          <div className='flex items-start gap-4'>
+            <div className='w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm'>
+              <ShieldCheck className='w-5 h-5 text-white' />
+            </div>
+            <div className='min-w-0'>
+              <p className='font-semibold text-slate-900 break-words'>
+                Super Admin: {adminProfile?.username ?? "—"}
+              </p>
+              <p className='text-sm text-slate-500 mt-0.5'>
+                The super admin has unrestricted access to all sections and
+                cannot be managed here. Sub-admins below are stored in
+                Firestore and can be enabled, disabled, or removed at any
+                time.
+              </p>
             </div>
           </div>
-        </header>
+        </section>
 
-        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6'>
-          {/* Super Admin notice */}
-          <div className='bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl p-5 text-white'>
-            <div className='flex items-start gap-4'>
-              <div className='w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0'>
-                <ShieldCheck className='w-5 h-5 text-white' />
-              </div>
-              <div>
-                <p className='font-semibold'>
-                  Super Admin: {adminProfile?.username ?? "—"}
-                </p>
-                <p className='text-sm text-white/80 mt-0.5'>
-                  The super admin has unrestricted access to all sections and
-                  cannot be managed here. Sub-admins below are stored in
-                  Firestore and can be enabled, disabled, or removed at any
-                  time.
-                </p>
-              </div>
+        {/* Admin list */}
+        <Panel
+          flush
+          title={
+            <span className='flex items-center gap-2'>
+              <Users className='w-5 h-5 text-blue-500' />
+              Sub-Admins
+              {!loading && <span className='slate-chip text-xs'>{admins.length}</span>}
+            </span>
+          }
+          actions={
+            <button onClick={openAdd} className='glass-button text-blue-600'>
+              <Plus className='w-4 h-4' />
+              New
+            </button>
+          }>
+          {loading ? (
+            <div className='flex items-center justify-center py-16 gap-3 text-slate-500'>
+              <Loader2 className='w-5 h-5 animate-spin' />
+              <span className='text-sm'>Loading admins…</span>
             </div>
-          </div>
-
-          {/* Admin list */}
-          <div className='bg-white rounded-2xl shadow-sm border border-apple-gray-200'>
-            <div className='px-6 py-4 border-b border-apple-gray-200 flex items-center justify-between'>
-              <div className='flex items-center gap-2'>
-                <Users className='w-5 h-5 text-blue-500' />
-                <h2 className='text-lg font-semibold text-apple-gray-900'>
-                  Sub-Admins
-                </h2>
-                {!loading && (
-                  <span className='ml-1 px-2 py-0.5 bg-apple-gray-100 text-apple-gray-600 text-xs font-medium rounded-full'>
-                    {admins.length}
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={openAdd}
-                className='inline-flex items-center gap-1.5 text-sm text-blue-600 font-medium hover:text-blue-800 transition-colors'>
-                <Plus className='w-4 h-4' />
-                New
-              </button>
+          ) : loadError ? (
+            <div className='py-12 px-4 text-center'>
+              <AlertCircle className='w-8 h-8 text-rose-400 mx-auto mb-2' />
+              <p className='text-rose-600 text-sm break-words'>{loadError}</p>
             </div>
-
-            {loading ? (
-              <div className='flex items-center justify-center py-16 gap-3 text-apple-gray-500'>
-                <Loader2 className='w-5 h-5 animate-spin' />
-                <span className='text-sm'>Loading admins…</span>
-              </div>
-            ) : loadError ? (
-              <div className='py-12 text-center'>
-                <AlertCircle className='w-8 h-8 text-red-400 mx-auto mb-2' />
-                <p className='text-red-600 text-sm'>{loadError}</p>
-              </div>
-            ) : admins.length === 0 ? (
-              <div className='py-16 text-center'>
-                <div className='w-16 h-16 bg-apple-gray-100 rounded-full flex items-center justify-center mx-auto mb-4'>
-                  <ShieldCheck className='w-8 h-8 text-apple-gray-400' />
+          ) : admins.length === 0 ? (
+            <EmptyState
+              icon={
+                <div className='w-16 h-16 bg-white/70 rounded-full flex items-center justify-center'>
+                  <ShieldCheck className='w-8 h-8 text-slate-400' />
                 </div>
-                <p className='text-apple-gray-600 font-medium'>
-                  No sub-admins yet
-                </p>
-                <p className='text-apple-gray-400 text-sm mt-1'>
-                  Click &quot;Add Admin&quot; to create the first one.
-                </p>
-              </div>
-            ) : (
-              <div className='divide-y divide-apple-gray-100'>
-                {admins.map((admin) => (
-                  <div
-                    key={admin.id}
-                    className={`px-6 py-5 transition-colors ${
-                      admin.isActive ? "bg-white" : "bg-apple-gray-50"
-                    }`}>
-                    <div className='flex flex-col sm:flex-row sm:items-start gap-4'>
-                      {/* Avatar */}
-                      <div className='w-10 h-10 rounded-xl bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0'>
-                        {admin.username.slice(0, 2).toUpperCase()}
+              }
+              title='No sub-admins yet'>
+              Click &quot;Add Admin&quot; to create the first one.
+            </EmptyState>
+          ) : (
+            <div className='divide-y divide-slate-200/60 border-t border-slate-200/60'>
+              {admins.map((admin) => (
+                <div
+                  key={admin.id}
+                  className={`px-4 py-5 transition sm:px-7 ${admin.isActive ? "" : "bg-slate-100/50"}`}>
+                  <div className='flex flex-wrap items-start gap-3 sm:flex-nowrap sm:gap-4'>
+                    {/* Avatar */}
+                    <div className='w-10 h-10 rounded-xl bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0'>
+                      {admin.username.slice(0, 2).toUpperCase()}
+                    </div>
+
+                    {/* Info */}
+                    <div className='flex-1 min-w-0'>
+                      <div className='flex flex-wrap items-center gap-2 mb-1'>
+                        <span
+                          className={`min-w-0 break-all font-semibold text-slate-900 ${
+                            !admin.isActive ? "opacity-50" : ""
+                          }`}>
+                          {admin.username}
+                        </span>
+                        {!admin.isActive && (
+                          <span className='glass-red rounded-full px-2.5 py-1 text-xs font-semibold'>Disabled</span>
+                        )}
+                        {admin.isPartner && (
+                          <span className='glass-purple rounded-full px-2.5 py-1 text-xs font-semibold'>
+                            Partner ·{" "}
+                            {admin.partnerSplitMode === "perHostel"
+                              ? "per-hostel split"
+                              : `${admin.partnerSplitPercent ?? 0}% split`}
+                          </span>
+                        )}
                       </div>
 
-                      {/* Info */}
-                      <div className='flex-1 min-w-0'>
-                        <div className='flex flex-wrap items-center gap-2 mb-1'>
-                          <span
-                            className={`font-semibold text-apple-gray-900 ${
-                              !admin.isActive ? "opacity-50" : ""
-                            }`}>
-                            {admin.username}
-                          </span>
-                          {!admin.isActive && (
-                            <span className='px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700'>
-                              Disabled
-                            </span>
-                          )}
-                          {admin.isPartner && (
-                            <span className='px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700'>
-                              Partner ·{" "}
-                              {admin.partnerSplitMode === "perHostel"
-                                ? "per-hostel split"
-                                : `${admin.partnerSplitPercent ?? 0}% split`}
-                            </span>
-                          )}
+                      {admin.email && <p className='text-sm text-slate-500 mb-1 break-all'>{admin.email}</p>}
+
+                      {admin.whatsappPhone && (
+                        <p className='text-sm text-emerald-600 mb-2 flex items-center gap-1 break-all'>
+                          <Phone className='w-3.5 h-3.5 shrink-0' />
+                          wa.me/{admin.whatsappPhone}
+                        </p>
+                      )}
+
+                      {/* Per-module permissions */}
+                      <div className='flex flex-wrap gap-1.5 mb-1'>
+                        {admin.modulePermissions.map((mp) => (
+                          <ModulePermissionBadge key={mp.module} mp={mp} />
+                        ))}
+                      </div>
+
+                      {/* Hostel restriction */}
+                      {admin.hostels.length > 0 && (
+                        <div className='flex flex-wrap items-center gap-1 mt-1'>
+                          <span className='text-xs text-slate-400 mr-0.5'>Hostels:</span>
+                          {admin.hostels.map((hId) => {
+                            const h = availableHostels.find((ah) => ah.id === hId);
+                            return (
+                              <span key={hId} className='warning-chip inline-flex items-center gap-1 !py-0.5 text-xs'>
+                                <Building2 className='w-3 h-3' />
+                                {h?.name ?? hId}
+                              </span>
+                            );
+                          })}
                         </div>
+                      )}
+                      {admin.hostels.length === 0 && (
+                        <p className='text-xs text-slate-400 mt-1'>
+                          <Building2 className='w-3 h-3 inline mr-0.5' />
+                          All hostels
+                        </p>
+                      )}
 
-                        {admin.email && (
-                          <p className='text-sm text-apple-gray-500 mb-1'>
-                            {admin.email}
+                      {admin.createdBy && (
+                        <p className='text-xs text-slate-400 mt-2 break-words'>
+                          Created by {admin.createdBy}
+                          {admin.createdAt ? ` · ${new Date(admin.createdAt).toLocaleDateString()}` : ""}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className='flex w-full items-center justify-end gap-2 sm:w-auto sm:flex-shrink-0'>
+                      {/* Toggle active */}
+                      <IconButton
+                        label={admin.isActive ? "Disable admin" : "Enable admin"}
+                        onClick={() => toggleActive(admin)}
+                        tone={admin.isActive ? "success" : "default"}
+                        className={admin.isActive ? "" : "!text-slate-400"}>
+                        {admin.isActive ? <ToggleRight className='w-5 h-5' /> : <ToggleLeft className='w-5 h-5' />}
+                      </IconButton>
+
+                      {/* Edit */}
+                      <IconButton label='Edit admin' onClick={() => openEdit(admin)} className='hover:!text-blue-600'>
+                        <Pencil className='w-4 h-4' />
+                      </IconButton>
+
+                      {/* Delete */}
+                      <IconButton label='Delete admin' onClick={() => setDeleteTarget(admin)} tone='danger'>
+                        <Trash2 className='w-4 h-4' />
+                      </IconButton>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
+      </AdminPage>
+
+      {/* ─── Slide-in Panel (Add / Edit) ─────────────────────────────────── */}
+      {panelOpen && (
+        <div className='fixed inset-0 z-50 flex'>
+          {/* Backdrop */}
+          <div className='flex-1 bg-slate-900/30 backdrop-blur-sm' onClick={closePanel} />
+
+          {/* Panel */}
+          <div className='glass-drawer h-full w-full max-w-lg rounded-none border-y-0 border-r-0 sm:rounded-l-[32px]'>
+            {/* Panel header */}
+            <div className='sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-white/80 bg-white/80 px-4 py-4 backdrop-blur-xl sm:px-6'>
+              <div className='min-w-0'>
+                <h2 className='text-lg font-semibold text-slate-900'>
+                  {editingAdmin ? "Edit Admin" : "Add New Admin"}
+                </h2>
+                <p className='text-sm text-slate-500 break-all'>
+                  {editingAdmin ? `Editing @${editingAdmin.username}` : "Create a new sub-admin account"}
+                </p>
+              </div>
+              <IconButton label='Close' onClick={closePanel}>
+                <X className='w-5 h-5' />
+              </IconButton>
+            </div>
+
+            <div className='flex-1 px-4 py-6 space-y-6 sm:px-6'>
+              {/* Feedback */}
+              {formError && (
+                <div className='flex items-start gap-3 p-4 bg-rose-50/90 border border-rose-200 rounded-2xl'>
+                  <AlertCircle className='w-5 h-5 text-rose-500 flex-shrink-0 mt-0.5' />
+                  <p className='text-sm text-rose-700 break-words'>{formError}</p>
+                </div>
+              )}
+              {formSuccess && (
+                <div className='flex items-start gap-3 p-4 bg-emerald-50/90 border border-emerald-200 rounded-2xl'>
+                  <CheckCircle className='w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5' />
+                  <p className='text-sm text-emerald-700'>{formSuccess}</p>
+                </div>
+              )}
+
+              {/* Username */}
+              <div>
+                <label className='block text-sm font-medium text-slate-700 mb-2'>
+                  Username <span className='text-rose-500'>*</span>
+                </label>
+                <input
+                  type='text'
+                  value={form.username}
+                  onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))}
+                  disabled={!!editingAdmin}
+                  placeholder='e.g. john_doe'
+                  className={`${GLASS_INPUT} disabled:text-slate-500`}
+                />
+                {editingAdmin && (
+                  <p className='text-xs text-slate-400 mt-1'>Username cannot be changed after creation.</p>
+                )}
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className='block text-sm font-medium text-slate-700 mb-2'>
+                  Email <span className='text-slate-400 font-normal'>(optional)</span>
+                </label>
+                <input
+                  type='email'
+                  value={form.email}
+                  onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+                  placeholder='admin@example.com'
+                  className={GLASS_INPUT}
+                />
+              </div>
+
+              {/* WhatsApp Phone */}
+              <div>
+                <label className='block text-sm font-medium text-slate-700 mb-2'>
+                  WhatsApp Phone{" "}
+                  <span className='text-slate-400 font-normal'>
+                    (optional — shown as support contact on hostel pages)
+                  </span>
+                </label>
+                <div className='relative'>
+                  <Phone className={`${GLASS_INPUT_ICON} !text-emerald-500`} />
+                  <input
+                    type='tel'
+                    value={form.whatsappPhone}
+                    onChange={(e) =>
+                      setForm((p) => ({
+                        ...p,
+                        whatsappPhone: e.target.value.replace(/[^0-9]/g, ""),
+                      }))
+                    }
+                    placeholder='e.g. 2348012345678 (no + prefix)'
+                    className={`${GLASS_INPUT} pl-11 font-mono focus:border-emerald-400 focus:ring-emerald-100`}
+                  />
+                </div>
+                <p className='text-xs text-slate-400 mt-1'>
+                  Include country code without +. E.g. <span className='font-mono'>2348130437519</span>
+                </p>
+              </div>
+
+              {/* Partner toggle */}
+              <div>
+                <div className='flex items-center justify-between gap-3'>
+                  <div className='min-w-0'>
+                    <label className='block text-sm font-medium text-slate-700 mb-0.5'>Partner Account</label>
+                    <p className='text-xs text-slate-400'>
+                      Gives this admin a read-only view of their transaction shares
+                    </p>
+                  </div>
+                  <label className='relative inline-flex min-h-[40px] items-center cursor-pointer shrink-0'>
+                    <input
+                      type='checkbox'
+                      checked={form.isPartner}
+                      onChange={(e) =>
+                        setForm((p) => ({
+                          ...p,
+                          isPartner: e.target.checked,
+                        }))
+                      }
+                      className='sr-only'
+                    />
+                    <div
+                      className={`w-11 h-6 rounded-full transition-colors ${form.isPartner ? "bg-purple-500" : "bg-slate-300"}`}
+                    />
+                    <div
+                      className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow transition-all ${form.isPartner ? "left-6" : "left-1"}`}
+                    />
+                  </label>
+                </div>
+                {form.isPartner && (
+                  <div className='mt-4 rounded-2xl border border-purple-200 bg-purple-50/80 p-4 space-y-4'>
+                    {/* Split mode: one % for all hostels, or a % per hostel */}
+                    <div>
+                      <label className='block text-sm font-medium text-purple-900 mb-1.5'>Split Setup</label>
+                      <div className='flex flex-wrap gap-1 rounded-2xl border border-purple-200 bg-white/80 p-1 text-xs font-semibold'>
+                        <button
+                          type='button'
+                          onClick={() => setForm((p) => ({ ...p, partnerSplitMode: "whole" }))}
+                          className={`min-h-[40px] flex-1 whitespace-nowrap rounded-xl px-3 py-2 transition-colors ${
+                            form.partnerSplitMode === "whole" ? "bg-purple-500 text-white" : "text-purple-700"
+                          }`}>
+                          Same for all hostels
+                        </button>
+                        <button
+                          type='button'
+                          onClick={() =>
+                            setForm((p) => ({
+                              ...p,
+                              partnerSplitMode: "perHostel",
+                            }))
+                          }
+                          className={`min-h-[40px] flex-1 whitespace-nowrap rounded-xl px-3 py-2 transition-colors ${
+                            form.partnerSplitMode === "perHostel" ? "bg-purple-500 text-white" : "text-purple-700"
+                          }`}>
+                          Different per hostel
+                        </button>
+                      </div>
+                    </div>
+
+                    {form.partnerSplitMode === "whole" ? (
+                      <div>
+                        <label className='block text-sm font-medium text-purple-900 mb-1.5'>Partner Split (%)</label>
+                        <div className='flex flex-wrap items-center gap-3'>
+                          <input
+                            type='number'
+                            min='0'
+                            max='100'
+                            step='0.01'
+                            value={form.partnerSplitPercent}
+                            onChange={(e) =>
+                              setForm((p) => ({
+                                ...p,
+                                partnerSplitPercent: e.target.value === "" ? "" : Number(e.target.value),
+                              }))
+                            }
+                            className={`${GLASS_INPUT} w-28 font-semibold text-purple-900 focus:border-purple-300 focus:ring-purple-100`}
+                            aria-label='Partner split percentage'
+                          />
+                          <p className='min-w-0 flex-1 text-xs text-purple-700'>
+                            % of each transaction (from the full 100%)
                           </p>
-                        )}
-
-                        {admin.whatsappPhone && (
-                          <p className='text-sm text-green-600 mb-2 flex items-center gap-1'>
-                            <Phone className='w-3.5 h-3.5' />
-                            wa.me/{admin.whatsappPhone}
-                          </p>
-                        )}
-
-                        {/* Per-module permissions */}
-                        <div className='flex flex-wrap gap-1.5 mb-1'>
-                          {admin.modulePermissions.map((mp) => (
-                            <ModulePermissionBadge key={mp.module} mp={mp} />
-                          ))}
                         </div>
-
-                        {/* Hostel restriction */}
-                        {admin.hostels.length > 0 && (
-                          <div className='flex flex-wrap gap-1 mt-1'>
-                            <span className='text-xs text-apple-gray-400 mr-0.5'>
-                              Hostels:
-                            </span>
-                            {admin.hostels.map((hId) => {
-                              const h = availableHostels.find(
-                                (ah) => ah.id === hId,
-                              );
+                      </div>
+                    ) : (
+                      <div>
+                        <label className='block text-sm font-medium text-purple-900 mb-1.5'>
+                          Split per hostel (%)
+                        </label>
+                        {form.hostels.length === 0 ? (
+                          <p className='text-xs text-purple-700'>
+                            Select the partner&apos;s hostels below, then set a % for each here.
+                          </p>
+                        ) : (
+                          <div className='space-y-2'>
+                            {form.hostels.map((hostelId) => {
+                              const hostel = availableHostels.find((h) => h.id === hostelId);
+                              const value = form.partnerHostelSplits[hostelId] ?? form.partnerSplitPercent;
                               return (
-                                <span
-                                  key={hId}
-                                  className='inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 text-xs rounded-lg font-medium border border-amber-200'>
-                                  <Building2 className='w-3 h-3' />
-                                  {h?.name ?? hId}
-                                </span>
+                                <div key={hostelId} className='flex items-center justify-between gap-3'>
+                                  <span className='min-w-0 text-sm text-purple-900 truncate'>
+                                    {hostel?.name ?? hostelId}
+                                  </span>
+                                  <div className='flex items-center gap-1.5 shrink-0'>
+                                    <input
+                                      type='number'
+                                      min='0'
+                                      max='100'
+                                      step='0.01'
+                                      value={value}
+                                      onChange={(e) =>
+                                        setForm((p) => ({
+                                          ...p,
+                                          partnerHostelSplits: {
+                                            ...p.partnerHostelSplits,
+                                            [hostelId]: e.target.value === "" ? "" : Number(e.target.value),
+                                          },
+                                        }))
+                                      }
+                                      className={`${GLASS_INPUT} w-24 font-semibold text-purple-900 focus:border-purple-300 focus:ring-purple-100`}
+                                      aria-label={`Split percentage for ${hostel?.name ?? hostelId}`}
+                                    />
+                                    <span className='text-xs text-purple-700'>%</span>
+                                  </div>
+                                </div>
                               );
                             })}
                           </div>
                         )}
-                        {admin.hostels.length === 0 && (
-                          <p className='text-xs text-apple-gray-400 mt-1'>
-                            <Building2 className='w-3 h-3 inline mr-0.5' />
-                            All hostels
-                          </p>
-                        )}
-
-                        {admin.createdBy && (
-                          <p className='text-xs text-apple-gray-400 mt-2'>
-                            Created by {admin.createdBy}
-                            {admin.createdAt
-                              ? ` · ${new Date(admin.createdAt).toLocaleDateString()}`
-                              : ""}
-                          </p>
-                        )}
+                        <p className='mt-2 text-xs text-purple-700'>
+                          Each hostel&apos;s % is taken from that hostel&apos;s full transaction amount.
+                        </p>
                       </div>
-
-                      {/* Actions */}
-                      <div className='flex items-center gap-2 flex-shrink-0'>
-                        {/* Toggle active */}
-                        <button
-                          onClick={() => toggleActive(admin)}
-                          title={
-                            admin.isActive ? "Disable admin" : "Enable admin"
-                          }
-                          className={`p-2 rounded-lg transition-colors ${
-                            admin.isActive
-                              ? "text-green-600 hover:bg-green-50"
-                              : "text-apple-gray-400 hover:bg-apple-gray-100"
-                          }`}>
-                          {admin.isActive ? (
-                            <ToggleRight className='w-5 h-5' />
-                          ) : (
-                            <ToggleLeft className='w-5 h-5' />
-                          )}
-                        </button>
-
-                        {/* Edit */}
-                        <button
-                          onClick={() => openEdit(admin)}
-                          title='Edit admin'
-                          className='p-2 rounded-lg text-apple-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors'>
-                          <Pencil className='w-4 h-4' />
-                        </button>
-
-                        {/* Delete */}
-                        <button
-                          onClick={() => setDeleteTarget(admin)}
-                          title='Delete admin'
-                          className='p-2 rounded-lg text-apple-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors'>
-                          <Trash2 className='w-4 h-4' />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ─── Slide-in Panel (Add / Edit) ─────────────────────────────────── */}
-        {panelOpen && (
-          <div className='fixed inset-0 z-50 flex'>
-            {/* Backdrop */}
-            <div
-              className='flex-1 bg-black/40 backdrop-blur-sm'
-              onClick={closePanel}
-            />
-
-            {/* Panel */}
-            <div className='w-full max-w-lg bg-white h-full overflow-y-auto shadow-2xl flex flex-col'>
-              {/* Panel header */}
-              <div className='sticky top-0 bg-white border-b border-apple-gray-200 px-6 py-4 flex items-center justify-between z-10'>
-                <div>
-                  <h2 className='text-lg font-bold text-apple-gray-900'>
-                    {editingAdmin ? "Edit Admin" : "Add New Admin"}
-                  </h2>
-                  <p className='text-sm text-apple-gray-500'>
-                    {editingAdmin
-                      ? `Editing @${editingAdmin.username}`
-                      : "Create a new sub-admin account"}
-                  </p>
-                </div>
-                <button
-                  onClick={closePanel}
-                  className='p-2 hover:bg-apple-gray-100 rounded-lg transition-colors'>
-                  <X className='w-5 h-5 text-apple-gray-600' />
-                </button>
-              </div>
-
-              <div className='flex-1 px-6 py-6 space-y-6'>
-                {/* Feedback */}
-                {formError && (
-                  <div className='flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl'>
-                    <AlertCircle className='w-5 h-5 text-red-500 flex-shrink-0 mt-0.5' />
-                    <p className='text-sm text-red-700'>{formError}</p>
-                  </div>
-                )}
-                {formSuccess && (
-                  <div className='flex items-start gap-3 p-4 bg-green-50 border border-green-200 rounded-xl'>
-                    <CheckCircle className='w-5 h-5 text-green-500 flex-shrink-0 mt-0.5' />
-                    <p className='text-sm text-green-700'>{formSuccess}</p>
-                  </div>
-                )}
-
-                {/* Username */}
-                <div>
-                  <label className='block text-sm font-medium text-apple-gray-700 mb-2'>
-                    Username <span className='text-red-500'>*</span>
-                  </label>
-                  <input
-                    type='text'
-                    value={form.username}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, username: e.target.value }))
-                    }
-                    disabled={!!editingAdmin}
-                    placeholder='e.g. john_doe'
-                    className='w-full px-4 py-3 rounded-xl border-2 border-apple-gray-200 focus:border-blue-400 focus:outline-none text-sm disabled:bg-apple-gray-50 disabled:text-apple-gray-500'
-                  />
-                  {editingAdmin && (
-                    <p className='text-xs text-apple-gray-400 mt-1'>
-                      Username cannot be changed after creation.
-                    </p>
-                  )}
-                </div>
-
-                {/* Email */}
-                <div>
-                  <label className='block text-sm font-medium text-apple-gray-700 mb-2'>
-                    Email{" "}
-                    <span className='text-apple-gray-400 font-normal'>
-                      (optional)
-                    </span>
-                  </label>
-                  <input
-                    type='email'
-                    value={form.email}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, email: e.target.value }))
-                    }
-                    placeholder='admin@example.com'
-                    className='w-full px-4 py-3 rounded-xl border-2 border-apple-gray-200 focus:border-blue-400 focus:outline-none text-sm'
-                  />
-                </div>
-
-                {/* WhatsApp Phone */}
-                <div>
-                  <label className='block text-sm font-medium text-apple-gray-700 mb-2'>
-                    WhatsApp Phone{" "}
-                    <span className='text-apple-gray-400 font-normal'>
-                      (optional — shown as support contact on hostel pages)
-                    </span>
-                  </label>
-                  <div className='relative'>
-                    <Phone className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500' />
-                    <input
-                      type='tel'
-                      value={form.whatsappPhone}
-                      onChange={(e) =>
-                        setForm((p) => ({
-                          ...p,
-                          whatsappPhone: e.target.value.replace(/[^0-9]/g, ""),
-                        }))
-                      }
-                      placeholder='e.g. 2348012345678 (no + prefix)'
-                      className='w-full pl-10 pr-4 py-3 rounded-xl border-2 border-apple-gray-200 focus:border-green-400 focus:outline-none text-sm font-mono'
-                    />
-                  </div>
-                  <p className='text-xs text-apple-gray-400 mt-1'>
-                    Include country code without +. E.g.{" "}
-                    <span className='font-mono'>2348130437519</span>
-                  </p>
-                </div>
-
-                {/* Partner toggle */}
-                <div>
-                  <div className='flex items-center justify-between'>
-                    <div>
-                      <label className='block text-sm font-medium text-apple-gray-700 mb-0.5'>
-                        Partner Account
-                      </label>
-                      <p className='text-xs text-apple-gray-400'>
-                        Gives this admin a read-only view of their transaction
-                        shares
-                      </p>
-                    </div>
-                    <label className='relative inline-flex items-center cursor-pointer shrink-0'>
-                      <input
-                        type='checkbox'
-                        checked={form.isPartner}
-                        onChange={(e) =>
-                          setForm((p) => ({
-                            ...p,
-                            isPartner: e.target.checked,
-                          }))
-                        }
-                        className='sr-only'
-                      />
-                      <div
-                        className={`w-10 h-6 rounded-full transition-colors ${form.isPartner ? "bg-purple-500" : "bg-apple-gray-300"}`}
-                      />
-                      <div
-                        className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${form.isPartner ? "left-5" : "left-1"}`}
-                      />
-                    </label>
-                  </div>
-                  {form.isPartner && (
-                    <div className='mt-4 rounded-xl border border-purple-200 bg-purple-50 p-4 space-y-4'>
-                      {/* Split mode: one % for all hostels, or a % per hostel */}
-                      <div>
-                        <label className='block text-sm font-medium text-purple-900 mb-1.5'>
-                          Split Setup
-                        </label>
-                        <div className='inline-flex rounded-lg border border-purple-200 bg-white p-0.5 text-xs font-semibold'>
-                          <button
-                            type='button'
-                            onClick={() =>
-                              setForm((p) => ({ ...p, partnerSplitMode: "whole" }))
-                            }
-                            className={`px-3 py-1.5 rounded-md transition-colors ${
-                              form.partnerSplitMode === "whole"
-                                ? "bg-purple-500 text-white"
-                                : "text-purple-700"
-                            }`}>
-                            Same for all hostels
-                          </button>
-                          <button
-                            type='button'
-                            onClick={() =>
-                              setForm((p) => ({
-                                ...p,
-                                partnerSplitMode: "perHostel",
-                              }))
-                            }
-                            className={`px-3 py-1.5 rounded-md transition-colors ${
-                              form.partnerSplitMode === "perHostel"
-                                ? "bg-purple-500 text-white"
-                                : "text-purple-700"
-                            }`}>
-                            Different per hostel
-                          </button>
-                        </div>
-                      </div>
-
-                      {form.partnerSplitMode === "whole" ? (
-                        <div>
-                          <label className='block text-sm font-medium text-purple-900 mb-1.5'>
-                            Partner Split (%)
-                          </label>
-                          <div className='flex items-center gap-3'>
-                            <input
-                              type='number'
-                              min='0'
-                              max='100'
-                              step='0.01'
-                              value={form.partnerSplitPercent}
-                              onChange={(e) =>
-                                setForm((p) => ({
-                                  ...p,
-                                  partnerSplitPercent:
-                                    e.target.value === ""
-                                      ? ""
-                                      : Number(e.target.value),
-                                }))
-                              }
-                              className='w-28 px-3 py-2 rounded-lg border border-purple-200 bg-white text-sm font-semibold text-purple-900 focus:outline-none focus:ring-2 focus:ring-purple-300'
-                              aria-label='Partner split percentage'
-                            />
-                            <p className='text-xs text-purple-700'>
-                              % of each transaction (from the full 100%)
-                            </p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div>
-                          <label className='block text-sm font-medium text-purple-900 mb-1.5'>
-                            Split per hostel (%)
-                          </label>
-                          {form.hostels.length === 0 ? (
-                            <p className='text-xs text-purple-700'>
-                              Select the partner&apos;s hostels below, then set a
-                              % for each here.
-                            </p>
-                          ) : (
-                            <div className='space-y-2'>
-                              {form.hostels.map((hostelId) => {
-                                const hostel = availableHostels.find(
-                                  (h) => h.id === hostelId,
-                                );
-                                const value =
-                                  form.partnerHostelSplits[hostelId] ??
-                                  form.partnerSplitPercent;
-                                return (
-                                  <div
-                                    key={hostelId}
-                                    className='flex items-center justify-between gap-3'>
-                                    <span className='text-sm text-purple-900 truncate'>
-                                      {hostel?.name ?? hostelId}
-                                    </span>
-                                    <div className='flex items-center gap-1.5 shrink-0'>
-                                      <input
-                                        type='number'
-                                        min='0'
-                                        max='100'
-                                        step='0.01'
-                                        value={value}
-                                        onChange={(e) =>
-                                          setForm((p) => ({
-                                            ...p,
-                                            partnerHostelSplits: {
-                                              ...p.partnerHostelSplits,
-                                              [hostelId]:
-                                                e.target.value === ""
-                                                  ? ""
-                                                  : Number(e.target.value),
-                                            },
-                                          }))
-                                        }
-                                        className='w-24 px-3 py-2 rounded-lg border border-purple-200 bg-white text-sm font-semibold text-purple-900 focus:outline-none focus:ring-2 focus:ring-purple-300'
-                                        aria-label={`Split percentage for ${
-                                          hostel?.name ?? hostelId
-                                        }`}
-                                      />
-                                      <span className='text-xs text-purple-700'>
-                                        %
-                                      </span>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                          <p className='mt-2 text-xs text-purple-700'>
-                            Each hostel&apos;s % is taken from that hostel&apos;s
-                            full transaction amount.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Password */}
-                <div>
-                  <label className='block text-sm font-medium text-apple-gray-700 mb-2'>
-                    {editingAdmin ? "New Password" : "Password"}{" "}
-                    {!editingAdmin && <span className='text-red-500'>*</span>}
-                    {editingAdmin && (
-                      <span className='text-apple-gray-400 font-normal'>
-                        (leave blank to keep current)
-                      </span>
                     )}
+                  </div>
+                )}
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className='block text-sm font-medium text-slate-700 mb-2'>
+                  {editingAdmin ? "New Password" : "Password"}{" "}
+                  {!editingAdmin && <span className='text-rose-500'>*</span>}
+                  {editingAdmin && <span className='text-slate-400 font-normal'>(leave blank to keep current)</span>}
+                </label>
+                <div className='relative'>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={form.password}
+                    onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+                    placeholder={editingAdmin ? "Enter new password…" : "Min. 6 characters"}
+                    className={`${GLASS_INPUT} pr-12`}
+                  />
+                  <button
+                    type='button'
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className='absolute right-1 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 transition-colors hover:text-slate-600'>
+                    {showPassword ? <EyeOff className='w-4 h-4' /> : <Eye className='w-4 h-4' />}
+                  </button>
+                </div>
+              </div>
+
+              {/* ── Per-Module Permissions ───────────────────────────── */}
+              <div>
+                <div className='flex flex-wrap items-center justify-between gap-2 mb-3'>
+                  <label className='text-sm font-medium text-slate-700'>
+                    Module Permissions <span className='text-rose-500'>*</span>
                   </label>
-                  <div className='relative'>
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={form.password}
-                      onChange={(e) =>
-                        setForm((p) => ({ ...p, password: e.target.value }))
-                      }
-                      placeholder={
-                        editingAdmin
-                          ? "Enter new password…"
-                          : "Min. 6 characters"
-                      }
-                      className='w-full pl-4 pr-12 py-3 rounded-xl border-2 border-apple-gray-200 focus:border-blue-400 focus:outline-none text-sm'
-                    />
+                  <div className='flex gap-1'>
                     <button
                       type='button'
-                      onClick={() => setShowPassword((v) => !v)}
-                      className='absolute right-3 top-1/2 -translate-y-1/2 text-apple-gray-400 hover:text-apple-gray-600 transition-colors'>
-                      {showPassword ? (
-                        <EyeOff className='w-4 h-4' />
-                      ) : (
-                        <Eye className='w-4 h-4' />
-                      )}
+                      onClick={grantAllModules}
+                      className='min-h-[40px] rounded-full px-3 text-xs font-medium text-blue-600 transition-colors hover:bg-white/70 hover:text-blue-800'>
+                      Grant All
+                    </button>
+                    <button
+                      type='button'
+                      onClick={clearAllModules}
+                      className='min-h-[40px] rounded-full px-3 text-xs font-medium text-slate-400 transition-colors hover:bg-white/70 hover:text-slate-600'>
+                      Clear All
                     </button>
                   </div>
                 </div>
-
-                {/* ── Per-Module Permissions ───────────────────────────── */}
-                <div>
-                  <div className='flex items-center justify-between mb-3'>
-                    <label className='text-sm font-medium text-apple-gray-700'>
-                      Module Permissions <span className='text-red-500'>*</span>
-                    </label>
-                    <div className='flex gap-3'>
-                      <button
-                        type='button'
-                        onClick={grantAllModules}
-                        className='text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors'>
-                        Grant All
-                      </button>
-                      <button
-                        type='button'
-                        onClick={clearAllModules}
-                        className='text-xs font-medium text-apple-gray-400 hover:text-apple-gray-600 transition-colors'>
-                        Clear All
-                      </button>
-                    </div>
-                  </div>
-                  <div className='space-y-2'>
-                    {ALL_MODULES.map((mod) => {
-                      const current = form.modulePermissions[mod.id];
-                      return (
-                        <div
-                          key={mod.id}
-                          className={`p-3.5 rounded-xl border-2 transition-all ${
-                            current !== "none"
-                              ? "border-blue-300 bg-blue-50/50"
-                              : "border-apple-gray-200 bg-white"
-                          }`}>
-                          <div className='flex items-center gap-3 mb-2.5'>
-                            <div
-                              className={`w-7 h-7 rounded-lg bg-gradient-to-r ${mod.color} flex items-center justify-center flex-shrink-0`}>
-                              <div className='text-white'>{mod.icon}</div>
-                            </div>
-                            <div>
-                              <p className='text-sm font-semibold text-apple-gray-900'>
-                                {mod.label}
-                              </p>
-                              <p className='text-xs text-apple-gray-400'>
-                                {mod.description}
-                              </p>
-                            </div>
+                <div className='space-y-2'>
+                  {ALL_MODULES.map((mod) => {
+                    const current = form.modulePermissions[mod.id];
+                    return (
+                      <div
+                        key={mod.id}
+                        className={`p-3.5 rounded-2xl border transition-all ${
+                          current !== "none"
+                            ? "border-blue-300 bg-blue-50/60"
+                            : "border-white/85 bg-white/70"
+                        }`}>
+                        <div className='flex items-center gap-3 mb-2.5'>
+                          <div
+                            className={`w-7 h-7 rounded-lg bg-gradient-to-r ${mod.color} flex items-center justify-center flex-shrink-0`}>
+                            <div className='text-white'>{mod.icon}</div>
                           </div>
-                          {/* Permission pill group */}
-                          <div className='flex rounded-lg border border-apple-gray-200 overflow-hidden text-xs w-full'>
-                            {PERMISSION_LEVELS.map((pl) => (
-                              <button
-                                key={pl.id}
-                                type='button'
-                                onClick={() => setModulePerm(mod.id, pl.id)}
-                                className={`flex-1 py-1.5 font-semibold border-r last:border-r-0 border-apple-gray-200 transition-colors ${
-                                  current === pl.id
-                                    ? pl.id === "none"
-                                      ? "bg-apple-gray-700 text-white"
-                                      : pl.id === "read"
-                                        ? "bg-slate-500 text-white"
-                                        : "bg-blue-500 text-white"
-                                    : "bg-white text-apple-gray-600 hover:bg-apple-gray-50"
-                                }`}>
-                                {pl.short}
-                              </button>
-                            ))}
+                          <div className='min-w-0'>
+                            <p className='text-sm font-semibold text-slate-900'>{mod.label}</p>
+                            <p className='text-xs text-slate-400'>{mod.description}</p>
                           </div>
                         </div>
+                        {/* Permission pill group */}
+                        <div className='grid grid-cols-3 gap-1 rounded-full border border-white/80 bg-white/70 p-1 text-xs'>
+                          {PERMISSION_LEVELS.map((pl) => (
+                            <button
+                              key={pl.id}
+                              type='button'
+                              onClick={() => setModulePerm(mod.id, pl.id)}
+                              className={`min-h-[40px] rounded-full px-2 font-semibold transition-colors ${
+                                current === pl.id
+                                  ? pl.id === "none"
+                                    ? "bg-slate-700 text-white"
+                                    : pl.id === "read"
+                                      ? "bg-slate-500 text-white"
+                                      : "bg-blue-500 text-white"
+                                  : "text-slate-600 hover:bg-white"
+                              }`}>
+                              {pl.short}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* ── Hostel Access ────────────────────────────────────── */}
+              <div>
+                <label className='block text-sm font-medium text-slate-700 mb-1'>Hostel Access</label>
+                <p className='text-xs text-slate-400 mb-3'>
+                  Leave all unchecked to grant access to <strong>all hostels</strong>. Select specific hostels to
+                  restrict this admin.
+                </p>
+                {hostelsLoading ? (
+                  <div className='flex items-center gap-2 text-slate-400 text-sm py-2'>
+                    <Loader2 className='w-4 h-4 animate-spin' />
+                    Loading hostels…
+                  </div>
+                ) : availableHostels.length === 0 ? (
+                  <p className='text-sm text-slate-400 italic'>No hostels found — add hostels first.</p>
+                ) : (
+                  <div className='space-y-2'>
+                    {/* All-hostels shortcut pill */}
+                    <button
+                      type='button'
+                      onClick={() => setForm((p) => ({ ...p, hostels: [] }))}
+                      className={`w-full min-h-[44px] flex items-center gap-3 p-3 rounded-2xl border text-left transition-all ${
+                        form.hostels.length === 0
+                          ? "border-amber-400 bg-amber-50/90"
+                          : "border-white/85 bg-white/70 hover:border-amber-200"
+                      }`}>
+                      <div className='w-6 h-6 rounded-lg bg-gradient-to-r from-amber-400 to-orange-500 flex items-center justify-center flex-shrink-0'>
+                        <Building2 className='w-3.5 h-3.5 text-white' />
+                      </div>
+                      <span
+                        className={`min-w-0 text-sm font-semibold flex-1 ${
+                          form.hostels.length === 0 ? "text-amber-900" : "text-slate-600"
+                        }`}>
+                        All Hostels (unrestricted)
+                      </span>
+                      <div
+                        className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                          form.hostels.length === 0 ? "border-amber-500 bg-amber-500" : "border-slate-300"
+                        }`}>
+                        {form.hostels.length === 0 && (
+                          <svg className='w-3 h-3 text-white' viewBox='0 0 12 12' fill='none'>
+                            <path
+                              d='M2 6l3 3 5-5'
+                              stroke='currentColor'
+                              strokeWidth={2}
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                            />
+                          </svg>
+                        )}
+                      </div>
+                    </button>
+
+                    {availableHostels.map((hostel) => {
+                      const selected = form.hostels.includes(hostel.id);
+                      return (
+                        <button
+                          key={hostel.id}
+                          type='button'
+                          onClick={() => toggleHostel(hostel.id)}
+                          className={`w-full min-h-[44px] flex items-center gap-3 p-3 rounded-2xl border text-left transition-all ${
+                            selected
+                              ? "border-amber-400 bg-amber-50/90"
+                              : "border-white/85 bg-white/70 hover:border-amber-200"
+                          }`}>
+                          <div className='w-6 h-6 rounded-lg bg-gradient-to-r from-amber-400 to-orange-500 flex items-center justify-center flex-shrink-0'>
+                            <Building2 className='w-3.5 h-3.5 text-white' />
+                          </div>
+                          <span
+                            className={`min-w-0 break-words text-sm font-semibold flex-1 ${
+                              selected ? "text-amber-900" : "text-slate-900"
+                            }`}>
+                            {hostel.name}
+                          </span>
+                          <div
+                            className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                              selected ? "bg-amber-500 border-amber-500" : "border-slate-300"
+                            }`}>
+                            {selected && (
+                              <svg className='w-3 h-3 text-white' viewBox='0 0 12 12' fill='none'>
+                                <path
+                                  d='M2 6l3 3 5-5'
+                                  stroke='currentColor'
+                                  strokeWidth={2}
+                                  strokeLinecap='round'
+                                  strokeLinejoin='round'
+                                />
+                              </svg>
+                            )}
+                          </div>
+                        </button>
                       );
                     })}
                   </div>
-                </div>
-
-                {/* ── Hostel Access ────────────────────────────────────── */}
-                <div>
-                  <label className='block text-sm font-medium text-apple-gray-700 mb-1'>
-                    Hostel Access
-                  </label>
-                  <p className='text-xs text-apple-gray-400 mb-3'>
-                    Leave all unchecked to grant access to{" "}
-                    <strong>all hostels</strong>. Select specific hostels to
-                    restrict this admin.
-                  </p>
-                  {hostelsLoading ? (
-                    <div className='flex items-center gap-2 text-apple-gray-400 text-sm py-2'>
-                      <Loader2 className='w-4 h-4 animate-spin' />
-                      Loading hostels…
-                    </div>
-                  ) : availableHostels.length === 0 ? (
-                    <p className='text-sm text-apple-gray-400 italic'>
-                      No hostels found — add hostels first.
-                    </p>
-                  ) : (
-                    <div className='space-y-2'>
-                      {/* All-hostels shortcut pill */}
-                      <button
-                        type='button'
-                        onClick={() => setForm((p) => ({ ...p, hostels: [] }))}
-                        className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all ${
-                          form.hostels.length === 0
-                            ? "border-amber-400 bg-amber-50"
-                            : "border-apple-gray-200 hover:border-amber-200 bg-white"
-                        }`}>
-                        <div className='w-6 h-6 rounded-lg bg-gradient-to-r from-amber-400 to-orange-500 flex items-center justify-center flex-shrink-0'>
-                          <Building2 className='w-3.5 h-3.5 text-white' />
-                        </div>
-                        <span
-                          className={`text-sm font-semibold flex-1 ${
-                            form.hostels.length === 0
-                              ? "text-amber-900"
-                              : "text-apple-gray-600"
-                          }`}>
-                          All Hostels (unrestricted)
-                        </span>
-                        <div
-                          className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-                            form.hostels.length === 0
-                              ? "border-amber-500 bg-amber-500"
-                              : "border-apple-gray-300"
-                          }`}>
-                          {form.hostels.length === 0 && (
-                            <svg
-                              className='w-3 h-3 text-white'
-                              viewBox='0 0 12 12'
-                              fill='none'>
-                              <path
-                                d='M2 6l3 3 5-5'
-                                stroke='currentColor'
-                                strokeWidth={2}
-                                strokeLinecap='round'
-                                strokeLinejoin='round'
-                              />
-                            </svg>
-                          )}
-                        </div>
-                      </button>
-
-                      {availableHostels.map((hostel) => {
-                        const selected = form.hostels.includes(hostel.id);
-                        return (
-                          <button
-                            key={hostel.id}
-                            type='button'
-                            onClick={() => toggleHostel(hostel.id)}
-                            className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all ${
-                              selected
-                                ? "border-amber-400 bg-amber-50"
-                                : "border-apple-gray-200 hover:border-amber-200 bg-white"
-                            }`}>
-                            <div className='w-6 h-6 rounded-lg bg-gradient-to-r from-amber-400 to-orange-500 flex items-center justify-center flex-shrink-0'>
-                              <Building2 className='w-3.5 h-3.5 text-white' />
-                            </div>
-                            <span
-                              className={`text-sm font-semibold flex-1 ${
-                                selected
-                                  ? "text-amber-900"
-                                  : "text-apple-gray-900"
-                              }`}>
-                              {hostel.name}
-                            </span>
-                            <div
-                              className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-                                selected
-                                  ? "bg-amber-500 border-amber-500"
-                                  : "border-apple-gray-300"
-                              }`}>
-                              {selected && (
-                                <svg
-                                  className='w-3 h-3 text-white'
-                                  viewBox='0 0 12 12'
-                                  fill='none'>
-                                  <path
-                                    d='M2 6l3 3 5-5'
-                                    stroke='currentColor'
-                                    strokeWidth={2}
-                                    strokeLinecap='round'
-                                    strokeLinejoin='round'
-                                  />
-                                </svg>
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Panel footer */}
-              <div className='sticky bottom-0 bg-white border-t border-apple-gray-200 px-6 py-4 flex gap-3'>
-                <button
-                  type='button'
-                  onClick={closePanel}
-                  className='flex-1 py-3 rounded-xl border-2 border-apple-gray-200 text-apple-gray-700 font-semibold text-sm hover:bg-apple-gray-50 transition-colors'>
-                  Cancel
-                </button>
-                <button
-                  type='button'
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  className='flex-1 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2'>
-                  {submitting ? (
-                    <>
-                      <Loader2 className='w-4 h-4 animate-spin' />
-                      {editingAdmin ? "Saving…" : "Creating…"}
-                    </>
-                  ) : editingAdmin ? (
-                    "Save Changes"
-                  ) : (
-                    "Create Admin"
-                  )}
-                </button>
+                )}
               </div>
             </div>
-          </div>
-        )}
 
-        {/* ─── Delete Confirmation ─────────────────────────────────────────── */}
-        <ConfirmationModal
-          isOpen={!!deleteTarget}
-          onClose={() => setDeleteTarget(null)}
-          onConfirm={handleDelete}
-          title={`Delete @${deleteTarget?.username ?? ""}?`}
-          message='This admin account will be permanently removed and they will no longer be able to log in. This action cannot be undone.'
-          confirmText={deleting ? "Deleting…" : "Delete Admin"}
-          type='danger'
-        />
-      </div>
+            {/* Panel footer */}
+            <div className='sticky bottom-0 flex gap-3 border-t border-white/80 bg-white/80 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-xl sm:px-6'>
+              <button type='button' onClick={closePanel} className='glass-button flex-1'>
+                Cancel
+              </button>
+              <button type='button' onClick={handleSubmit} disabled={submitting} className='glass-primary flex-1'>
+                {submitting ? (
+                  <>
+                    <Loader2 className='w-4 h-4 animate-spin' />
+                    {editingAdmin ? "Saving…" : "Creating…"}
+                  </>
+                ) : editingAdmin ? (
+                  "Save Changes"
+                ) : (
+                  "Create Admin"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Delete Confirmation ─────────────────────────────────────────── */}
+      <ConfirmationModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title={`Delete @${deleteTarget?.username ?? ""}?`}
+        message='This admin account will be permanently removed and they will no longer be able to log in. This action cannot be undone.'
+        confirmText={deleting ? "Deleting…" : "Delete Admin"}
+        type='danger'
+      />
     </ProtectedRoute>
   );
 }

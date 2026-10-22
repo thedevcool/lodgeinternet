@@ -2,15 +2,21 @@
 import { adminFetch } from "@/lib/apiClient";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
-import Logo from "@/components/Logo";
 import { useAuthStore } from "@/store/authStore";
 import { useToast } from "@/components/Toast";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import {
-  LogOut,
+  AdminPage,
+  EmptyState,
+  GLASS_INPUT,
+  GLASS_INPUT_ICON,
+  IconButton,
+  Kpi,
+  Panel,
+  SegToggle,
+} from "@/components/admin/ui";
+import {
   GraduationCap,
   Home,
   Users,
@@ -60,9 +66,8 @@ const STATUS_STYLES: Record<WaitlistEntry["status"], string> = {
 };
 
 export default function AdminWaitlistPage() {
-  const { logout, canWrite } = useAuthStore();
+  const { canWrite } = useAuthStore();
   const canEdit = canWrite("waitlist");
-  const router = useRouter();
   const { addToast } = useToast();
 
   const [entries, setEntries] = useState<WaitlistEntry[]>([]);
@@ -97,11 +102,6 @@ export default function AdminWaitlistPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleLogout = async () => {
-    await logout();
-    router.push("/admin/login");
   };
 
   // ───────── Filtering ─────────
@@ -343,328 +343,288 @@ export default function AdminWaitlistPage() {
 
   return (
     <ProtectedRoute module="waitlist">
-      <div className="min-h-screen bg-apple-gray-100">
-        {/* Header */}
-        <header className="bg-white border-b border-apple-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <Link href="/" className="flex items-center">
-                <Logo />
-              </Link>
-              <div className="flex items-center gap-2 sm:gap-4">
-                <Link
-                  href="/admin/dashboard"
-                  className="hidden sm:block text-apple-gray-600 hover:text-apple-gray-800 text-sm font-medium"
-                >
-                  Dashboard
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-apple-gray-700 hover:text-apple-gray-900 transition-colors"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span className="hidden sm:inline">Logout</span>
-                </button>
-              </div>
-            </div>
+      <AdminPage
+        eyebrow="DEMAND"
+        title="Waitlist"
+        subtitle="Demand signals from the public waitlist sign-up form"
+        actions={
+          <button onClick={exportCsv} disabled={filtered.length === 0} className="glass-button">
+            <Download className="h-4 w-4" />
+            Export CSV
+          </button>
+        }
+      >
+        {error && (
+          <div className="glass-alert border-rose-200 bg-rose-50/90 text-rose-700">
+            <span className="min-w-0 flex-1 break-words">{error}</span>
           </div>
-        </header>
+        )}
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Title + actions */}
-          <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-semibold text-apple-gray-900 mb-2">
-                Waitlist
-              </h1>
-              <p className="text-apple-gray-600">
-                Demand signals from the public waitlist sign-up form
-              </p>
-            </div>
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-              <button
-                onClick={exportCsv}
-                disabled={filtered.length === 0}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-apple-gray-300 text-apple-gray-700 font-semibold rounded-xl hover:bg-apple-gray-50 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Download className="w-4 h-4" />
-                Export CSV
-              </button>
-            </div>
-          </div>
-
-          {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-              {error}
-            </div>
-          )}
-
-          {/* KPI cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-            <KpiCard label="Total signups" value={stats.total} icon={<Users className="w-5 h-5 text-blue-600" />} tone="blue" />
-            <KpiCard
-              label="Students / Residents"
-              value={`${stats.students} / ${stats.residents}`}
-              icon={<GraduationCap className="w-5 h-5 text-purple-600" />}
-              tone="purple"
-            />
-            <KpiCard
-              label="Can afford / Can manage"
-              value={`${stats.canAfford} / ${stats.canManage}`}
-              icon={<CheckCircle className="w-5 h-5 text-green-600" />}
-              tone="green"
-            />
-            <KpiCard
-              label="Signups in last 7 days"
-              value={stats.last7}
-              icon={<Sparkles className="w-5 h-5 text-amber-600" />}
-              tone="amber"
-            />
-            <KpiCard
+        {/* KPI cards. Five tiles: on the two-column phone grid the last spans
+            the row rather than sitting alone in half of it. */}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <Kpi label="Total signups" value={stats.total} icon={<Users className="h-4 w-4" />} tone="blue" />
+          <Kpi
+            label="Students / Residents"
+            value={`${stats.students} / ${stats.residents}`}
+            icon={<GraduationCap className="h-4 w-4" />}
+            tone="purple"
+          />
+          <Kpi
+            label="Can afford / Can manage"
+            value={`${stats.canAfford} / ${stats.canManage}`}
+            icon={<CheckCircle className="h-4 w-4" />}
+            tone="green"
+          />
+          <Kpi
+            label="Signups in last 7 days"
+            value={stats.last7}
+            icon={<Sparkles className="h-4 w-4" />}
+            tone="orange"
+          />
+          <div className="col-span-2 lg:col-span-1">
+            <Kpi
               label="Potential reach (students)"
               value={stats.potentialReach.toLocaleString()}
-              icon={<Home className="w-5 h-5 text-pink-600" />}
-              tone="pink"
+              icon={<Home className="h-4 w-4" />}
+              tone="violet"
             />
           </div>
+        </div>
 
-          {/* Charts */}
-          <div className="grid lg:grid-cols-2 gap-6 mb-8">
-            <ChartCard title="Audience split">
-              <DonutChart
-                segments={[
-                  { label: "Student", value: stats.students, color: "#a78bfa" },
-                  { label: "Resident", value: stats.residents, color: "#60a5fa" },
-                ]}
+        {/* Charts */}
+        <div className="grid gap-5 lg:grid-cols-2">
+          <ChartCard title="Audience split">
+            <DonutChart
+              segments={[
+                { label: "Student", value: stats.students, color: "#a78bfa" },
+                { label: "Resident", value: stats.residents, color: "#60a5fa" },
+              ]}
+            />
+          </ChartCard>
+          <ChartCard title="Affordability split">
+            <DonutChart
+              segments={[
+                { label: "Can afford", value: stats.canAfford, color: "#34d399" },
+                { label: "Can manage", value: stats.canManage, color: "#fbbf24" },
+              ]}
+            />
+          </ChartCard>
+          <ChartCard title="Top schools">
+            <BarChart rows={topSchools} accent="from-blue-400 to-purple-400" />
+          </ChartCard>
+          <ChartCard title="Top hostels">
+            <BarChart rows={topHostels} accent="from-blue-400 to-purple-400" />
+          </ChartCard>
+          {topCities.length > 0 && (
+            <ChartCard title="Top cities (residents)" className="lg:col-span-2">
+              <BarChart rows={topCities} accent="from-green-400 to-emerald-500" />
+            </ChartCard>
+          )}
+        </div>
+
+        {/* Filters */}
+        <Panel>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <SegToggle<AudienceTab>
+              value={audienceTab}
+              onChange={setAudienceTab}
+              options={(["all", "student", "resident"] as AudienceTab[]).map((t) => ({
+                value: t,
+                label: t === "all" ? "All" : t === "student" ? "Students" : "Residents",
+              }))}
+            />
+
+            <div className="relative min-w-0 flex-1">
+              <Search className={GLASS_INPUT_ICON} />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search email, WhatsApp, school, hostel, city…"
+                className={`${GLASS_INPUT} pl-11`}
               />
-            </ChartCard>
-            <ChartCard title="Affordability split">
-              <DonutChart
-                segments={[
-                  { label: "Can afford", value: stats.canAfford, color: "#34d399" },
-                  { label: "Can manage", value: stats.canManage, color: "#fbbf24" },
-                ]}
-              />
-            </ChartCard>
-            <ChartCard title="Top schools">
-              <BarChart rows={topSchools} accent="from-blue-400 to-purple-400" />
-            </ChartCard>
-            <ChartCard title="Top hostels">
-              <BarChart rows={topHostels} accent="from-blue-400 to-purple-400" />
-            </ChartCard>
-            {topCities.length > 0 && (
-              <ChartCard title="Top cities (residents)" className="lg:col-span-2">
-                <BarChart rows={topCities} accent="from-green-400 to-emerald-500" />
-              </ChartCard>
-            )}
+            </div>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+              className={`${GLASS_INPUT} lg:w-auto`}
+            >
+              <option value="all">All statuses</option>
+              <option value="new">New</option>
+              <option value="contacted">Contacted</option>
+              <option value="converted">Converted</option>
+              <option value="dismissed">Dismissed</option>
+            </select>
           </div>
+          <p className="mt-3 text-xs text-slate-500">
+            Showing {filtered.length} of {entries.length} entries
+          </p>
+        </Panel>
 
-          {/* Filters */}
-          <div className="bg-white rounded-2xl shadow-sm border border-apple-gray-200 p-4 mb-6">
-            <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-              <div className="flex gap-1.5 bg-apple-gray-100 p-1 rounded-xl">
-                {(["all", "student", "resident"] as AudienceTab[]).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setAudienceTab(t)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                      audienceTab === t
-                        ? "bg-white text-apple-gray-900 shadow-sm"
-                        : "text-apple-gray-600 hover:text-apple-gray-900"
-                    }`}
-                  >
-                    {t === "all" ? "All" : t === "student" ? "Students" : "Residents"}
-                  </button>
-                ))}
-              </div>
-
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-apple-gray-400" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search email, WhatsApp, school, hostel, city…"
-                  className="w-full pl-9 pr-4 py-2.5 bg-apple-gray-50 border border-apple-gray-200 rounded-xl text-sm text-apple-gray-900 placeholder-apple-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                />
-              </div>
-
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-                className="px-3 py-2.5 bg-apple-gray-50 border border-apple-gray-200 rounded-xl text-sm text-apple-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              >
-                <option value="all">All statuses</option>
-                <option value="new">New</option>
-                <option value="contacted">Contacted</option>
-                <option value="converted">Converted</option>
-                <option value="dismissed">Dismissed</option>
-              </select>
+        {/* List */}
+        {loading ? (
+          <Panel>
+            <div className="py-8 text-center">
+              <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+              <p className="text-sm text-slate-600">Loading the waitlist…</p>
             </div>
-            <p className="text-xs text-apple-gray-500 mt-3">
-              Showing {filtered.length} of {entries.length} entries
-            </p>
-          </div>
+          </Panel>
+        ) : filtered.length === 0 ? (
+          <Panel>
+            <EmptyState title="No matching entries." />
+          </Panel>
+        ) : (
+          <div className="space-y-5">
+            {(audienceTab === "all" || audienceTab === "student") &&
+              studentGroups.length > 0 && (
+                <SectionCard title="Students" subtitle={`${studentGroups.reduce((n, g) => n + g.total, 0)} entries`}>
+                  <div className="space-y-2">
+                    {studentGroups.map((group) => {
+                      const schoolKey = `school:${group.school}`;
+                      const open = expanded.has(schoolKey);
+                      return (
+                        <div key={schoolKey} className="overflow-hidden rounded-2xl border border-white/80 bg-white/50">
+                          <button
+                            onClick={() => toggleGroup(schoolKey)}
+                            className="flex min-h-[44px] w-full items-center gap-2 px-3 py-3 text-left transition-colors hover:bg-white/70 sm:gap-3 sm:px-4"
+                          >
+                            {open ? (
+                              <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" />
+                            )}
+                            <GraduationCap className="h-4 w-4 shrink-0 text-purple-600" />
+                            <span className="min-w-0 flex-1 break-words font-semibold text-slate-900">{group.school}</span>
+                            <span className="shrink-0 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
+                              {group.total}
+                            </span>
+                          </button>
 
-          {/* List */}
-          {loading ? (
-            <div className="bg-white rounded-2xl shadow-sm border border-apple-gray-200 p-12 text-center">
-              <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-              <p className="text-sm text-apple-gray-600">Loading the waitlist…</p>
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow-sm border border-apple-gray-200 p-12 text-center">
-              <p className="text-apple-gray-600">No matching entries.</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {(audienceTab === "all" || audienceTab === "student") &&
-                studentGroups.length > 0 && (
-                  <SectionCard title="Students" subtitle={`${studentGroups.reduce((n, g) => n + g.total, 0)} entries`}>
-                    <div className="space-y-2">
-                      {studentGroups.map((group) => {
-                        const schoolKey = `school:${group.school}`;
-                        const open = expanded.has(schoolKey);
-                        return (
-                          <div key={schoolKey} className="bg-apple-gray-50 rounded-2xl border border-apple-gray-100 overflow-hidden">
-                            <button
-                              onClick={() => toggleGroup(schoolKey)}
-                              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-apple-gray-100 transition-colors"
-                            >
-                              {open ? (
-                                <ChevronDown className="w-4 h-4 text-apple-gray-500" />
-                              ) : (
-                                <ChevronRight className="w-4 h-4 text-apple-gray-500" />
-                              )}
-                              <GraduationCap className="w-4 h-4 text-purple-600" />
-                              <span className="flex-1 font-semibold text-apple-gray-900">{group.school}</span>
-                              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-purple-100 text-purple-700">
-                                {group.total}
-                              </span>
-                            </button>
-
-                            {open && (
-                              <div className="px-4 pb-3 space-y-2">
-                                {group.hostels.map((h) => {
-                                  const hostelKey = `${schoolKey}:hostel:${h.hostel}`;
-                                  const hOpen = expanded.has(hostelKey);
-                                  return (
-                                    <div key={hostelKey} className="bg-white rounded-xl border border-apple-gray-200 overflow-hidden">
-                                      <button
-                                        onClick={() => toggleGroup(hostelKey)}
-                                        className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-apple-gray-50 transition-colors"
-                                      >
-                                        {hOpen ? (
-                                          <ChevronDown className="w-4 h-4 text-apple-gray-500" />
-                                        ) : (
-                                          <ChevronRight className="w-4 h-4 text-apple-gray-500" />
-                                        )}
-                                        <span className="flex-1 text-sm font-medium text-apple-gray-900">{h.hostel}</span>
+                          {open && (
+                            <div className="space-y-2 px-2 pb-2 sm:px-4 sm:pb-3">
+                              {group.hostels.map((h) => {
+                                const hostelKey = `${schoolKey}:hostel:${h.hostel}`;
+                                const hOpen = expanded.has(hostelKey);
+                                return (
+                                  <div key={hostelKey} className="overflow-hidden rounded-xl border border-white/80 bg-white/70">
+                                    <button
+                                      onClick={() => toggleGroup(hostelKey)}
+                                      className="flex min-h-[44px] w-full items-center gap-2 px-3 py-2.5 text-left transition-colors hover:bg-white sm:gap-3"
+                                    >
+                                      {hOpen ? (
+                                        <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+                                      ) : (
+                                        <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" />
+                                      )}
+                                      <span className="min-w-0 flex-1 break-words text-sm font-medium text-slate-900">{h.hostel}</span>
+                                      <span className="flex flex-wrap items-center justify-end gap-1">
                                         {(() => {
                                           const reach = hostelMaxOccupants.get(
                                             `${group.school}|${h.hostel}`,
                                           );
                                           return reach ? (
-                                            <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full font-semibold bg-pink-100 text-pink-700">
+                                            <span className="rounded-full bg-pink-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-pink-700">
                                               ~{reach.toLocaleString()} occupants
                                             </span>
                                           ) : null;
                                         })()}
-                                        <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-100 text-blue-700">
+                                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
                                           {h.entries.length}
                                         </span>
-                                      </button>
-                                      {hOpen && (
-                                        <div className="divide-y divide-apple-gray-100">
-                                          {h.entries.map((entry) => (
-                                            <EntryRow
-                                              key={entry.id}
-                                              entry={entry}
-                                              canEdit={canEdit}
-                                              onStatusChange={updateStatus}
-                                              onDelete={() =>
-                                                setConfirmDelete({ isOpen: true, id: entry.id, label: entry.email })
-                                              }
-                                            />
-                                          ))}
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </SectionCard>
-                )}
+                                      </span>
+                                    </button>
+                                    {hOpen && (
+                                      <div className="divide-y divide-slate-100">
+                                        {h.entries.map((entry) => (
+                                          <EntryRow
+                                            key={entry.id}
+                                            entry={entry}
+                                            canEdit={canEdit}
+                                            onStatusChange={updateStatus}
+                                            onDelete={() =>
+                                              setConfirmDelete({ isOpen: true, id: entry.id, label: entry.email })
+                                            }
+                                          />
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </SectionCard>
+              )}
 
-              {(audienceTab === "all" || audienceTab === "resident") &&
-                residentGroups.length > 0 && (
-                  <SectionCard
-                    title="Residents"
-                    subtitle={`${residentGroups.reduce((n, g) => n + g.entries.length, 0)} entries`}
-                  >
-                    <div className="space-y-2">
-                      {residentGroups.map((group) => {
-                        const cityKey = `city:${group.city}`;
-                        const open = expanded.has(cityKey);
-                        return (
-                          <div key={cityKey} className="bg-apple-gray-50 rounded-2xl border border-apple-gray-100 overflow-hidden">
-                            <button
-                              onClick={() => toggleGroup(cityKey)}
-                              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-apple-gray-100 transition-colors"
-                            >
-                              {open ? (
-                                <ChevronDown className="w-4 h-4 text-apple-gray-500" />
-                              ) : (
-                                <ChevronRight className="w-4 h-4 text-apple-gray-500" />
-                              )}
-                              <Home className="w-4 h-4 text-blue-600" />
-                              <span className="flex-1 font-semibold text-apple-gray-900">{group.city}</span>
-                              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-100 text-blue-700">
-                                {group.entries.length}
-                              </span>
-                            </button>
-                            {open && (
-                              <div className="px-4 pb-3 bg-white border-t border-apple-gray-100 divide-y divide-apple-gray-100">
-                                {group.entries.map((entry) => (
-                                  <EntryRow
-                                    key={entry.id}
-                                    entry={entry}
-                                    canEdit={canEdit}
-                                    onStatusChange={updateStatus}
-                                    onDelete={() =>
-                                      setConfirmDelete({ isOpen: true, id: entry.id, label: entry.email })
-                                    }
-                                  />
-                                ))}
-                              </div>
+            {(audienceTab === "all" || audienceTab === "resident") &&
+              residentGroups.length > 0 && (
+                <SectionCard
+                  title="Residents"
+                  subtitle={`${residentGroups.reduce((n, g) => n + g.entries.length, 0)} entries`}
+                >
+                  <div className="space-y-2">
+                    {residentGroups.map((group) => {
+                      const cityKey = `city:${group.city}`;
+                      const open = expanded.has(cityKey);
+                      return (
+                        <div key={cityKey} className="overflow-hidden rounded-2xl border border-white/80 bg-white/50">
+                          <button
+                            onClick={() => toggleGroup(cityKey)}
+                            className="flex min-h-[44px] w-full items-center gap-2 px-3 py-3 text-left transition-colors hover:bg-white/70 sm:gap-3 sm:px-4"
+                          >
+                            {open ? (
+                              <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" />
                             )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </SectionCard>
-                )}
-            </div>
-          )}
-        </main>
+                            <Home className="h-4 w-4 shrink-0 text-blue-600" />
+                            <span className="min-w-0 flex-1 break-words font-semibold text-slate-900">{group.city}</span>
+                            <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                              {group.entries.length}
+                            </span>
+                          </button>
+                          {open && (
+                            <div className="divide-y divide-slate-100 border-t border-white/80 bg-white/70 px-2 pb-2 sm:px-4 sm:pb-3">
+                              {group.entries.map((entry) => (
+                                <EntryRow
+                                  key={entry.id}
+                                  entry={entry}
+                                  canEdit={canEdit}
+                                  onStatusChange={updateStatus}
+                                  onDelete={() =>
+                                    setConfirmDelete({ isOpen: true, id: entry.id, label: entry.email })
+                                  }
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </SectionCard>
+              )}
+          </div>
+        )}
+      </AdminPage>
 
-        <ConfirmationModal
-          isOpen={confirmDelete.isOpen}
-          onClose={() => setConfirmDelete({ isOpen: false, id: null, label: "" })}
-          onConfirm={() => {
-            if (confirmDelete.id) deleteEntry(confirmDelete.id);
-          }}
-          title="Delete waitlist entry"
-          message={`Permanently remove ${confirmDelete.label} from the waitlist? This cannot be undone.`}
-          type="danger"
-          confirmText="Delete"
-        />
-      </div>
+      <ConfirmationModal
+        isOpen={confirmDelete.isOpen}
+        onClose={() => setConfirmDelete({ isOpen: false, id: null, label: "" })}
+        onConfirm={() => {
+          if (confirmDelete.id) deleteEntry(confirmDelete.id);
+        }}
+        title="Delete waitlist entry"
+        message={`Permanently remove ${confirmDelete.label} from the waitlist? This cannot be undone.`}
+        type="danger"
+        confirmText="Delete"
+      />
     </ProtectedRoute>
   );
 }
@@ -673,38 +633,7 @@ export default function AdminWaitlistPage() {
 // Sub-components
 // ───────────────────────────────────────────────────────────────────────────
 
-function KpiCard({
-  label,
-  value,
-  icon,
-  tone,
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ReactNode;
-  tone: "blue" | "purple" | "green" | "amber" | "pink";
-}) {
-  const tile =
-    tone === "blue"
-      ? "bg-blue-100"
-      : tone === "purple"
-        ? "bg-purple-100"
-        : tone === "green"
-          ? "bg-green-100"
-          : tone === "pink"
-            ? "bg-pink-100"
-            : "bg-amber-100";
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-apple-gray-200 p-4">
-      <div className="flex items-center gap-3 mb-3">
-        <div className={`p-2 rounded-lg ${tile}`}>{icon}</div>
-        <p className="text-xs text-apple-gray-500 font-medium">{label}</p>
-      </div>
-      <p className="text-2xl font-semibold text-apple-gray-900">{value}</p>
-    </div>
-  );
-}
-
+/** An audience group (Students / Residents): a kit Panel with a count. */
 function SectionCard({
   title,
   subtitle,
@@ -715,13 +644,9 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-3xl shadow-sm border border-apple-gray-200 p-5 sm:p-6">
-      <div className="flex items-baseline justify-between mb-4">
-        <h2 className="text-lg font-semibold text-apple-gray-900">{title}</h2>
-        {subtitle && <p className="text-xs text-apple-gray-500">{subtitle}</p>}
-      </div>
+    <Panel title={title} actions={subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}>
       {children}
-    </div>
+    </Panel>
   );
 }
 
@@ -735,10 +660,10 @@ function ChartCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className={`bg-white rounded-2xl shadow-sm border border-apple-gray-200 p-5 ${className ?? ""}`}>
-      <h3 className="text-sm font-semibold text-apple-gray-900 mb-4">{title}</h3>
+    <section className={`glass-panel min-w-0 ${className ?? ""}`}>
+      <h3 className="mb-4 text-sm font-semibold text-slate-900">{title}</h3>
       {children}
-    </div>
+    </section>
   );
 }
 
@@ -750,7 +675,7 @@ function DonutChart({
   const total = segments.reduce((n, s) => n + s.value, 0);
   if (total === 0) {
     return (
-      <div className="flex items-center justify-center h-40 text-sm text-apple-gray-500">
+      <div className="flex h-40 items-center justify-center text-sm text-slate-500">
         No data yet
       </div>
     );
@@ -759,8 +684,8 @@ function DonutChart({
   const circumference = 2 * Math.PI * radius;
   let offset = 0;
   return (
-    <div className="flex items-center gap-6">
-      <svg viewBox="0 0 140 140" className="w-32 h-32 -rotate-90">
+    <div className="flex flex-col items-center gap-4 min-[400px]:flex-row min-[400px]:gap-6">
+      <svg viewBox="0 0 140 140" className="h-32 w-32 shrink-0 -rotate-90">
         <circle cx={70} cy={70} r={radius} fill="none" stroke="#f5f5f7" strokeWidth={18} />
         {segments.map((s) => {
           const fraction = s.value / total;
@@ -782,13 +707,13 @@ function DonutChart({
           return seg;
         })}
       </svg>
-      <div className="space-y-2 flex-1">
+      <div className="w-full min-w-0 flex-1 space-y-2">
         {segments.map((s) => (
           <div key={s.label} className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: s.color }} />
-            <span className="text-sm text-apple-gray-700 flex-1">{s.label}</span>
-            <span className="text-sm font-semibold text-apple-gray-900">{s.value}</span>
-            <span className="text-xs text-apple-gray-500">
+            <span className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: s.color }} />
+            <span className="min-w-0 flex-1 truncate text-sm text-slate-700">{s.label}</span>
+            <span className="text-sm font-semibold text-slate-900">{s.value}</span>
+            <span className="text-xs text-slate-500">
               {((s.value / total) * 100).toFixed(0)}%
             </span>
           </div>
@@ -807,7 +732,7 @@ function BarChart({
 }) {
   if (rows.length === 0) {
     return (
-      <div className="flex items-center justify-center h-32 text-sm text-apple-gray-500">
+      <div className="flex h-32 items-center justify-center text-sm text-slate-500">
         No data yet
       </div>
     );
@@ -817,13 +742,13 @@ function BarChart({
     <div className="space-y-2.5">
       {rows.map((row) => (
         <div key={row.name}>
-          <div className="flex items-center justify-between text-xs text-apple-gray-600 mb-1">
-            <span className="truncate pr-2">{row.name}</span>
-            <span className="font-semibold text-apple-gray-900">{row.count}</span>
+          <div className="mb-1 flex items-center justify-between gap-2 text-xs text-slate-600">
+            <span className="min-w-0 truncate">{row.name}</span>
+            <span className="shrink-0 font-semibold text-slate-900">{row.count}</span>
           </div>
-          <div className="h-2 bg-apple-gray-100 rounded-full overflow-hidden">
+          <div className="h-2 overflow-hidden rounded-full bg-slate-200/70">
             <div
-              className={`h-full bg-gradient-to-r ${accent} rounded-full`}
+              className={`h-full rounded-full bg-gradient-to-r ${accent}`}
               style={{ width: `${(row.count / max) * 100}%` }}
             />
           </div>
@@ -851,13 +776,13 @@ function EntryRow({
     : "—";
 
   return (
-    <div className="px-3 py-3">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            <span className="text-sm font-semibold text-apple-gray-900 truncate">{entry.email}</span>
+    <div className="px-2 py-3 sm:px-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 max-w-full flex-1">
+          <div className="mb-1 flex min-w-0 max-w-full flex-wrap items-center gap-2">
+            <span className="min-w-0 max-w-full truncate text-sm font-semibold text-slate-900">{entry.email}</span>
             <span
-              className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full font-semibold ${
+              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
                 entry.affordability === "yes"
                   ? "bg-green-100 text-green-700"
                   : "bg-amber-100 text-amber-700"
@@ -865,41 +790,42 @@ function EntryRow({
             >
               {entry.affordability === "yes" ? "Can afford" : "Can manage"}
             </span>
-            <span className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full font-semibold ${STATUS_STYLES[entry.status]}`}>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATUS_STYLES[entry.status]}`}>
               {STATUS_LABELS[entry.status]}
             </span>
           </div>
-          <div className="text-xs text-apple-gray-500 space-x-2">
-            <a href={waLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+            <a href={waLink} target="_blank" rel="noreferrer" className="inline-flex min-h-[32px] items-center gap-1 font-medium text-blue-600 hover:text-blue-700">
               {entry.whatsappPhone}
-              <ExternalLink className="w-3 h-3" />
+              <ExternalLink className="h-3 w-3" />
             </a>
-            <span className="text-apple-gray-300">·</span>
+            <span className="text-slate-300">·</span>
             <span>Joined {createdLabel}</span>
           </div>
           {entry.audienceType === "student" ? (
-            <p className="text-xs text-apple-gray-600 mt-1">
+            <p className="mt-1 break-words text-xs text-slate-600">
               {entry.hostelName}, {entry.schoolName} — {entry.schoolAddress}
               {entry.hostelOccupants ? (
-                <span className="text-apple-gray-500">
+                <span className="text-slate-500">
                   {" "}
                   · ~{entry.hostelOccupants.toLocaleString()} in hostel
                 </span>
               ) : null}
             </p>
           ) : (
-            <p className="text-xs text-apple-gray-600 mt-1">
+            <p className="mt-1 break-words text-xs text-slate-600">
               {entry.address}, {entry.estate}, {entry.city}
             </p>
           )}
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex shrink-0 items-center gap-2">
           <select
             value={entry.status}
             onChange={(e) => onStatusChange(entry.id, e.target.value as WaitlistEntry["status"])}
             disabled={!canEdit}
-            className="text-xs px-2.5 py-1.5 bg-apple-gray-50 border border-apple-gray-200 rounded-lg text-apple-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+            aria-label="Status"
+            className={`${GLASS_INPUT} w-auto py-2 text-xs`}
           >
             {Object.entries(STATUS_LABELS).map(([v, l]) => (
               <option key={v} value={v}>
@@ -908,13 +834,9 @@ function EntryRow({
             ))}
           </select>
           {canEdit && (
-            <button
-              onClick={onDelete}
-              className="p-1.5 text-apple-gray-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50"
-              aria-label="Delete entry"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+            <IconButton label="Delete entry" tone="danger" onClick={onDelete}>
+              <Trash2 className="h-4 w-4" />
+            </IconButton>
           )}
         </div>
       </div>

@@ -2,12 +2,9 @@
 import { adminFetch } from "@/lib/apiClient";
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
-import Logo from "@/components/Logo";
+import { AdminPage, GLASS_INPUT, GLASS_INPUT_ICON, Panel } from "@/components/admin/ui";
 import {
-  LogOut,
-  ArrowLeft,
   Mail,
   Send,
   Users,
@@ -144,10 +141,10 @@ function ToolbarBtn({
         onClick();
       }}
       title={title}
-      className={`p-1.5 rounded-lg transition-colors text-sm font-medium min-w-[28px] ${
+      className={`inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg p-1.5 text-sm font-medium transition-colors md:min-h-[32px] md:min-w-[32px] ${
         active
           ? "bg-blue-100 text-blue-700"
-          : "text-apple-gray-700 hover:bg-apple-gray-100"
+          : "text-slate-700 hover:bg-white"
       }`}>
       {children}
     </button>
@@ -191,7 +188,7 @@ function RichEditor({
     editorProps: {
       attributes: {
         class:
-          "min-h-[280px] px-5 py-4 text-apple-gray-900 focus:outline-none prose prose-sm max-w-none",
+          "min-h-[280px] px-4 py-4 sm:px-5 text-slate-900 focus:outline-none prose prose-sm max-w-none",
       },
     },
     onUpdate: ({ editor: e }) => {
@@ -262,9 +259,9 @@ function RichEditor({
   if (!editor) return null;
 
   return (
-    <div className='border-2 border-apple-gray-200 rounded-2xl overflow-hidden focus-within:border-blue-400 transition-colors'>
+    <div className='rounded-2xl border border-white/80 bg-white/70 backdrop-blur-xl overflow-hidden focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-colors'>
       {/* Toolbar */}
-      <div className='flex flex-wrap items-center gap-0.5 px-3 py-2 bg-apple-gray-50 border-b border-apple-gray-200'>
+      <div className='flex flex-wrap items-center gap-0.5 px-2 py-2 sm:px-3 bg-white/60 border-b border-white/80'>
         {/* Text style */}
         <ToolbarBtn
           onClick={() => editor.chain().focus().toggleBold().run()}
@@ -291,7 +288,7 @@ function RichEditor({
           <span className='line-through'>S</span>
         </ToolbarBtn>
 
-        <div className='w-px h-5 bg-apple-gray-300 mx-1' />
+        <div className='w-px h-5 bg-slate-300 mx-1' />
 
         {/* Headings */}
         <ToolbarBtn
@@ -319,7 +316,7 @@ function RichEditor({
           H3
         </ToolbarBtn>
 
-        <div className='w-px h-5 bg-apple-gray-300 mx-1' />
+        <div className='w-px h-5 bg-slate-300 mx-1' />
 
         {/* Lists */}
         <ToolbarBtn
@@ -368,7 +365,7 @@ function RichEditor({
           </svg>
         </ToolbarBtn>
 
-        <div className='w-px h-5 bg-apple-gray-300 mx-1' />
+        <div className='w-px h-5 bg-slate-300 mx-1' />
 
         {/* Alignment */}
         <ToolbarBtn
@@ -405,7 +402,7 @@ function RichEditor({
           </svg>
         </ToolbarBtn>
 
-        <div className='w-px h-5 bg-apple-gray-300 mx-1' />
+        <div className='w-px h-5 bg-slate-300 mx-1' />
 
         {/* Link */}
         <ToolbarBtn
@@ -450,7 +447,7 @@ function RichEditor({
           </svg>
         </ToolbarBtn>
 
-        <div className='w-px h-5 bg-apple-gray-300 mx-1' />
+        <div className='w-px h-5 bg-slate-300 mx-1' />
 
         {/* Undo / Redo */}
         <ToolbarBtn
@@ -491,13 +488,14 @@ function RichEditor({
 
       {/* Upload error */}
       {uploadError && (
-        <div className='flex items-center gap-2 px-4 py-2 bg-red-50 border-b border-red-200 text-xs text-red-700'>
+        <div className='flex items-center gap-2 pl-4 pr-1 py-1 bg-rose-50/90 border-b border-rose-200 text-xs text-rose-700'>
           <AlertCircle className='w-3.5 h-3.5 flex-shrink-0' />
-          <span className='flex-1'>{uploadError}</span>
+          <span className='min-w-0 flex-1 break-words'>{uploadError}</span>
           <button
             type='button'
             onClick={() => setUploadError("")}
-            className='text-red-500 hover:text-red-700'>
+            aria-label='Dismiss'
+            className='inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-rose-500 hover:text-rose-700'>
             <X className='w-3 h-3' />
           </button>
         </div>
@@ -511,9 +509,8 @@ function RichEditor({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function EmailsPage() {
-  const { logout, canWrite, adminProfile } = useAuthStore();
+  const { canWrite, adminProfile } = useAuthStore();
   const canEdit = canWrite("emails");
-  const router = useRouter();
   const [subject, setSubject] = useState("");
   const [html, setHtml] = useState("");
   const [recipientGroup, setRecipientGroup] = useState<RecipientGroup>("all");
@@ -661,11 +658,6 @@ export default function EmailsPage() {
   useEffect(() => {
     fetchDrafts();
   }, []);
-
-  const handleLogout = () => {
-    logout();
-    router.push("/admin/login");
-  };
 
   // Load hostels for the filter dropdown
   useEffect(() => {
@@ -831,521 +823,441 @@ export default function EmailsPage() {
 
   return (
     <ProtectedRoute module='emails'>
-      <div className='min-h-screen bg-apple-gray-50'>
-        {/* Header */}
-        <header className='bg-white shadow-sm sticky top-0 z-10'>
-          <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4'>
-            <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
-              <div className='flex items-center gap-3'>
-                <button
-                  onClick={() => router.push("/admin/dashboard")}
-                  className='p-2 hover:bg-apple-gray-100 rounded-lg transition-colors'>
-                  <ArrowLeft className='w-5 h-5 text-apple-gray-600' />
-                </button>
-                <Logo variant='dark' />
-                <div>
-                  <h1 className='text-2xl font-bold bg-gradient-to-r from-blue-400 via-blue-500 to-black-400 bg-clip-text text-transparent'>
-                    Email Management
-                  </h1>
-                  <p className='text-sm text-apple-gray-600'>
-                    Send newsletters and announcements to users
+      <AdminPage
+        eyebrow='EMAILS'
+        title='Email Management'
+        subtitle='Send newsletters and announcements to users'
+        width='narrow'>
+        {/* Send Result */}
+        {result && (
+          <div
+            className={`rounded-2xl p-4 sm:p-5 flex items-start gap-3 sm:gap-4 backdrop-blur-xl ${
+              result.success
+                ? "bg-emerald-50/90 border border-emerald-200"
+                : "bg-rose-50/90 border border-rose-200"
+            }`}>
+            {result.success ? (
+              <>
+                <CheckCircle className='w-6 h-6 text-emerald-600 flex-shrink-0 mt-0.5' />
+                <div className='min-w-0'>
+                  <p className='font-semibold text-emerald-900'>Emails sent successfully!</p>
+                  <p className='text-sm text-emerald-700 mt-1'>
+                    Sent {result.sent} of {result.total} emails.
+                    {(result.failed ?? 0) > 0 && <span className='text-amber-700'> ({result.failed} failed)</span>}
                   </p>
                 </div>
-              </div>
-              <button
-                onClick={handleLogout}
-                className='flex items-center gap-2 px-4 py-2 text-sm font-medium text-apple-gray-700 hover:bg-apple-gray-100 rounded-lg transition-colors'>
-                <LogOut className='w-4 h-4' />
-                Logout
-              </button>
-            </div>
+              </>
+            ) : (
+              <>
+                <AlertCircle className='w-6 h-6 text-rose-600 flex-shrink-0 mt-0.5' />
+                <div className='min-w-0'>
+                  <p className='font-semibold text-rose-900'>Failed to send</p>
+                  <p className='text-sm text-rose-700 mt-1 break-words'>{result.error}</p>
+                </div>
+              </>
+            )}
           </div>
-        </header>
+        )}
 
-        <div className='max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6'>
-          {/* Send Result */}
-          {result && (
-            <div
-              className={`rounded-2xl p-5 flex items-start gap-4 ${
-                result.success
-                  ? "bg-green-50 border border-green-200"
-                  : "bg-red-50 border border-red-200"
-              }`}>
-              {result.success ? (
-                <>
-                  <CheckCircle className='w-6 h-6 text-green-600 flex-shrink-0 mt-0.5' />
-                  <div>
-                    <p className='font-semibold text-green-900'>
-                      Emails sent successfully!
-                    </p>
-                    <p className='text-sm text-green-700 mt-1'>
-                      Sent {result.sent} of {result.total} emails.
-                      {(result.failed ?? 0) > 0 && (
-                        <span className='text-amber-700'>
-                          {" "}
-                          ({result.failed} failed)
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                </>
+        {/* Recipients Section */}
+        <Panel title='Recipients'>
+          <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5'>
+            {RECIPIENT_OPTIONS.map((option) => (
+              <button
+                key={option.id}
+                type='button'
+                onClick={() => {
+                  setRecipientGroup(option.id);
+                  setResult(null);
+                }}
+                className={`flex items-start gap-3 p-4 rounded-2xl border transition-all text-left ${
+                  recipientGroup === option.id
+                    ? "border-blue-400 bg-blue-50/80 shadow-sm"
+                    : "border-white/85 bg-white/70 hover:border-blue-200"
+                }`}>
+                <div className={`p-2 bg-gradient-to-r ${option.color} rounded-lg flex-shrink-0`}>
+                  <div className='text-white'>{option.icon}</div>
+                </div>
+                <div className='min-w-0'>
+                  <p
+                    className={`font-semibold text-sm ${
+                      recipientGroup === option.id ? "text-blue-900" : "text-slate-900"
+                    }`}>
+                    {option.label}
+                  </p>
+                  <p className='text-xs text-slate-500 mt-0.5'>{option.description}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Hostel Filter (for all / tv-users / data-users) */}
+          {recipientGroup !== "specific" && (
+            <div>
+              <label className='block text-sm font-medium text-slate-700 mb-2'>
+                Filter by Hostel{" "}
+                <span className='text-slate-400 font-normal'>(optional — leave blank for all hostels)</span>
+              </label>
+              <div className='relative'>
+                <Building2 className={`${GLASS_INPUT_ICON} pointer-events-none`} />
+                <select
+                  value={hostelFilter}
+                  onChange={(e) => setHostelFilter(e.target.value)}
+                  className={`${GLASS_INPUT} appearance-none pl-11 pr-10`}>
+                  {(!adminProfile?.hostels?.length || adminProfile?.isSuperAdmin) && (
+                    <option value=''>All hostels</option>
+                  )}
+                  {allowedHostels.map((h) => (
+                    <option key={h.id} value={h.name}>
+                      {h.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className='absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none' />
+              </div>
+            </div>
+          )}
+
+          {/* Recipient Preview List (for all / tv-users / data-users) */}
+          {recipientGroup !== "specific" && (
+            <div className='mt-5'>
+              {loadingRecipients ? (
+                <div className='flex items-center gap-3 py-6 justify-center text-slate-500'>
+                  <Loader2 className='w-5 h-5 animate-spin' />
+                  <span className='text-sm'>Loading recipients…</span>
+                </div>
+              ) : recipientLoadError ? (
+                <div className='flex items-center gap-2 py-4 text-rose-600 text-sm break-words'>
+                  <AlertCircle className='w-4 h-4 flex-shrink-0' />
+                  {recipientLoadError}
+                </div>
+              ) : loadedRecipients.length === 0 ? (
+                <p className='text-sm text-slate-500 py-4 text-center'>No recipients found for this selection.</p>
               ) : (
-                <>
-                  <AlertCircle className='w-6 h-6 text-red-600 flex-shrink-0 mt-0.5' />
-                  <div>
-                    <p className='font-semibold text-red-900'>Failed to send</p>
-                    <p className='text-sm text-red-700 mt-1'>{result.error}</p>
+                <div className='rounded-2xl border border-white/85 bg-white/60 overflow-hidden'>
+                  {/* List Header */}
+                  <div className='flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-2 bg-white/60 border-b border-white/80'>
+                    <div className='flex min-w-0 items-center gap-2'>
+                      <UserCheck className='w-4 h-4 shrink-0 text-blue-500' />
+                      <span className='text-sm font-semibold text-slate-900'>
+                        {selectedEmails.size} of {loadedRecipients.length} recipients selected
+                      </span>
+                    </div>
+                    <div className='flex flex-wrap items-center gap-1'>
+                      {selectedEmails.size > 0 && (
+                        <button
+                          type='button'
+                          onClick={removeSelected}
+                          className='inline-flex min-h-[40px] items-center gap-1 rounded-full px-3 text-xs font-medium text-rose-600 transition-colors hover:bg-rose-50 hover:text-rose-800'>
+                          <Trash2 className='w-3 h-3' />
+                          Remove Selected
+                        </button>
+                      )}
+                      <button
+                        type='button'
+                        onClick={toggleAll}
+                        className='inline-flex min-h-[40px] items-center rounded-full px-3 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-800'>
+                        {selectedEmails.size === loadedRecipients.length ? "Deselect All" : "Select All"}
+                      </button>
+                    </div>
                   </div>
-                </>
+                  {/* Scrollable List */}
+                  <div className='max-h-64 overflow-y-auto divide-y divide-slate-200/60'>
+                    {loadedRecipients.map((r) => (
+                      <div
+                        key={r.email}
+                        className='flex items-center gap-2 pl-4 pr-1 py-1 hover:bg-white/60 transition-colors group'>
+                        <label className='flex items-center gap-3 flex-1 min-w-0 min-h-[44px] cursor-pointer'>
+                          <input
+                            type='checkbox'
+                            checked={selectedEmails.has(r.email)}
+                            onChange={() => toggleEmail(r.email)}
+                            className='w-4 h-4 rounded accent-blue-500 cursor-pointer flex-shrink-0'
+                          />
+                          <div className='min-w-0'>
+                            {r.name && <p className='text-sm font-medium text-slate-900 truncate'>{r.name}</p>}
+                            <p
+                              className={`text-xs truncate ${
+                                r.name ? "text-slate-500" : "text-slate-900 text-sm font-medium"
+                              }`}>
+                              {r.email}
+                            </p>
+                          </div>
+                        </label>
+                        <button
+                          type='button'
+                          onClick={() => removeRecipient(r.email)}
+                          aria-label='Remove from list'
+                          className='inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-rose-50 hover:text-rose-500 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100'
+                          title='Remove from list'>
+                          <X className='w-3.5 h-3.5' />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}
 
-          {/* Recipients Section */}
-          <div className='bg-white rounded-2xl shadow-sm border border-apple-gray-200 p-6'>
-            <h2 className='text-lg font-semibold text-apple-gray-900 mb-4'>
-              Recipients
-            </h2>
-
-            <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5'>
-              {RECIPIENT_OPTIONS.map((option) => (
-                <button
-                  key={option.id}
-                  type='button'
-                  onClick={() => {
-                    setRecipientGroup(option.id);
-                    setResult(null);
+          {/* Specific Emails Input */}
+          {recipientGroup === "specific" && (
+            <div>
+              <label className='block text-sm font-medium text-slate-700 mb-2'>Add Email Addresses</label>
+              <div className='flex gap-2'>
+                <input
+                  type='email'
+                  value={specificInput}
+                  onChange={(e) => setSpecificInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addSpecificEmail();
+                    }
                   }}
-                  className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all text-left ${
-                    recipientGroup === option.id
-                      ? "border-blue-400 bg-blue-50"
-                      : "border-apple-gray-200 hover:border-blue-200 bg-white"
-                  }`}>
-                  <div
-                    className={`p-2 bg-gradient-to-r ${option.color} rounded-lg flex-shrink-0`}>
-                    <div className='text-white'>{option.icon}</div>
-                  </div>
-                  <div>
-                    <p
-                      className={`font-semibold text-sm ${
-                        recipientGroup === option.id
-                          ? "text-blue-900"
-                          : "text-apple-gray-900"
-                      }`}>
-                      {option.label}
-                    </p>
-                    <p className='text-xs text-apple-gray-500 mt-0.5'>
-                      {option.description}
-                    </p>
-                  </div>
+                  placeholder='user@example.com'
+                  className={`${GLASS_INPUT} min-w-0 flex-1`}
+                />
+                <button type='button' onClick={addSpecificEmail} className='glass-primary shrink-0'>
+                  Add
                 </button>
-              ))}
-            </div>
-
-            {/* Hostel Filter (for all / tv-users / data-users) */}
-            {recipientGroup !== "specific" && (
-              <div>
-                <label className='block text-sm font-medium text-apple-gray-700 mb-2'>
-                  Filter by Hostel{" "}
-                  <span className='text-apple-gray-400 font-normal'>
-                    (optional — leave blank for all hostels)
-                  </span>
-                </label>
-                <div className='relative'>
-                  <Building2 className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-apple-gray-400 pointer-events-none' />
-                  <select
-                    value={hostelFilter}
-                    onChange={(e) => setHostelFilter(e.target.value)}
-                    className='w-full pl-10 pr-10 py-3 rounded-xl border-2 border-apple-gray-200 focus:border-blue-400 focus:outline-none appearance-none bg-white text-apple-gray-900 text-sm'>
-                    {(!adminProfile?.hostels?.length ||
-                      adminProfile?.isSuperAdmin) && (
-                      <option value=''>All hostels</option>
-                    )}
-                    {allowedHostels.map((h) => (
-                      <option key={h.id} value={h.name}>
-                        {h.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className='absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-apple-gray-400 pointer-events-none' />
-                </div>
               </div>
-            )}
-
-            {/* Recipient Preview List (for all / tv-users / data-users) */}
-            {recipientGroup !== "specific" && (
-              <div className='mt-5'>
-                {loadingRecipients ? (
-                  <div className='flex items-center gap-3 py-6 justify-center text-apple-gray-500'>
-                    <Loader2 className='w-5 h-5 animate-spin' />
-                    <span className='text-sm'>Loading recipients…</span>
-                  </div>
-                ) : recipientLoadError ? (
-                  <div className='flex items-center gap-2 py-4 text-red-600 text-sm'>
-                    <AlertCircle className='w-4 h-4 flex-shrink-0' />
-                    {recipientLoadError}
-                  </div>
-                ) : loadedRecipients.length === 0 ? (
-                  <p className='text-sm text-apple-gray-500 py-4 text-center'>
-                    No recipients found for this selection.
-                  </p>
-                ) : (
-                  <div className='border-2 border-apple-gray-200 rounded-xl overflow-hidden'>
-                    {/* List Header */}
-                    <div className='flex items-center justify-between px-4 py-3 bg-apple-gray-50 border-b border-apple-gray-200'>
-                      <div className='flex items-center gap-2'>
-                        <UserCheck className='w-4 h-4 text-blue-500' />
-                        <span className='text-sm font-semibold text-apple-gray-900'>
-                          {selectedEmails.size} of {loadedRecipients.length}{" "}
-                          recipients selected
-                        </span>
-                      </div>
-                      <div className='flex items-center gap-3'>
-                        {selectedEmails.size > 0 && (
-                          <button
-                            type='button'
-                            onClick={removeSelected}
-                            className='inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:text-red-800 transition-colors'>
-                            <Trash2 className='w-3 h-3' />
-                            Remove Selected
-                          </button>
-                        )}
-                        <button
-                          type='button'
-                          onClick={toggleAll}
-                          className='text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors'>
-                          {selectedEmails.size === loadedRecipients.length
-                            ? "Deselect All"
-                            : "Select All"}
-                        </button>
-                      </div>
-                    </div>
-                    {/* Scrollable List */}
-                    <div className='max-h-64 overflow-y-auto divide-y divide-apple-gray-100'>
-                      {loadedRecipients.map((r) => (
-                        <div
-                          key={r.email}
-                          className='flex items-center gap-3 px-4 py-3 hover:bg-apple-gray-50 transition-colors group'>
-                          <label className='flex items-center gap-3 flex-1 min-w-0 cursor-pointer'>
-                            <input
-                              type='checkbox'
-                              checked={selectedEmails.has(r.email)}
-                              onChange={() => toggleEmail(r.email)}
-                              className='w-4 h-4 rounded accent-blue-500 cursor-pointer flex-shrink-0'
-                            />
-                            <div className='min-w-0'>
-                              {r.name && (
-                                <p className='text-sm font-medium text-apple-gray-900 truncate'>
-                                  {r.name}
-                                </p>
-                              )}
-                              <p
-                                className={`text-xs truncate ${
-                                  r.name
-                                    ? "text-apple-gray-500"
-                                    : "text-apple-gray-900 text-sm font-medium"
-                                }`}>
-                                {r.email}
-                              </p>
-                            </div>
-                          </label>
-                          <button
-                            type='button'
-                            onClick={() => removeRecipient(r.email)}
-                            className='opacity-0 group-hover:opacity-100 p-1 text-apple-gray-400 hover:text-red-500 transition-all flex-shrink-0'
-                            title='Remove from list'>
-                            <X className='w-3.5 h-3.5' />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Specific Emails Input */}
-            {recipientGroup === "specific" && (
-              <div>
-                <label className='block text-sm font-medium text-apple-gray-700 mb-2'>
-                  Add Email Addresses
-                </label>
-                <div className='flex gap-2'>
-                  <input
-                    type='email'
-                    value={specificInput}
-                    onChange={(e) => setSpecificInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        addSpecificEmail();
-                      }
-                    }}
-                    placeholder='user@example.com'
-                    className='flex-1 px-4 py-3 rounded-xl border-2 border-apple-gray-200 focus:border-blue-400 focus:outline-none text-sm'
-                  />
-                  <button
-                    type='button'
-                    onClick={addSpecificEmail}
-                    className='px-5 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity'>
-                    Add
-                  </button>
-                </div>
-                {specificEmails.length > 0 && (
-                  <div className='flex flex-wrap gap-2 mt-3'>
-                    {specificEmails.map((email) => (
-                      <span
-                        key={email}
-                        className='inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-800 rounded-full text-xs font-medium'>
-                        {email}
-                        <button
-                          type='button'
-                          onClick={() => removeSpecificEmail(email)}
-                          className='text-blue-500 hover:text-blue-700 transition-colors'>
-                          <X className='w-3 h-3' />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Templates */}
-          <div className='bg-white rounded-2xl shadow-sm border border-apple-gray-200 p-6'>
-            <h2 className='text-lg font-semibold text-apple-gray-900 mb-4 flex items-center gap-2'>
-              <FileText className='w-5 h-5 text-blue-500' />
-              Quick Templates
-            </h2>
-            <div className='grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2'>
-              {EMAIL_TEMPLATES.map((tpl) => (
-                <button
-                  key={tpl.name}
-                  type='button'
-                  onClick={() => loadTemplate(tpl)}
-                  className='px-3 py-2.5 text-sm font-medium text-apple-gray-700 bg-apple-gray-50 border border-apple-gray-200 rounded-xl hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-all text-center'>
-                  {tpl.name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Drafts */}
-          <div className='bg-white rounded-2xl shadow-sm border border-apple-gray-200 overflow-hidden'>
-            <button
-              type='button'
-              onClick={() => setShowDrafts((v) => !v)}
-              className='w-full flex items-center justify-between px-6 py-4 hover:bg-apple-gray-50 transition-colors'>
-              <h2 className='text-lg font-semibold text-apple-gray-900 flex items-center gap-2'>
-                <BookOpen className='w-5 h-5 text-purple-500' />
-                Saved Drafts
-                {drafts.length > 0 && (
-                  <span className='text-xs font-medium bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full'>
-                    {drafts.length}
-                  </span>
-                )}
-              </h2>
-              <ChevronRight
-                className={`w-5 h-5 text-apple-gray-400 transition-transform ${
-                  showDrafts ? "rotate-90" : ""
-                }`}
-              />
-            </button>
-            {showDrafts && (
-              <div className='border-t border-apple-gray-200 px-6 py-4'>
-                {loadingDrafts ? (
-                  <div className='flex items-center gap-2 py-4 justify-center text-apple-gray-500'>
-                    <Loader2 className='w-4 h-4 animate-spin' />
-                    <span className='text-sm'>Loading drafts…</span>
-                  </div>
-                ) : drafts.length === 0 ? (
-                  <p className='text-sm text-apple-gray-500 py-4 text-center'>
-                    No saved drafts yet. Save one after composing a message.
-                  </p>
-                ) : (
-                  <div className='space-y-2'>
-                    {drafts.map((draft) => (
-                      <div
-                        key={draft.id}
-                        className='flex items-center gap-3 p-3 rounded-xl border border-apple-gray-200 hover:border-blue-200 hover:bg-blue-50/50 transition-all group'>
-                        <button
-                          type='button'
-                          onClick={() => loadDraft(draft)}
-                          className='flex-1 min-w-0 text-left'>
-                          <p className='text-sm font-medium text-apple-gray-900 truncate'>
-                            {draft.subject}
-                          </p>
-                          <p className='text-xs text-apple-gray-500 mt-0.5'>
-                            {new Date(draft.updatedAt).toLocaleDateString()} ·{" "}
-                            {new Date(draft.updatedAt).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </p>
-                        </button>
-                        <button
-                          type='button'
-                          onClick={() => deleteDraft(draft.id)}
-                          className='opacity-0 group-hover:opacity-100 p-1.5 text-apple-gray-400 hover:text-red-500 transition-all flex-shrink-0'
-                          title='Delete draft'>
-                          <Trash2 className='w-4 h-4' />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Compose Section */}
-          <div className='bg-white rounded-2xl shadow-sm border border-apple-gray-200 p-6'>
-            <h2 className='text-lg font-semibold text-apple-gray-900 mb-4'>
-              Compose Message
-            </h2>
-
-            {/* Subject */}
-            <div className='mb-5'>
-              <label className='block text-sm font-medium text-apple-gray-700 mb-2'>
-                Subject
-              </label>
-              <input
-                type='text'
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder='e.g. Important update about Lodge Internet'
-                className='w-full px-4 py-3 rounded-xl border-2 border-apple-gray-200 focus:border-blue-400 focus:outline-none text-sm'
-              />
-            </div>
-
-            {/* Body */}
-            <div className='mb-5'>
-              <label className='block text-sm font-medium text-apple-gray-700 mb-2'>
-                Message Body
-              </label>
-              <RichEditor
-                onChange={setHtml}
-                contentKey={editorContentKey}
-                initialContent={editorInitialContent}
-              />
-            </div>
-
-            {/* Preview toggle */}
-            {html && html !== "<p></p>" && (
-              <div className='mb-5'>
-                <button
-                  type='button'
-                  onClick={() => setShowPreview((v) => !v)}
-                  className='inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors'>
-                  {showPreview ? (
-                    <>
-                      <EyeOff className='w-4 h-4' />
-                      Hide Preview
-                    </>
-                  ) : (
-                    <>
-                      <Eye className='w-4 h-4' />
-                      Preview Email
-                    </>
-                  )}
-                </button>
-
-                {showPreview && (
-                  <div className='mt-3 border-2 border-apple-gray-200 rounded-2xl overflow-hidden'>
-                    <div className='bg-apple-gray-50 px-4 py-2 border-b border-apple-gray-200 text-xs font-medium text-apple-gray-500 uppercase tracking-wide'>
-                      Email Preview
-                    </div>
-                    <div className='bg-[#f5f5f7] p-4'>
-                      <iframe
-                        srcDoc={buildPreviewHtml(html)}
-                        title='Email preview'
-                        className='w-full rounded-xl border-0 bg-white'
-                        style={{ height: "500px" }}
-                        sandbox='allow-same-origin'
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Summary & Send */}
-            <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-4 border-t border-apple-gray-200'>
-              <div className='text-sm text-apple-gray-600'>
-                Sending to:{" "}
-                <span className='font-semibold text-apple-gray-900'>
-                  {selected.label}
-                </span>
-                {hostelFilter && recipientGroup !== "specific" && (
-                  <span className='text-apple-gray-500'> → {hostelFilter}</span>
-                )}
-                {recipientGroup !== "specific" && !loadingRecipients && (
-                  <span className='text-apple-gray-500'>
-                    {" "}
-                    ({selectedEmails.size} recipient
-                    {selectedEmails.size !== 1 ? "s" : ""})
-                  </span>
-                )}
-                {recipientGroup === "specific" && specificEmails.length > 0 && (
-                  <span className='text-apple-gray-500'>
-                    {" "}
-                    ({specificEmails.length} address
-                    {specificEmails.length !== 1 ? "es" : ""})
-                  </span>
-                )}
-              </div>
-
-              {canEdit && (
-                <div className='flex items-center gap-3'>
-                  <button
-                    type='button'
-                    onClick={saveDraft}
-                    disabled={savingDraft || !subject.trim()}
-                    className='inline-flex items-center gap-2 px-5 py-3.5 border-2 border-apple-gray-200 text-apple-gray-700 font-semibold rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm'>
-                    <Save className='w-4 h-4' />
-                    {savingDraft ? "Saving…" : "Save Draft"}
-                  </button>
-                  <button
-                    type='button'
-                    onClick={handleSend}
-                    disabled={sending}
-                    className='inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl text-sm'>
-                    <Send className='w-4 h-4' />
-                    {sending ? "Sending…" : "Send Email"}
-                  </button>
+              {specificEmails.length > 0 && (
+                <div className='flex flex-wrap gap-2 mt-3'>
+                  {specificEmails.map((email) => (
+                    <span
+                      key={email}
+                      className='inline-flex max-w-full items-center gap-0.5 rounded-full bg-blue-100 py-0.5 pl-3 pr-0.5 text-xs font-medium text-blue-800'>
+                      <span className='min-w-0 break-all'>{email}</span>
+                      <button
+                        type='button'
+                        onClick={() => removeSpecificEmail(email)}
+                        aria-label={`Remove ${email}`}
+                        className='relative inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-blue-500 transition-colors hover:bg-blue-200/60 hover:text-blue-700 before:absolute before:-inset-1.5'>
+                        <X className='w-3 h-3' />
+                      </button>
+                    </span>
+                  ))}
                 </div>
               )}
             </div>
+          )}
+        </Panel>
 
-            {/* Save to drafts prompt after sending */}
-            {showSaveDraftPrompt && (
-              <div className='mt-5 p-4 bg-purple-50 border border-purple-200 rounded-xl flex items-center justify-between gap-4'>
-                <p className='text-sm text-purple-800 font-medium'>
-                  Save this message as a draft for future use?
-                </p>
-                <div className='flex items-center gap-2 flex-shrink-0'>
-                  <button
-                    type='button'
-                    onClick={() => {
-                      saveDraft();
-                    }}
-                    disabled={savingDraft}
-                    className='px-4 py-2 text-sm font-semibold bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50'>
-                    {savingDraft ? "Saving…" : "Yes, Save"}
-                  </button>
-                  <button
-                    type='button'
-                    onClick={() => setShowSaveDraftPrompt(false)}
-                    className='px-4 py-2 text-sm font-medium text-apple-gray-600 hover:text-apple-gray-800 transition-colors'>
-                    No Thanks
-                  </button>
+        {/* Templates */}
+        <Panel
+          title={
+            <span className='flex items-center gap-2'>
+              <FileText className='w-5 h-5 text-blue-500' />
+              Quick Templates
+            </span>
+          }>
+          <div className='grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2'>
+            {EMAIL_TEMPLATES.map((tpl) => (
+              <button
+                key={tpl.name}
+                type='button'
+                onClick={() => loadTemplate(tpl)}
+                className='min-h-[44px] px-3 py-2.5 text-sm font-medium text-slate-700 bg-white/70 border border-white/85 rounded-2xl hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-all text-center'>
+                {tpl.name}
+              </button>
+            ))}
+          </div>
+        </Panel>
+
+        {/* Drafts */}
+        <section className='glass-panel !p-0'>
+          <button
+            type='button'
+            onClick={() => setShowDrafts((v) => !v)}
+            className='w-full flex items-center justify-between gap-3 px-4 py-4 sm:px-7 sm:py-5 hover:bg-white/40 transition-colors'>
+            <h2 className='text-lg font-semibold text-slate-900 flex items-center gap-2 sm:text-xl'>
+              <BookOpen className='w-5 h-5 text-purple-500' />
+              Saved Drafts
+              {drafts.length > 0 && (
+                <span className='glass-purple text-xs font-semibold px-2 py-0.5 rounded-full'>{drafts.length}</span>
+              )}
+            </h2>
+            <ChevronRight
+              className={`w-5 h-5 shrink-0 text-slate-400 transition-transform ${showDrafts ? "rotate-90" : ""}`}
+            />
+          </button>
+          {showDrafts && (
+            <div className='border-t border-white/80 px-4 py-4 sm:px-7'>
+              {loadingDrafts ? (
+                <div className='flex items-center gap-2 py-4 justify-center text-slate-500'>
+                  <Loader2 className='w-4 h-4 animate-spin' />
+                  <span className='text-sm'>Loading drafts…</span>
                 </div>
+              ) : drafts.length === 0 ? (
+                <p className='text-sm text-slate-500 py-4 text-center'>
+                  No saved drafts yet. Save one after composing a message.
+                </p>
+              ) : (
+                <div className='space-y-2'>
+                  {drafts.map((draft) => (
+                    <div
+                      key={draft.id}
+                      className='flex items-center gap-2 py-1 pl-3 pr-1 rounded-2xl border border-white/85 bg-white/60 hover:border-blue-200 hover:bg-blue-50/50 transition-all group'>
+                      <button
+                        type='button'
+                        onClick={() => loadDraft(draft)}
+                        className='flex-1 min-w-0 min-h-[44px] py-1 text-left'>
+                        <p className='text-sm font-medium text-slate-900 truncate'>{draft.subject}</p>
+                        <p className='text-xs text-slate-500 mt-0.5'>
+                          {new Date(draft.updatedAt).toLocaleDateString()} ·{" "}
+                          {new Date(draft.updatedAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </button>
+                      <button
+                        type='button'
+                        onClick={() => deleteDraft(draft.id)}
+                        aria-label='Delete draft'
+                        className='inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-rose-50 hover:text-rose-500 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100'
+                        title='Delete draft'>
+                        <Trash2 className='w-4 h-4' />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* Compose Section */}
+        <Panel title='Compose Message'>
+          {/* Subject */}
+          <div className='mb-5'>
+            <label className='block text-sm font-medium text-slate-700 mb-2'>Subject</label>
+            <input
+              type='text'
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder='e.g. Important update about Lodge Internet'
+              className={GLASS_INPUT}
+            />
+          </div>
+
+          {/* Body */}
+          <div className='mb-5'>
+            <label className='block text-sm font-medium text-slate-700 mb-2'>Message Body</label>
+            <RichEditor onChange={setHtml} contentKey={editorContentKey} initialContent={editorInitialContent} />
+          </div>
+
+          {/* Preview toggle */}
+          {html && html !== "<p></p>" && (
+            <div className='mb-5'>
+              <button
+                type='button'
+                onClick={() => setShowPreview((v) => !v)}
+                className='glass-link min-h-[40px]'>
+                {showPreview ? (
+                  <>
+                    <EyeOff className='w-4 h-4' />
+                    Hide Preview
+                  </>
+                ) : (
+                  <>
+                    <Eye className='w-4 h-4' />
+                    Preview Email
+                  </>
+                )}
+              </button>
+
+              {showPreview && (
+                <div className='mt-3 rounded-2xl border border-white/85 overflow-hidden'>
+                  <div className='bg-white/70 px-4 py-2 border-b border-white/80 text-[11px] font-semibold text-slate-500 uppercase tracking-[0.13em]'>
+                    Email Preview
+                  </div>
+                  <div className='bg-[#f5f5f7] p-2 sm:p-4'>
+                    <iframe
+                      srcDoc={buildPreviewHtml(html)}
+                      title='Email preview'
+                      className='block h-[60vh] min-h-[320px] w-full rounded-xl border-0 bg-white md:h-[500px]'
+                      sandbox='allow-same-origin'
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Summary & Send */}
+          <div className='flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-4 border-t border-slate-200/60'>
+            <div className='min-w-0 text-sm text-slate-600 break-words'>
+              Sending to: <span className='font-semibold text-slate-900'>{selected.label}</span>
+              {hostelFilter && recipientGroup !== "specific" && (
+                <span className='text-slate-500'> → {hostelFilter}</span>
+              )}
+              {recipientGroup !== "specific" && !loadingRecipients && (
+                <span className='text-slate-500'>
+                  {" "}
+                  ({selectedEmails.size} recipient
+                  {selectedEmails.size !== 1 ? "s" : ""})
+                </span>
+              )}
+              {recipientGroup === "specific" && specificEmails.length > 0 && (
+                <span className='text-slate-500'>
+                  {" "}
+                  ({specificEmails.length} address
+                  {specificEmails.length !== 1 ? "es" : ""})
+                </span>
+              )}
+            </div>
+
+            {canEdit && (
+              <div className='flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-3'>
+                <button
+                  type='button'
+                  onClick={saveDraft}
+                  disabled={savingDraft || !subject.trim()}
+                  className='glass-button w-full sm:w-auto hover:text-purple-700'>
+                  <Save className='w-4 h-4' />
+                  {savingDraft ? "Saving…" : "Save Draft"}
+                </button>
+                <button
+                  type='button'
+                  onClick={handleSend}
+                  disabled={sending}
+                  className='glass-primary w-full sm:w-auto sm:px-8'>
+                  <Send className='w-4 h-4' />
+                  {sending ? "Sending…" : "Send Email"}
+                </button>
               </div>
             )}
           </div>
-        </div>
-      </div>
+
+          {/* Save to drafts prompt after sending */}
+          {showSaveDraftPrompt && (
+            <div className='mt-5 p-4 bg-purple-50/90 border border-purple-200 rounded-2xl flex flex-wrap items-center justify-between gap-3'>
+              <p className='min-w-0 flex-1 basis-56 text-sm text-purple-800 font-medium'>
+                Save this message as a draft for future use?
+              </p>
+              <div className='flex flex-wrap items-center gap-2'>
+                <button
+                  type='button'
+                  onClick={() => {
+                    saveDraft();
+                  }}
+                  disabled={savingDraft}
+                  className='inline-flex min-h-[40px] items-center justify-center rounded-full bg-gradient-to-r from-purple-500 to-purple-600 px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50'>
+                  {savingDraft ? "Saving…" : "Yes, Save"}
+                </button>
+                <button
+                  type='button'
+                  onClick={() => setShowSaveDraftPrompt(false)}
+                  className='inline-flex min-h-[40px] items-center justify-center rounded-full px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-white/70 hover:text-slate-800'>
+                  No Thanks
+                </button>
+              </div>
+            </div>
+          )}
+        </Panel>
+      </AdminPage>
     </ProtectedRoute>
   );
 }

@@ -2,13 +2,19 @@
 import { adminFetch } from "@/lib/apiClient";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { useAuthStore } from "@/store/authStore";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
-import Logo from "@/components/Logo";
 import {
-  LogOut,
-  ArrowLeft,
+  AdminPage,
+  EmptyState,
+  GLASS_INPUT,
+  GLASS_INPUT_ICON,
+  IconButton,
+  Kpi,
+  Modal,
+  Panel,
+  TabBar,
+} from "@/components/admin/ui";
+import {
   Search,
   Users,
   CheckCircle,
@@ -134,9 +140,6 @@ function UserInitials({ name, email }: { name: string; email: string }) {
 }
 
 export default function AdminUsersPage() {
-  const { logout } = useAuthStore();
-  const router = useRouter();
-
   const [users, setUsers] = useState<UserRow[]>([]);
   const [hostels, setHostels] = useState<Hostel[]>([]);
   const [selectedHostel, setSelectedHostel] = useState("");
@@ -173,11 +176,6 @@ export default function AdminUsersPage() {
   const [historyFilter, setHistoryFilter] = useState<"all" | "data" | "tv">(
     "all",
   );
-
-  const handleLogout = () => {
-    logout();
-    router.push("/admin/login");
-  };
 
   useEffect(() => {
     adminFetch("/api/hostels")
@@ -356,372 +354,290 @@ export default function AdminUsersPage() {
     (u) => !u.hostelId || u.hostelId === "Unknown",
   );
 
+  const listUsers = userTab === "needs-setup" ? needsSetupUsers : users;
+
   return (
     <ProtectedRoute module='users'>
-      <div className='min-h-screen bg-apple-gray-50'>
-        {/* Header */}
-        <header className='bg-white shadow-sm sticky top-0 z-10'>
-          <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4'>
-            <div className='flex flex-wrap items-center justify-between gap-3'>
-              <div className='flex items-center gap-3'>
-                <button
-                  onClick={() => router.push("/admin/dashboard")}
-                  className='flex items-center gap-1.5 text-sm text-apple-gray-600 hover:text-apple-gray-900 transition-colors'>
-                  <ArrowLeft className='w-4 h-4' />
-                  Dashboard
-                </button>
-                <span className='text-apple-gray-300'>|</span>
-                <Logo variant='dark' />
-                <h1 className='text-xl font-bold bg-gradient-to-r from-blue-400 via-blue-500 to-white bg-clip-text text-transparent'>
-                  User Management
-                </h1>
-              </div>
-              <div className='flex items-center gap-3'>
-                <button
-                  onClick={loadUsers}
-                  disabled={loading}
-                  className='p-2 text-apple-gray-500 hover:text-apple-gray-700 hover:bg-apple-gray-100 rounded-lg transition-colors disabled:opacity-40'
-                  title='Refresh'>
-                  <RefreshCw
-                    className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
-                  />
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className='flex items-center gap-2 px-4 py-2 text-sm font-medium text-apple-gray-700 hover:bg-apple-gray-100 rounded-lg transition-colors'>
-                  <LogOut className='w-4 h-4' />
-                  Logout
-                </button>
-              </div>
-            </div>
-          </div>
-        </header>
+      <AdminPage
+        eyebrow='USERS'
+        title='User Management'
+        actions={
+          <IconButton label='Refresh' onClick={loadUsers} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          </IconButton>
+        }>
+        {/* Stats Row */}
+        <div className='kpi-grid lg:!grid-cols-4 2xl:!grid-cols-4'>
+          <Kpi label='Total Users' value={totalUsers} tone='blue' />
+          <Kpi label='Active & Verified' value={activeUsers} tone='green' />
+          <Kpi label='Unverified' value={unverifiedUsers} tone='orange' />
+          <Kpi label='Disabled' value={disabledUsers} tone='red' />
+        </div>
 
-        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5'>
-          {/* Stats Row */}
-          <div className='grid grid-cols-2 sm:grid-cols-4 gap-4'>
-            {[
-              {
-                label: "Total Users",
-                value: totalUsers,
-                color: "text-blue-600",
-                bg: "bg-blue-50",
-              },
-              {
-                label: "Active & Verified",
-                value: activeUsers,
-                color: "text-green-600",
-                bg: "bg-green-50",
-              },
-              {
-                label: "Unverified",
-                value: unverifiedUsers,
-                color: "text-amber-600",
-                bg: "bg-amber-50",
-              },
-              {
-                label: "Disabled",
-                value: disabledUsers,
-                color: "text-red-600",
-                bg: "bg-red-50",
-              },
-            ].map((s) => (
-              <div key={s.label} className={`${s.bg} rounded-2xl px-5 py-4`}>
-                <p className='text-xs font-semibold text-apple-gray-500 uppercase tracking-wide mb-1'>
-                  {s.label}
-                </p>
-                <p className={`text-3xl font-bold ${s.color}`}>{s.value}</p>
-              </div>
-            ))}
-          </div>
+        {/* View Tabs */}
+        <TabBar
+          value={userTab}
+          onChange={setUserTab}
+          tabs={[
+            { value: "all", label: "All Users" },
+            {
+              value: "needs-setup",
+              label: "Needs Setup",
+              icon: <AlertTriangle className='w-4 h-4' />,
+              count: needsSetupUsers.length,
+            },
+          ]}
+        />
 
-          {/* View Tabs */}
-          <div className='flex items-center gap-2'>
-            <button
-              onClick={() => setUserTab("all")}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                userTab === "all"
-                  ? "bg-gradient-to-r from-blue-400 to-blue-600 text-white shadow-sm"
-                  : "bg-white text-apple-gray-600 hover:bg-apple-gray-100 shadow-sm"
-              }`}>
-              All Users
-            </button>
-            <button
-              onClick={() => setUserTab("needs-setup")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                userTab === "needs-setup"
-                  ? "bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-sm"
-                  : "bg-white text-apple-gray-600 hover:bg-apple-gray-100 shadow-sm"
-              }`}>
-              <AlertTriangle className='w-4 h-4' />
-              Needs Setup
-              {needsSetupUsers.length > 0 && (
-                <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold ${userTab === "needs-setup" ? "bg-white/30" : "bg-amber-100 text-amber-700"}`}>
-                  {needsSetupUsers.length}
-                </span>
-              )}
-            </button>
-          </div>
-
-          {/* Filters */}
-          <div className='bg-white rounded-2xl shadow-sm p-4 flex flex-col sm:flex-row gap-3'>
+        {/* Filters */}
+        <Panel>
+          <div className='flex flex-col gap-3 lg:flex-row lg:items-center'>
             {/* Search */}
-            <div className='relative flex-1'>
-              <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-apple-gray-400' />
+            <div className='relative min-w-0 flex-1'>
+              <Search className={GLASS_INPUT_ICON} />
               <input
                 type='text'
                 placeholder='Search by name, email, phone or hostel…'
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className='w-full pl-9 pr-9 py-2.5 bg-apple-gray-50 border border-apple-gray-200 rounded-xl text-sm text-apple-gray-900 placeholder-apple-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all'
+                className={`${GLASS_INPUT} pl-11 pr-11`}
               />
               {search && (
                 <button
                   onClick={() => setSearch("")}
-                  className='absolute right-3 top-1/2 -translate-y-1/2 text-apple-gray-400 hover:text-apple-gray-600'>
+                  aria-label='Clear search'
+                  className='absolute right-1 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 hover:text-slate-600'>
                   <X className='w-4 h-4' />
                 </button>
               )}
             </div>
 
-            {/* Hostel Tabs — hidden in needs-setup view */}
+            {/* Hostel Tabs — hidden in needs-setup view. One sideways row on
+                a phone, wrapping from sm up. */}
             {userTab === "all" && (
-              <div className='flex items-center gap-2 flex-wrap'>
-                <button
-                  onClick={() => setSelectedHostel("")}
-                  className={`px-3 py-2 rounded-xl text-sm font-semibold transition-all ${
-                    selectedHostel === ""
-                      ? "bg-gradient-to-r from-blue-400 to-blue-600 text-white shadow-sm"
-                      : "bg-apple-gray-100 text-apple-gray-600 hover:bg-apple-gray-200"
-                  }`}>
-                  All
-                </button>
-                {hostels.map((h) => (
+              <div className='ui-scroll-x -mx-4 px-4 sm:mx-0 sm:overflow-visible sm:px-0'>
+                <div className='flex min-w-max items-center gap-2 sm:min-w-0 sm:flex-wrap'>
                   <button
-                    key={h.id}
-                    onClick={() => setSelectedHostel(h.name)}
-                    className={`px-3 py-2 rounded-xl text-sm font-semibold transition-all ${
-                      selectedHostel === h.name
-                        ? "bg-gradient-to-r from-blue-400 to-blue-600 text-white shadow-sm"
-                        : "bg-apple-gray-100 text-apple-gray-600 hover:bg-apple-gray-200"
+                    onClick={() => setSelectedHostel("")}
+                    className={`min-h-[40px] shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
+                      selectedHostel === ""
+                        ? "bg-slate-900 text-white shadow-sm"
+                        : "border border-white/80 bg-white/70 text-slate-600 hover:bg-white"
                     }`}>
-                    {h.name}
+                    All
                   </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Needs Setup — bulk send banner */}
-          {userTab === "needs-setup" && needsSetupUsers.length > 0 && (
-            <div className='bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
-              <div className='flex items-start gap-3'>
-                <AlertTriangle className='w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5' />
-                <div>
-                  <p className='text-sm font-semibold text-amber-800'>
-                    {needsSetupUsers.length} user{needsSetupUsers.length !== 1 ? "s" : ""} without a hostel
-                  </p>
-                  <p className='text-xs text-amber-600 mt-0.5'>
-                    Send them a registration reminder with a link to complete their setup.
-                  </p>
+                  {hostels.map((h) => (
+                    <button
+                      key={h.id}
+                      onClick={() => setSelectedHostel(h.name)}
+                      className={`min-h-[40px] shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
+                        selectedHostel === h.name
+                          ? "bg-slate-900 text-white shadow-sm"
+                          : "border border-white/80 bg-white/70 text-slate-600 hover:bg-white"
+                      }`}>
+                      {h.name}
+                    </button>
+                  ))}
                 </div>
               </div>
-              <div className='flex items-center gap-3 flex-shrink-0'>
-                {reminderFeedback && (
-                  <span className={`text-xs font-medium ${reminderFeedback.type === "success" ? "text-green-700" : "text-red-600"}`}>
-                    {reminderFeedback.text}
-                  </span>
-                )}
-                <button
-                  onClick={() => sendReminder("all")}
-                  disabled={sendingReminder === "bulk"}
-                  className='flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50'>
-                  {sendingReminder === "bulk" ? (
-                    <div className='w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin' />
-                  ) : (
-                    <Mail className='w-4 h-4' />
-                  )}
-                  Send to All
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* User List */}
-          <div className='bg-white rounded-2xl shadow-sm overflow-hidden'>
-            {loading ? (
-              <div className='flex items-center justify-center py-20 gap-3 text-apple-gray-500'>
-                <div className='w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin' />
-                <span className='text-sm'>Loading users…</span>
-              </div>
-            ) : (userTab === "needs-setup" ? needsSetupUsers : users).length === 0 ? (
-              <div className='flex flex-col items-center justify-center py-20 text-apple-gray-500'>
-                <Users className='w-12 h-12 mb-3 text-apple-gray-300' />
-                <p className='text-sm font-medium'>
-                  {userTab === "needs-setup" ? "All users have a hostel set up" : "No users found"}
-                </p>
-                {userTab === "all" && (search || selectedHostel) && (
-                  <button
-                    onClick={() => {
-                      setSearch("");
-                      setSelectedHostel("");
-                    }}
-                    className='mt-2 text-sm text-blue-600 hover:text-blue-700'>
-                    Clear filters
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className='divide-y divide-apple-gray-100'>
-                {(userTab === "needs-setup" ? needsSetupUsers : users).map((user) => {
-                  const isBusy = togglingId === user.id || deletingId === user.id;
-                  const fb = feedback?.id === user.id ? feedback : null;
-                  return (
-                    <div
-                      key={user.id}
-                      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 hover:bg-apple-gray-50 transition-colors ${!user.isActive ? "opacity-60" : ""}`}>
-                      {/* Left: avatar + info */}
-                      <div className='flex items-start sm:items-center gap-3 min-w-0'>
-                        <UserInitials
-                          name={user.displayName}
-                          email={user.email}
-                        />
-                        <div className='min-w-0'>
-                          <div className='flex items-center gap-2 flex-wrap'>
-                            <p className='text-sm font-semibold text-apple-gray-900 truncate'>
-                              {user.displayName || user.email.split("@")[0]}
-                            </p>
-                            {user.emailVerified ? (
-                              <span className='inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 text-green-700 rounded-full text-xs font-medium'>
-                                <CheckCircle className='w-3 h-3' /> Verified
-                              </span>
-                            ) : (
-                              <span className='inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium'>
-                                <Clock className='w-3 h-3' /> Unverified
-                              </span>
-                            )}
-                            {!user.isActive && (
-                              <span className='inline-flex items-center gap-1 px-2 py-0.5 bg-red-50 text-red-600 rounded-full text-xs font-medium'>
-                                <XCircle className='w-3 h-3' /> Disabled
-                              </span>
-                            )}
-                          </div>
-                          <p className='text-xs text-apple-gray-500 mt-0.5 truncate'>
-                            {user.email}
-                          </p>
-                          <div className='flex items-center gap-3 mt-1 flex-wrap'>
-                            {user.hostelId && (
-                              <span className='inline-flex items-center gap-1 text-xs text-apple-gray-500'>
-                                <Building2 className='w-3 h-3' />
-                                {user.hostelId}
-                              </span>
-                            )}
-                            {user.phone && (
-                              <span className='inline-flex items-center gap-1 text-xs text-apple-gray-500'>
-                                <Phone className='w-3 h-3' />
-                                {user.phone}
-                              </span>
-                            )}
-                            <span className='inline-flex items-center gap-1 text-xs text-apple-gray-400'>
-                              <Clock className='w-3 h-3' />
-                              Last active: {fmtRelative(user.lastActivityAt)}
-                            </span>
-                            <span className='text-xs text-apple-gray-400'>
-                              Joined: {fmtDate(user.createdAt)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Right: actions */}
-                      <div className='flex items-center gap-2 sm:flex-shrink-0 self-end sm:self-auto'>
-                        {fb && (
-                          <span
-                            className={`text-xs font-medium ${fb.type === "success" ? "text-green-600" : "text-red-500"}`}>
-                            {fb.text}
-                          </span>
-                        )}
-
-                        {/* Send Registration Reminder (Needs Setup only) */}
-                        {userTab === "needs-setup" && (
-                          <button
-                            onClick={() => sendReminder([user.id])}
-                            disabled={sendingReminder === user.id}
-                            title='Send registration reminder email'
-                            className='inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-all disabled:opacity-50'>
-                            {sendingReminder === user.id ? (
-                              <div className='w-3.5 h-3.5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin' />
-                            ) : (
-                              <Mail className='w-3.5 h-3.5' />
-                            )}
-                            Send Email
-                          </button>
-                        )}
-
-                        {/* Payment History */}
-                        <button
-                          onClick={() => openHistory(user)}
-                          className='inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-apple-gray-100 text-apple-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-all border border-apple-gray-200'
-                          title='View payment history'>
-                          <History className='w-3.5 h-3.5' />
-                          History
-                        </button>
-
-                        {/* Enable / Disable */}
-                        <button
-                          onClick={() => handleToggle(user, !user.isActive)}
-                          disabled={isBusy}
-                          title={
-                            user.isActive ? "Disable account" : "Enable account"
-                          }
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                            user.isActive
-                              ? "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
-                              : "bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
-                          }`}>
-                          {togglingId === user.id ? (
-                            <div className='w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin' />
-                          ) : user.isActive ? (
-                            <ShieldOff className='w-3.5 h-3.5' />
-                          ) : (
-                            <ShieldCheck className='w-3.5 h-3.5' />
-                          )}
-                          {user.isActive ? "Disable" : "Enable"}
-                        </button>
-
-                        {/* Delete */}
-                        <button
-                          onClick={() => {
-                            setDeleteConfirmText("");
-                            setDeleteModal(user);
-                          }}
-                          disabled={isBusy}
-                          title='Delete account and all footprints'
-                          className='inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed'>
-                          {deletingId === user.id ? (
-                            <div className='w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin' />
-                          ) : (
-                            <Trash2 className='w-3.5 h-3.5' />
-                          )}
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
             )}
           </div>
+        </Panel>
 
-          {!loading && (userTab === "needs-setup" ? needsSetupUsers : users).length > 0 && (
-            <p className='text-center text-xs text-apple-gray-400'>
-              {userTab === "needs-setup"
-                ? `${needsSetupUsers.length} user${needsSetupUsers.length !== 1 ? "s" : ""} without a hostel`
-                : `Showing ${users.length} user${users.length !== 1 ? "s" : ""}${selectedHostel ? ` in ${selectedHostel}` : ""}${search ? ` matching "${search}"` : ""}`}
-            </p>
+        {/* Needs Setup — bulk send banner */}
+        {userTab === "needs-setup" && needsSetupUsers.length > 0 && (
+          <div className='glass-alert justify-between'>
+            <div className='flex min-w-0 flex-1 basis-64 items-start gap-3'>
+              <AlertTriangle className='w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5' />
+              <div className='min-w-0'>
+                <p className='text-sm font-semibold text-amber-800'>
+                  {needsSetupUsers.length} user{needsSetupUsers.length !== 1 ? "s" : ""} without a hostel
+                </p>
+                <p className='text-xs text-amber-700 mt-0.5'>
+                  Send them a registration reminder with a link to complete their setup.
+                </p>
+              </div>
+            </div>
+            <div className='flex flex-wrap items-center gap-3'>
+              {reminderFeedback && (
+                <span className={`text-xs font-medium ${reminderFeedback.type === "success" ? "text-emerald-700" : "text-rose-600"}`}>
+                  {reminderFeedback.text}
+                </span>
+              )}
+              <button
+                onClick={() => sendReminder("all")}
+                disabled={sendingReminder === "bulk"}
+                className='inline-flex min-h-[40px] items-center gap-2 rounded-full bg-amber-500 px-5 py-2 text-sm font-semibold text-white shadow-[0_8px_22px_rgba(245,158,11,.25)] transition hover:bg-amber-600 disabled:opacity-50'>
+                {sendingReminder === "bulk" ? (
+                  <div className='w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin' />
+                ) : (
+                  <Mail className='w-4 h-4' />
+                )}
+                Send to All
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* User List */}
+        <Panel flush>
+          {loading ? (
+            <div className='flex items-center justify-center py-20 gap-3 text-slate-500'>
+              <div className='w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin' />
+              <span className='text-sm'>Loading users…</span>
+            </div>
+          ) : listUsers.length === 0 ? (
+            <EmptyState
+              icon={<Users className='w-12 h-12 text-slate-300' />}
+              title={userTab === "needs-setup" ? "All users have a hostel set up" : "No users found"}>
+              {userTab === "all" && (search || selectedHostel) && (
+                <button
+                  onClick={() => {
+                    setSearch("");
+                    setSelectedHostel("");
+                  }}
+                  className='glass-link min-h-[40px]'>
+                  Clear filters
+                </button>
+              )}
+            </EmptyState>
+          ) : (
+            <div className='divide-y divide-slate-200/60'>
+              {listUsers.map((user) => {
+                const isBusy = togglingId === user.id || deletingId === user.id;
+                const fb = feedback?.id === user.id ? feedback : null;
+                return (
+                  <div
+                    key={user.id}
+                    className={`flex flex-col gap-3 px-4 py-4 transition hover:bg-white/50 sm:px-7 lg:flex-row lg:items-center lg:justify-between ${!user.isActive ? "opacity-60" : ""}`}>
+                    {/* Left: avatar + info */}
+                    <div className='flex min-w-0 items-start gap-3 lg:items-center'>
+                      <UserInitials name={user.displayName} email={user.email} />
+                      <div className='min-w-0 flex-1'>
+                        <div className='flex flex-wrap items-center gap-2'>
+                          <p className='min-w-0 max-w-full truncate text-sm font-semibold text-slate-900'>
+                            {user.displayName || user.email.split("@")[0]}
+                          </p>
+                          {user.emailVerified ? (
+                            <span className='status-chip inline-flex items-center gap-1 text-xs'>
+                              <CheckCircle className='w-3 h-3' /> Verified
+                            </span>
+                          ) : (
+                            <span className='warning-chip inline-flex items-center gap-1 text-xs'>
+                              <Clock className='w-3 h-3' /> Unverified
+                            </span>
+                          )}
+                          {!user.isActive && (
+                            <span className='glass-red inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold'>
+                              <XCircle className='w-3 h-3' /> Disabled
+                            </span>
+                          )}
+                        </div>
+                        <p className='text-xs text-slate-500 mt-0.5 break-all'>{user.email}</p>
+                        <div className='flex flex-wrap items-center gap-x-3 gap-y-1 mt-1'>
+                          {user.hostelId && (
+                            <span className='inline-flex items-center gap-1 text-xs text-slate-500'>
+                              <Building2 className='w-3 h-3' />
+                              {user.hostelId}
+                            </span>
+                          )}
+                          {user.phone && (
+                            <span className='inline-flex items-center gap-1 text-xs text-slate-500'>
+                              <Phone className='w-3 h-3' />
+                              {user.phone}
+                            </span>
+                          )}
+                          <span className='inline-flex items-center gap-1 text-xs text-slate-400'>
+                            <Clock className='w-3 h-3' />
+                            Last active: {fmtRelative(user.lastActivityAt)}
+                          </span>
+                          <span className='text-xs text-slate-400'>Joined: {fmtDate(user.createdAt)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: actions — wrap on a phone */}
+                    <div className='flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end'>
+                      {fb && (
+                        <span
+                          className={`w-full text-xs font-medium lg:w-auto ${fb.type === "success" ? "text-emerald-600" : "text-rose-500"}`}>
+                          {fb.text}
+                        </span>
+                      )}
+
+                      {/* Send Registration Reminder (Needs Setup only) */}
+                      {userTab === "needs-setup" && (
+                        <button
+                          onClick={() => sendReminder([user.id])}
+                          disabled={sendingReminder === user.id}
+                          title='Send registration reminder email'
+                          className='glass-button px-3 text-amber-700'>
+                          {sendingReminder === user.id ? (
+                            <div className='w-3.5 h-3.5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin' />
+                          ) : (
+                            <Mail className='w-3.5 h-3.5' />
+                          )}
+                          Send Email
+                        </button>
+                      )}
+
+                      {/* Payment History */}
+                      <button
+                        onClick={() => openHistory(user)}
+                        className='glass-button px-3 text-slate-700 hover:text-blue-600'
+                        title='View payment history'>
+                        <History className='w-3.5 h-3.5' />
+                        History
+                      </button>
+
+                      {/* Enable / Disable */}
+                      <button
+                        onClick={() => handleToggle(user, !user.isActive)}
+                        disabled={isBusy}
+                        title={user.isActive ? "Disable account" : "Enable account"}
+                        className={`glass-button px-3 ${user.isActive ? "text-rose-600" : "text-emerald-700"}`}>
+                        {togglingId === user.id ? (
+                          <div className='w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin' />
+                        ) : user.isActive ? (
+                          <ShieldOff className='w-3.5 h-3.5' />
+                        ) : (
+                          <ShieldCheck className='w-3.5 h-3.5' />
+                        )}
+                        {user.isActive ? "Disable" : "Enable"}
+                      </button>
+
+                      {/* Delete */}
+                      <button
+                        onClick={() => {
+                          setDeleteConfirmText("");
+                          setDeleteModal(user);
+                        }}
+                        disabled={isBusy}
+                        title='Delete account and all footprints'
+                        className='glass-danger px-4'>
+                        {deletingId === user.id ? (
+                          <div className='w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin' />
+                        ) : (
+                          <Trash2 className='w-3.5 h-3.5' />
+                        )}
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
-        </div>
-      </div>
+        </Panel>
+
+        {!loading && listUsers.length > 0 && (
+          <p className='text-center text-xs text-slate-400'>
+            {userTab === "needs-setup"
+              ? `${needsSetupUsers.length} user${needsSetupUsers.length !== 1 ? "s" : ""} without a hostel`
+              : `Showing ${users.length} user${users.length !== 1 ? "s" : ""}${selectedHostel ? ` in ${selectedHostel}` : ""}${search ? ` matching "${search}"` : ""}`}
+          </p>
+        )}
+      </AdminPage>
 
       {/* ── Payment History Modal ───────────────────────────────────────── */}
       {historyUser &&
@@ -743,271 +659,189 @@ export default function AdminUsersPage() {
           });
 
           return (
-            <div className='fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4'>
-              <div className='bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col'>
-                {/* Modal Header */}
-                <div className='flex items-center justify-between p-5 pb-4 border-b border-apple-gray-100'>
-                  <div className='flex items-center gap-3 min-w-0'>
-                    <div className='p-2.5 bg-gradient-to-br from-blue-400 to-purple-500 rounded-xl flex-shrink-0'>
-                      <Receipt className='w-5 h-5 text-white' />
-                    </div>
-                    <div className='min-w-0'>
-                      <h3 className='text-base font-semibold text-apple-gray-900'>
-                        Payment History
-                      </h3>
-                      <p className='text-xs text-apple-gray-500 mt-0.5 truncate max-w-[200px]'>
-                        {historyUser.displayName ||
-                          historyUser.email.split("@")[0]}{" "}
-                        · {historyUser.email}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setHistoryUser(null)}
-                    className='p-2 text-apple-gray-400 hover:text-apple-gray-600 hover:bg-apple-gray-100 rounded-xl transition-colors flex-shrink-0'>
-                    <X className='w-5 h-5' />
-                  </button>
+            <Modal
+              open
+              onClose={() => setHistoryUser(null)}
+              size='xl'
+              icon={
+                <div className='p-2.5 bg-gradient-to-br from-blue-400 to-purple-500 rounded-xl'>
+                  <Receipt className='w-5 h-5 text-white' />
                 </div>
-
-                {/* Type filter tabs — shown for ALL users once purchases load */}
-                {!historyLoading && purchases.length > 0 && (
-                  <div className='px-4 pt-3 pb-2 flex items-center gap-2 border-b border-apple-gray-100'>
-                    {(["all", "data", "tv"] as const).map((f) => (
-                      <button
-                        key={f}
-                        onClick={() => setHistoryFilter(f)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                          historyFilter === f
-                            ? f === "tv"
-                              ? "bg-purple-100 text-purple-700"
-                              : f === "data"
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-gradient-to-r from-blue-400 to-blue-600 text-white shadow-sm"
-                            : "bg-apple-gray-100 text-apple-gray-500 hover:bg-apple-gray-200"
-                        }`}>
-                        {f === "tv" && <Tv className='w-3 h-3' />}
-                        {f === "data" && <Wifi className='w-3 h-3' />}
-                        {f === "all" ? "All" : f === "tv" ? "TV" : "Data"}
-                        <span
-                          className={`text-xs px-1.5 py-0.5 rounded-full ${
-                            historyFilter === f
-                              ? "bg-white/30"
-                              : "bg-apple-gray-200"
-                          }`}>
-                          {f === "all"
-                            ? enriched.length
-                            : f === "tv"
-                              ? enriched.filter((p) => p.isTv).length
-                              : enriched.filter((p) => !p.isTv).length}
-                        </span>
-                      </button>
-                    ))}
-
-                    {/* For unverified: unique hostels detected from refs */}
-                    {isUnverified &&
-                      (() => {
-                        const hostelsInRefs = [
-                          ...new Set(
-                            enriched.map((p) => p.refHostel).filter(Boolean),
-                          ),
-                        ];
-                        if (hostelsInRefs.length === 0) return null;
-                        return (
-                          <div className='ml-auto flex items-center gap-1.5 flex-wrap justify-end'>
-                            {hostelsInRefs.map((h) => (
-                              <span
-                                key={h}
-                                className='inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium border border-amber-100'>
-                                <Building2 className='w-3 h-3' />
-                                {h}
-                              </span>
-                            ))}
-                          </div>
-                        );
-                      })()}
-                  </div>
-                )}
-
-                {/* Modal Body */}
-                <div className='flex-1 overflow-y-auto p-4'>
-                  {historyLoading ? (
-                    <div className='flex items-center justify-center py-16 gap-3 text-apple-gray-500'>
-                      <div className='w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin' />
-                      <span className='text-sm'>Loading history…</span>
-                    </div>
-                  ) : purchases.length === 0 ? (
-                    <div className='flex flex-col items-center justify-center py-16 text-apple-gray-400'>
-                      <Receipt className='w-10 h-10 mb-3 text-apple-gray-200' />
-                      <p className='text-sm font-medium'>
-                        No payment history found
-                      </p>
-                    </div>
-                  ) : filtered.length === 0 ? (
-                    <div className='flex flex-col items-center justify-center py-12 text-apple-gray-400'>
-                      <p className='text-sm'>No {historyFilter} transactions</p>
-                      <button
-                        onClick={() => setHistoryFilter("all")}
-                        className='mt-2 text-xs text-blue-600 hover:text-blue-700'>
-                        Show all
-                      </button>
-                    </div>
-                  ) : (
-                    <div className='space-y-3'>
-                      {filtered.map((p) => (
-                        <div
-                          key={p.id}
-                          className='flex items-start gap-3 p-4 bg-apple-gray-50 rounded-2xl'>
-                          <div
-                            className={`p-2 rounded-xl flex-shrink-0 ${p.isTv ? "bg-purple-100" : "bg-blue-100"}`}>
-                            {p.isTv ? (
-                              <Tv className='w-4 h-4 text-purple-600' />
-                            ) : (
-                              <Wifi className='w-4 h-4 text-blue-600' />
-                            )}
-                          </div>
-                          <div className='flex-1 min-w-0'>
-                            <div className='flex items-start justify-between gap-2'>
-                              <div className='min-w-0'>
-                                <p className='text-sm font-semibold text-apple-gray-900'>
-                                  {p.planName}
-                                </p>
-                                <div className='flex items-center gap-2 flex-wrap mt-0.5'>
-                                  <p className='text-xs text-apple-gray-500'>
-                                    {p.isTv
-                                      ? "TV Subscription"
-                                      : `Data — ${p.planType}`}
-                                    {p.hostel ? ` · ${p.hostel}` : ""}
-                                  </p>
-                                  {/* For unverified: show hostel badge from ref when hostel field is missing */}
-                                  {isUnverified && p.refHostel && !p.hostel && (
-                                    <span className='inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded text-xs font-medium border border-amber-100'>
-                                      <Building2 className='w-2.5 h-2.5' />
-                                      {p.refHostel}
-                                    </span>
-                                  )}
-                                </div>
-                                {p.status && (
-                                  <span
-                                    className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                                      p.status === "active"
-                                        ? "bg-green-100 text-green-700"
-                                        : p.status === "expired"
-                                          ? "bg-red-100 text-red-600"
-                                          : "bg-amber-100 text-amber-700"
-                                    }`}>
-                                    {p.status.replace("_", " ")}
-                                  </span>
-                                )}
-                              </div>
-                              <div className='text-right flex-shrink-0'>
-                                <p className='text-sm font-bold text-apple-gray-900'>
-                                  ₦{p.price.toLocaleString()}
-                                </p>
-                                <p className='text-xs text-apple-gray-400 mt-0.5'>
-                                  {fmtDateTime(p.createdAt)}
-                                </p>
-                              </div>
-                            </div>
-                            {p.paymentRef && (
-                              <p className='text-xs text-apple-gray-400 mt-1.5 font-mono truncate'>
-                                Ref: {p.paymentRef}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+              }
+              title={
+                <div className='min-w-0'>
+                  <h3 className='text-base font-semibold text-slate-900'>Payment History</h3>
+                  <p className='text-xs font-normal text-slate-500 mt-0.5 break-all'>
+                    {historyUser.displayName || historyUser.email.split("@")[0]} · {historyUser.email}
+                  </p>
                 </div>
-
-                {/* Modal Footer */}
-                {purchases.length > 0 && (
-                  <div className='px-6 py-4 border-t border-apple-gray-100 flex items-center justify-between'>
-                    <p className='text-xs text-apple-gray-500'>
+              }
+              footer={
+                purchases.length > 0 ? (
+                  <div className='flex flex-wrap items-center justify-between gap-2 sm:w-full'>
+                    <p className='text-xs text-slate-500'>
                       {filtered.length} of {purchases.length} transaction
                       {purchases.length !== 1 ? "s" : ""}
                     </p>
-                    <p className='text-sm font-bold text-apple-gray-900'>
-                      Total: ₦
-                      {filtered
-                        .reduce((s, p) => s + p.price, 0)
-                        .toLocaleString()}
+                    <p className='text-sm font-bold text-slate-900'>
+                      Total: ₦{filtered.reduce((s, p) => s + p.price, 0).toLocaleString()}
                     </p>
                   </div>
-                )}
-              </div>
-            </div>
+                ) : undefined
+              }>
+              {/* Type filter tabs — shown for ALL users once purchases load */}
+              {!historyLoading && purchases.length > 0 && (
+                <div className='mb-4 flex flex-wrap items-center gap-2 border-b border-slate-200/60 pb-3'>
+                  {(["all", "data", "tv"] as const).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setHistoryFilter(f)}
+                      className={`inline-flex min-h-[40px] items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition ${
+                        historyFilter === f
+                          ? f === "tv"
+                            ? "bg-purple-100 text-purple-700"
+                            : f === "data"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-slate-900 text-white shadow-sm"
+                          : "border border-white/80 bg-white/70 text-slate-500 hover:bg-white"
+                      }`}>
+                      {f === "tv" && <Tv className='w-3 h-3' />}
+                      {f === "data" && <Wifi className='w-3 h-3' />}
+                      {f === "all" ? "All" : f === "tv" ? "TV" : "Data"}
+                      <span
+                        className={`text-xs px-1.5 py-0.5 rounded-full ${
+                          historyFilter === f ? "bg-white/30" : "bg-slate-200/80"
+                        }`}>
+                        {f === "all"
+                          ? enriched.length
+                          : f === "tv"
+                            ? enriched.filter((p) => p.isTv).length
+                            : enriched.filter((p) => !p.isTv).length}
+                      </span>
+                    </button>
+                  ))}
+
+                  {/* For unverified: unique hostels detected from refs */}
+                  {isUnverified &&
+                    (() => {
+                      const hostelsInRefs = [...new Set(enriched.map((p) => p.refHostel).filter(Boolean))];
+                      if (hostelsInRefs.length === 0) return null;
+                      return (
+                        <div className='flex flex-wrap items-center gap-1.5 sm:ml-auto sm:justify-end'>
+                          {hostelsInRefs.map((h) => (
+                            <span key={h} className='warning-chip inline-flex items-center gap-1 text-xs'>
+                              <Building2 className='w-3 h-3' />
+                              {h}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                </div>
+              )}
+
+              {historyLoading ? (
+                <div className='flex items-center justify-center py-16 gap-3 text-slate-500'>
+                  <div className='w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin' />
+                  <span className='text-sm'>Loading history…</span>
+                </div>
+              ) : purchases.length === 0 ? (
+                <EmptyState icon={<Receipt className='w-10 h-10 text-slate-300' />} title='No payment history found' />
+              ) : filtered.length === 0 ? (
+                <div className='flex flex-col items-center justify-center py-12 text-slate-400'>
+                  <p className='text-sm'>No {historyFilter} transactions</p>
+                  <button onClick={() => setHistoryFilter("all")} className='glass-link mt-1 min-h-[40px] text-xs'>
+                    Show all
+                  </button>
+                </div>
+              ) : (
+                <div className='space-y-3'>
+                  {filtered.map((p) => (
+                    <div key={p.id} className='glass-card flex items-start gap-3'>
+                      <div className={`p-2 rounded-xl flex-shrink-0 ${p.isTv ? "bg-purple-100" : "bg-blue-100"}`}>
+                        {p.isTv ? <Tv className='w-4 h-4 text-purple-600' /> : <Wifi className='w-4 h-4 text-blue-600' />}
+                      </div>
+                      <div className='flex-1 min-w-0'>
+                        <div className='flex flex-wrap items-start justify-between gap-2'>
+                          <div className='min-w-0'>
+                            <p className='text-sm font-semibold text-slate-900 break-words'>{p.planName}</p>
+                            <div className='flex items-center gap-2 flex-wrap mt-0.5'>
+                              <p className='text-xs text-slate-500'>
+                                {p.isTv ? "TV Subscription" : `Data — ${p.planType}`}
+                                {p.hostel ? ` · ${p.hostel}` : ""}
+                              </p>
+                              {/* For unverified: show hostel badge from ref when hostel field is missing */}
+                              {isUnverified && p.refHostel && !p.hostel && (
+                                <span className='warning-chip inline-flex items-center gap-1 !px-1.5 !py-0.5 text-xs'>
+                                  <Building2 className='w-2.5 h-2.5' />
+                                  {p.refHostel}
+                                </span>
+                              )}
+                            </div>
+                            {p.status && (
+                              <span
+                                className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                                  p.status === "active"
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : p.status === "expired"
+                                      ? "bg-rose-100 text-rose-600"
+                                      : "bg-amber-100 text-amber-700"
+                                }`}>
+                                {p.status.replace("_", " ")}
+                              </span>
+                            )}
+                          </div>
+                          <div className='text-right flex-shrink-0'>
+                            <p className='text-sm font-bold text-slate-900'>₦{p.price.toLocaleString()}</p>
+                            <p className='text-xs text-slate-400 mt-0.5'>{fmtDateTime(p.createdAt)}</p>
+                          </div>
+                        </div>
+                        {p.paymentRef && (
+                          <p className='text-xs text-slate-400 mt-1.5 font-mono break-all'>Ref: {p.paymentRef}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Modal>
           );
         })()}
 
       {/* ── Delete User Modal (danger) ──────────────────────────────────── */}
       {deleteModal && (
-        <div className='fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4'>
-          <div className='bg-white rounded-3xl shadow-2xl max-w-md w-full p-8'>
-            <div className='flex items-center justify-center mb-4'>
-              <div className='w-14 h-14 bg-gradient-to-br from-red-500 to-red-700 rounded-2xl flex items-center justify-center'>
-                <Trash2 className='w-7 h-7 text-white' />
-              </div>
+        <Modal
+          open
+          size='md'
+          dismissible={deletingId !== deleteModal.id}
+          onClose={() => {
+            setDeleteModal(null);
+            setDeleteConfirmText("");
+          }}
+          icon={
+            <div className='w-10 h-10 bg-gradient-to-br from-red-500 to-red-700 rounded-2xl flex items-center justify-center'>
+              <Trash2 className='w-5 h-5 text-white' />
             </div>
-            <h3 className='text-xl font-semibold text-apple-gray-900 text-center mb-2'>
-              Delete Account?
-            </h3>
-            <p className='text-sm text-apple-gray-600 text-center mb-1 font-semibold break-all'>
-              {deleteModal.email}
-            </p>
-            <p className='text-sm text-apple-gray-500 text-center mb-5'>
-              This permanently removes the user and all their footprints. This cannot be undone.
-            </p>
-
-            <div className='bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-5'>
-              <p className='text-xs font-semibold text-red-700 mb-2 flex items-center gap-1.5'>
-                <AlertTriangle className='w-3.5 h-3.5' />
-                Will be wiped:
-              </p>
-              <ul className='text-xs text-red-700 space-y-1 list-disc pl-5'>
-                <li>Sign-in account (immediate sign-out)</li>
-                <li>User profile (hostel, name, verification)</li>
-                <li>All TV subscriptions for this email</li>
-                <li>All data plan purchases for this email</li>
-              </ul>
-            </div>
-
-            <div className='mb-5'>
-              <label
-                htmlFor='delete-confirm'
-                className='block text-xs font-semibold text-apple-gray-700 mb-2'>
-                Type the user&apos;s email to confirm
-              </label>
-              <input
-                id='delete-confirm'
-                type='text'
-                value={deleteConfirmText}
-                onChange={(e) => setDeleteConfirmText(e.target.value)}
-                autoFocus
-                autoComplete='off'
-                placeholder={deleteModal.email}
-                className='w-full px-4 py-3 bg-apple-gray-50 border border-apple-gray-200 rounded-xl text-apple-gray-900 placeholder-apple-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all text-sm font-mono'
-              />
-            </div>
-
-            <div className='flex gap-3'>
+          }
+          title='Delete Account?'
+          footer={
+            <>
               <button
                 onClick={() => {
                   setDeleteModal(null);
                   setDeleteConfirmText("");
                 }}
                 disabled={deletingId === deleteModal.id}
-                className='flex-1 py-3 rounded-2xl border border-apple-gray-200 text-apple-gray-700 font-semibold hover:bg-apple-gray-50 transition-colors text-sm disabled:opacity-50'>
+                className='glass-button'>
                 Cancel
               </button>
               <button
                 onClick={handleDelete}
                 disabled={
                   deletingId === deleteModal.id ||
-                  deleteConfirmText.trim().toLowerCase() !==
-                    deleteModal.email.toLowerCase()
+                  deleteConfirmText.trim().toLowerCase() !== deleteModal.email.toLowerCase()
                 }
-                className='flex-1 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold rounded-2xl hover:opacity-90 transition-opacity text-sm disabled:opacity-40 disabled:cursor-not-allowed'>
+                className='glass-danger'>
                 {deletingId === deleteModal.id ? (
                   <span className='flex items-center justify-center gap-2'>
                     <div className='w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin' />
@@ -1017,43 +851,71 @@ export default function AdminUsersPage() {
                   "Delete forever"
                 )}
               </button>
-            </div>
+            </>
+          }>
+          <p className='text-sm text-slate-700 mb-1 font-semibold break-all'>{deleteModal.email}</p>
+          <p className='text-sm text-slate-500 mb-5'>
+            This permanently removes the user and all their footprints. This cannot be undone.
+          </p>
+
+          <div className='bg-rose-50/90 border border-rose-200 rounded-2xl px-4 py-3 mb-5'>
+            <p className='text-xs font-semibold text-rose-700 mb-2 flex items-center gap-1.5'>
+              <AlertTriangle className='w-3.5 h-3.5' />
+              Will be wiped:
+            </p>
+            <ul className='text-xs text-rose-700 space-y-1 list-disc pl-5'>
+              <li>Sign-in account (immediate sign-out)</li>
+              <li>User profile (hostel, name, verification)</li>
+              <li>All TV subscriptions for this email</li>
+              <li>All data plan purchases for this email</li>
+            </ul>
           </div>
-        </div>
+
+          <div>
+            <label htmlFor='delete-confirm' className='block text-xs font-semibold text-slate-700 mb-2'>
+              Type the user&apos;s email to confirm
+            </label>
+            <input
+              id='delete-confirm'
+              type='text'
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              autoFocus
+              autoComplete='off'
+              placeholder={deleteModal.email}
+              className={`${GLASS_INPUT} font-mono focus:border-rose-400 focus:ring-rose-100`}
+            />
+          </div>
+        </Modal>
       )}
 
       {/* ── Disable Confirmation Modal ──────────────────────────────────── */}
       {confirmModal && (
-        <div className='fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4'>
-          <div className='bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8'>
-            <div className='flex items-center justify-center mb-4'>
-              <div className='w-14 h-14 bg-gradient-to-br from-red-400 to-red-600 rounded-2xl flex items-center justify-center'>
-                <ShieldOff className='w-7 h-7 text-white' />
-              </div>
+        <Modal
+          open
+          size='sm'
+          onClose={() => setConfirmModal(null)}
+          icon={
+            <div className='w-10 h-10 bg-gradient-to-br from-red-400 to-red-600 rounded-2xl flex items-center justify-center'>
+              <ShieldOff className='w-5 h-5 text-white' />
             </div>
-            <h3 className='text-xl font-semibold text-apple-gray-900 text-center mb-2'>
-              Disable Account?
-            </h3>
-            <p className='text-sm text-apple-gray-600 text-center mb-1 font-semibold'>
-              {confirmModal.user.displayName || confirmModal.user.email}
-            </p>
-            <p className='text-sm text-apple-gray-500 text-center mb-6'>
-              This user will be blocked from signing in immediately.
-            </p>
-            <div className='flex gap-3'>
-              <button
-                onClick={() => setConfirmModal(null)}
-                className='flex-1 py-3 rounded-2xl border border-apple-gray-200 text-apple-gray-700 font-semibold hover:bg-apple-gray-50 transition-colors text-sm'>
+          }
+          title='Disable Account?'
+          footer={
+            <>
+              <button onClick={() => setConfirmModal(null)} className='glass-button'>
                 Cancel
               </button>
-              <button
-                onClick={() => doToggle(confirmModal.user.id, false)}
-                className='flex-1 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold rounded-2xl hover:opacity-90 transition-opacity text-sm'>
+              <button onClick={() => doToggle(confirmModal.user.id, false)} className='glass-danger'>
                 Disable
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }>
+          <p className='text-sm text-slate-700 mb-1 font-semibold break-words'>
+            {confirmModal.user.displayName || confirmModal.user.email}
+          </p>
+          <p className='text-sm text-slate-500'>This user will be blocked from signing in immediately.</p>
+        </Modal>
       )}
     </ProtectedRoute>
   );

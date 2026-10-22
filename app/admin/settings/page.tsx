@@ -2,13 +2,10 @@
 import { adminFetch } from "@/lib/apiClient";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
-import Logo from "@/components/Logo";
+import { AdminPage, Panel, Modal, GLASS_INPUT } from "@/components/admin/ui";
 import {
-  LogOut,
-  ArrowLeft,
   Lock,
   Unlock,
   AlertTriangle,
@@ -23,8 +20,7 @@ interface SiteSettings {
 }
 
 export default function AdminSettingsPage() {
-  const { logout, adminProfile } = useAuthStore();
-  const router = useRouter();
+  const { adminProfile } = useAuthStore();
   const isSuperAdmin = adminProfile?.isSuperAdmin ?? false;
 
   const [settings, setSettings] = useState<SiteSettings | null>(null);
@@ -36,11 +32,6 @@ export default function AdminSettingsPage() {
     text: string;
   } | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
-
-  const handleLogout = () => {
-    logout();
-    router.push("/admin/login");
-  };
 
   useEffect(() => {
     adminFetch("/api/admin/settings")
@@ -124,225 +115,193 @@ export default function AdminSettingsPage() {
 
   return (
     <ProtectedRoute module="settings">
-      <div className='min-h-screen bg-apple-gray-50'>
-        {/* Header */}
-        <header className='bg-white shadow-sm sticky top-0 z-10'>
-          <div className='max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4'>
-            <div className='flex flex-wrap items-center justify-between gap-3'>
-              <div className='flex items-center gap-3'>
-                <button
-                  onClick={() => router.push("/admin/dashboard")}
-                  className='flex items-center gap-1.5 text-sm text-apple-gray-600 hover:text-apple-gray-900 transition-colors'>
-                  <ArrowLeft className='w-4 h-4' />
-                  Dashboard
-                </button>
-                <span className='text-apple-gray-300'>|</span>
-                <Logo variant='dark' />
-                <div>
-                  <h1 className='text-xl font-bold bg-gradient-to-r from-blue-400 via-blue-500 to-white bg-clip-text text-transparent'>
-                    Site Settings
-                  </h1>
-                </div>
-              </div>
-              <button
-                onClick={handleLogout}
-                className='flex items-center gap-2 px-4 py-2 text-sm font-medium text-apple-gray-700 hover:bg-apple-gray-100 rounded-lg transition-colors'>
-                <LogOut className='w-4 h-4' />
-                Logout
-              </button>
+      <AdminPage eyebrow="SYSTEM" title="Site Settings" width="narrow">
+        {/* Super-admin only notice */}
+        {!isSuperAdmin && (
+          <div className='glass-alert !flex-nowrap'>
+            <AlertTriangle className='w-5 h-5 flex-shrink-0 text-amber-500' />
+            <span className='min-w-0'>Site settings are only modifiable by the Super Admin.</span>
+          </div>
+        )}
+
+        {/* Feedback */}
+        {feedback && (
+          <div
+            className={`flex items-start gap-3 px-4 py-4 rounded-2xl text-sm border sm:px-5 ${
+              feedback.type === "success"
+                ? "bg-green-50/90 border-green-200 text-green-800"
+                : "bg-red-50/90 border-red-200 text-red-700"
+            }`}>
+            {feedback.type === "success" ? (
+              <CheckCircle className='w-5 h-5 flex-shrink-0 text-green-500 mt-0.5' />
+            ) : (
+              <AlertTriangle className='w-5 h-5 flex-shrink-0 text-red-500 mt-0.5' />
+            )}
+            <span className='min-w-0 break-words'>{feedback.text}</span>
+          </div>
+        )}
+
+        {/* ── Lockdown Card ─────────────────────────────────────── */}
+        <Panel>
+          <div className='flex items-center gap-3 mb-5'>
+            <div className='shrink-0 p-2.5 bg-gradient-to-br from-red-400 to-red-600 rounded-xl'>
+              <Lock className='w-5 h-5 text-white' />
+            </div>
+            <div className='min-w-0'>
+              <h2 className='text-lg font-semibold text-slate-900'>
+                Site Lockdown
+              </h2>
+              <p className='text-sm text-slate-500'>
+                Instantly close the website and the WhatsApp bot together
+              </p>
             </div>
           </div>
-        </header>
 
-        <div className='max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6'>
-          {/* Super-admin only notice */}
-          {!isSuperAdmin && (
-            <div className='bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-center gap-3 text-amber-800 text-sm'>
-              <AlertTriangle className='w-5 h-5 flex-shrink-0 text-amber-500' />
-              Site settings are only modifiable by the Super Admin.
+          {loading ? (
+            <div className='flex items-center gap-3 py-4'>
+              <div className='w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin' />
+              <span className='text-sm text-slate-500'>
+                Loading settings…
+              </span>
             </div>
-          )}
-
-          {/* Feedback */}
-          {feedback && (
-            <div
-              className={`flex items-start gap-3 px-5 py-4 rounded-2xl text-sm border ${
-                feedback.type === "success"
-                  ? "bg-green-50 border-green-200 text-green-800"
-                  : "bg-red-50 border-red-200 text-red-700"
-              }`}>
-              {feedback.type === "success" ? (
-                <CheckCircle className='w-5 h-5 flex-shrink-0 text-green-500 mt-0.5' />
-              ) : (
-                <AlertTriangle className='w-5 h-5 flex-shrink-0 text-red-500 mt-0.5' />
-              )}
-              {feedback.text}
-            </div>
-          )}
-
-          {/* ── Lockdown Card ─────────────────────────────────────── */}
-          <div className='bg-white rounded-3xl shadow-sm p-6'>
-            <div className='flex items-center gap-3 mb-5'>
-              <div className='p-2.5 bg-gradient-to-br from-red-400 to-red-600 rounded-xl'>
-                <Lock className='w-5 h-5 text-white' />
-              </div>
-              <div>
-                <h2 className='text-lg font-semibold text-apple-gray-900'>
-                  Site Lockdown
-                </h2>
-                <p className='text-sm text-apple-gray-500'>
-                  Instantly close the website and the WhatsApp bot together
-                </p>
-              </div>
-            </div>
-
-            {loading ? (
-              <div className='flex items-center gap-3 py-4'>
-                <div className='w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin' />
-                <span className='text-sm text-apple-gray-500'>
-                  Loading settings…
-                </span>
-              </div>
-            ) : (
-              <>
-                {/* Toggle pill */}
-                <div className='flex items-center justify-between p-4 bg-apple-gray-50 rounded-2xl mb-5'>
-                  <div>
-                    <p className='font-semibold text-apple-gray-900 text-sm'>
-                      Lockdown Status
-                    </p>
-                    <p
-                      className={`text-xs font-medium mt-0.5 ${settings?.lockdownEnabled ? "text-red-600" : "text-green-600"}`}>
-                      {settings?.lockdownEnabled
-                        ? "ACTIVE — site is locked"
-                        : "INACTIVE — site is live"}
-                    </p>
-                    {settings?.updatedAt && (
-                      <p className='text-xs text-apple-gray-400 mt-1'>
-                        Last changed by {settings.updatedBy ?? "admin"} ·{" "}
-                        {new Date(settings.updatedAt).toLocaleString()}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Toggle switch */}
-                  <button
-                    disabled={saving || !isSuperAdmin}
-                    onClick={() => toggleLockdown(!settings?.lockdownEnabled)}
-                    className={`relative inline-flex h-8 w-16 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${
-                      settings?.lockdownEnabled
-                        ? "bg-gradient-to-r from-red-500 to-red-600"
-                        : "bg-gradient-to-r from-green-400 to-green-500"
-                    }`}
-                    title={isSuperAdmin ? undefined : "Super admin only"}>
-                    <span
-                      className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                        settings?.lockdownEnabled
-                          ? "translate-x-8"
-                          : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {/* Lockdown message */}
-                <div>
-                  <label className='block text-sm font-semibold text-apple-gray-900 mb-2'>
-                    Maintenance Message
-                  </label>
-                  <p className='text-xs text-apple-gray-500 mb-3'>
-                    Shown to visitors on the maintenance page, and sent by the
-                    WhatsApp bot to anyone who messages while the site is locked.
+          ) : (
+            <>
+              {/* Toggle pill */}
+              <div className='flex items-center justify-between gap-3 p-4 bg-white/60 border border-white/80 rounded-2xl mb-5'>
+                <div className='min-w-0'>
+                  <p className='font-semibold text-slate-900 text-sm'>
+                    Lockdown Status
                   </p>
-                  <textarea
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    disabled={!isSuperAdmin}
-                    rows={3}
-                    placeholder="We're currently performing scheduled maintenance. We'll be back shortly."
-                    className='w-full px-4 py-3 border border-apple-gray-200 rounded-2xl text-apple-gray-900 placeholder-apple-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent transition-all resize-none disabled:opacity-50 disabled:cursor-not-allowed text-sm'
-                  />
-                  {isSuperAdmin && (
-                    <button
-                      onClick={saveMessageOnly}
-                      disabled={
-                        saving || message.trim() === settings?.lockdownMessage
-                      }
-                      className='mt-3 px-5 py-2.5 bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white font-semibold rounded-2xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed text-sm'>
-                      {saving ? (
-                        <span className='flex items-center gap-2'>
-                          <span className='w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin' />
-                          Saving…
-                        </span>
-                      ) : (
-                        "Save Message"
-                      )}
-                    </button>
+                  <p
+                    className={`text-xs font-medium mt-0.5 ${settings?.lockdownEnabled ? "text-red-600" : "text-green-600"}`}>
+                    {settings?.lockdownEnabled
+                      ? "ACTIVE — site is locked"
+                      : "INACTIVE — site is live"}
+                  </p>
+                  {settings?.updatedAt && (
+                    <p className='text-xs text-slate-400 mt-1 break-words'>
+                      Last changed by {settings.updatedBy ?? "admin"} ·{" "}
+                      {new Date(settings.updatedAt).toLocaleString()}
+                    </p>
                   )}
                 </div>
 
-                {/* Status indicator banner */}
-                {settings?.lockdownEnabled && (
-                  <div className='mt-5 flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-sm'>
-                    <Lock className='w-4 h-4 flex-shrink-0' />
-                    <span>
-                      <strong>Lockdown is active.</strong> Visitors are being
-                      redirected to the maintenance page and the WhatsApp bot is
-                      replying with the message below instead of serving. Admins,
-                      payment webhooks and scheduled jobs are unaffected, so
-                      purchases already in flight still complete.
-                    </span>
-                  </div>
+                {/* Toggle switch */}
+                <button
+                  disabled={saving || !isSuperAdmin}
+                  onClick={() => toggleLockdown(!settings?.lockdownEnabled)}
+                  className={`relative inline-flex h-8 w-16 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${
+                    settings?.lockdownEnabled
+                      ? "bg-gradient-to-r from-red-500 to-red-600"
+                      : "bg-gradient-to-r from-green-400 to-green-500"
+                  }`}
+                  title={isSuperAdmin ? undefined : "Super admin only"}>
+                  <span
+                    className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      settings?.lockdownEnabled
+                        ? "translate-x-8"
+                        : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Lockdown message */}
+              <div>
+                <label className='block text-sm font-semibold text-slate-900 mb-2'>
+                  Maintenance Message
+                </label>
+                <p className='text-xs text-slate-500 mb-3'>
+                  Shown to visitors on the maintenance page, and sent by the
+                  WhatsApp bot to anyone who messages while the site is locked.
+                </p>
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  disabled={!isSuperAdmin}
+                  rows={3}
+                  placeholder="We're currently performing scheduled maintenance. We'll be back shortly."
+                  className={`${GLASS_INPUT} resize-none disabled:cursor-not-allowed`}
+                />
+                {isSuperAdmin && (
+                  <button
+                    onClick={saveMessageOnly}
+                    disabled={
+                      saving || message.trim() === settings?.lockdownMessage
+                    }
+                    className='glass-primary mt-3 w-full sm:w-auto'>
+                    {saving ? (
+                      <span className='flex items-center gap-2'>
+                        <span className='w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin' />
+                        Saving…
+                      </span>
+                    ) : (
+                      "Save Message"
+                    )}
+                  </button>
                 )}
-                {!settings?.lockdownEnabled && (
-                  <div className='mt-5 flex items-center gap-3 px-4 py-3 bg-green-50 border border-green-200 rounded-2xl text-green-700 text-sm'>
-                    <Unlock className='w-4 h-4 flex-shrink-0' />
-                    <span>
-                      <strong>Site is live.</strong> Visitors and the WhatsApp
-                      bot both have normal access.
-                    </span>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      </div>
+              </div>
+
+              {/* Status indicator banner */}
+              {settings?.lockdownEnabled && (
+                <div className='mt-5 flex items-start gap-3 px-4 py-3 bg-red-50/90 border border-red-200 rounded-2xl text-red-700 text-sm'>
+                  <Lock className='w-4 h-4 flex-shrink-0 mt-0.5' />
+                  <span className='min-w-0'>
+                    <strong>Lockdown is active.</strong> Visitors are being
+                    redirected to the maintenance page and the WhatsApp bot is
+                    replying with the message below instead of serving. Admins,
+                    payment webhooks and scheduled jobs are unaffected, so
+                    purchases already in flight still complete.
+                  </span>
+                </div>
+              )}
+              {!settings?.lockdownEnabled && (
+                <div className='mt-5 flex items-start gap-3 px-4 py-3 bg-green-50/90 border border-green-200 rounded-2xl text-green-700 text-sm'>
+                  <Unlock className='w-4 h-4 flex-shrink-0 mt-0.5' />
+                  <span className='min-w-0'>
+                    <strong>Site is live.</strong> Visitors and the WhatsApp
+                    bot both have normal access.
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+        </Panel>
+      </AdminPage>
 
       {/* ── Confirmation Modal ───────────────────────────────────────── */}
-      {showConfirm && (
-        <div className='fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4'>
-          <div className='bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8'>
-            <div className='flex items-center justify-center mb-4'>
-              <div className='w-14 h-14 bg-gradient-to-br from-red-400 to-red-600 rounded-2xl flex items-center justify-center'>
-                <Lock className='w-7 h-7 text-white' />
-              </div>
-            </div>
-            <h3 className='text-xl font-semibold text-apple-gray-900 text-center mb-2'>
-              Enable Site Lockdown?
-            </h3>
-            <p className='text-sm text-apple-gray-600 text-center mb-6'>
-              Visitors will immediately be redirected to the maintenance page,
-              and the WhatsApp bot will stop serving and reply with your message
-              instead. Admin access, payment webhooks and scheduled jobs keep
-              working, so purchases already in flight still complete.
-            </p>
-            <div className='flex gap-3'>
-              <button
-                onClick={() => setShowConfirm(false)}
-                className='flex-1 py-3 rounded-2xl border border-apple-gray-200 text-apple-gray-700 font-semibold hover:bg-apple-gray-50 transition-colors text-sm'>
-                Cancel
-              </button>
-              <button
-                onClick={() => toggleLockdown(true)}
-                disabled={saving}
-                className='flex-1 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold rounded-2xl hover:opacity-90 transition-opacity disabled:opacity-50 text-sm'>
-                {saving ? "Enabling…" : "Yes, Lock Site"}
-              </button>
-            </div>
+      <Modal
+        open={showConfirm}
+        onClose={() => setShowConfirm(false)}
+        size='sm'
+        title='Enable Site Lockdown?'
+        icon={
+          <div className='w-9 h-9 bg-gradient-to-br from-red-400 to-red-600 rounded-xl flex items-center justify-center'>
+            <Lock className='w-5 h-5 text-white' />
           </div>
-        </div>
-      )}
+        }
+        footer={
+          <>
+            <button
+              onClick={() => setShowConfirm(false)}
+              className='glass-button'>
+              Cancel
+            </button>
+            <button
+              onClick={() => toggleLockdown(true)}
+              disabled={saving}
+              className='glass-danger'>
+              {saving ? "Enabling…" : "Yes, Lock Site"}
+            </button>
+          </>
+        }>
+        <p className='text-sm text-slate-600'>
+          Visitors will immediately be redirected to the maintenance page,
+          and the WhatsApp bot will stop serving and reply with your message
+          instead. Admin access, payment webhooks and scheduled jobs keep
+          working, so purchases already in flight still complete.
+        </p>
+      </Modal>
     </ProtectedRoute>
   );
 }

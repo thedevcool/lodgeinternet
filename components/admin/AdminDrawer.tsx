@@ -16,6 +16,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { BarChart3, ChevronRight, LogOut, X } from "lucide-react";
 import Logo from "@/components/Logo";
 import { ADMIN_NAV, badgeFor, clearAttentionCache, type AttentionCounts } from "@/lib/adminNav";
@@ -37,13 +38,21 @@ export default function AdminDrawer({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { adminProfile, canAccess, logout } = useAuthStore();
+  const { adminProfile: storedProfile, canAccess, logout } = useAuthStore();
+  // Who's signed in is restored from the browser's storage, which the server
+  // never sees. Rendering the profile-dependent links on the first pass made
+  // the server's HTML and the browser's disagree (a hydration error that threw
+  // away the whole page's server render). So the first render is the same
+  // anonymous shell on both sides, and the links fill in once mounted.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const adminProfile = mounted ? storedProfile : null;
 
   if (!pinned && !open) return null;
 
-  const links = ADMIN_NAV.filter(
-    (item) => (item.superAdminOnly ? adminProfile?.isSuperAdmin : canAccess(item.module)),
-  );
+  const links = mounted
+    ? ADMIN_NAV.filter((item) => (item.superAdminOnly ? adminProfile?.isSuperAdmin : canAccess(item.module)))
+    : [];
 
   const signOut = () => {
     // The badge counts belong to the admin who is leaving.

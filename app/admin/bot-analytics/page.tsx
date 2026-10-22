@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Activity, ArrowLeft, LogOut } from "lucide-react";
 import { adminFetch } from "@/lib/apiClient";
 import { useAuthStore } from "@/store/authStore";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
-import Logo from "@/components/Logo";
+import { AdminPage, Panel, Kpi, EmptyState, type Tone } from "@/components/admin/ui";
+
+/** One tint per tile, in the order the cards are listed. */
+const CARD_TONES: Tone[] = ["blue", "green", "teal", "violet", "orange", "purple", "red", "slate"];
 
 type Metrics = {
   totalCheckouts: number;
@@ -21,7 +22,7 @@ type Metrics = {
 };
 
 export default function BotAnalyticsPage() {
-  const { adminProfile, logout } = useAuthStore();
+  const { adminProfile } = useAuthStore();
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [error, setError] = useState("");
 
@@ -51,46 +52,29 @@ export default function BotAnalyticsPage() {
 
   return (
     <ProtectedRoute requireSuperAdmin>
-      <div className="min-h-screen bg-apple-gray-50">
-        <header className="bg-white shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Logo variant="dark" />
-              <div>
-                <h1 className="text-2xl font-bold text-apple-gray-900">Bot Analytics</h1>
-                <p className="text-sm text-apple-gray-500">Super-admin payment reliability metrics</p>
-              </div>
-            </div>
-            <button onClick={() => { logout(); window.location.href = "/admin/login"; }} className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg hover:bg-apple-gray-100">
-              <LogOut className="w-4 h-4" /> Logout
-            </button>
+      <AdminPage
+        eyebrow="WHATSAPP BOT"
+        title="Bot Analytics"
+        subtitle="Super-admin payment reliability metrics"
+      >
+        {!adminProfile?.isSuperAdmin ? (
+          <Panel>
+            <EmptyState title="This section is available to the super admin only." />
+          </Panel>
+        ) : error ? (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-sm text-rose-700 break-words">{error}</div>
+        ) : !metrics ? (
+          <Panel>
+            <EmptyState title="Loading analytics…" />
+          </Panel>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {cards.map(([label, value], i) => (
+              <Kpi key={String(label)} label={String(label)} value={value} tone={CARD_TONES[i % CARD_TONES.length]} />
+            ))}
           </div>
-        </header>
-        <main className="max-w-7xl mx-auto px-4 py-8">
-          <div className="flex items-center justify-between mb-6">
-            <Link href="/admin/dashboard" className="flex items-center gap-2 text-sm text-apple-gray-600 hover:text-apple-gray-900">
-              <ArrowLeft className="w-4 h-4" /> Back to dashboard
-            </Link>
-            <Activity className="w-6 h-6 text-cyan-600" />
-          </div>
-          {!adminProfile?.isSuperAdmin ? (
-            <div className="bg-white rounded-2xl p-8 text-center text-apple-gray-500">This section is available to the super admin only.</div>
-          ) : error ? (
-            <div className="bg-red-50 text-red-700 rounded-2xl p-5">{error}</div>
-          ) : !metrics ? (
-            <div className="bg-white rounded-2xl p-8 text-center text-apple-gray-500">Loading analytics…</div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {cards.map(([label, value]) => (
-                <div key={String(label)} className="bg-white rounded-2xl shadow-sm p-5">
-                  <p className="text-sm text-apple-gray-500">{label}</p>
-                  <p className="text-3xl font-bold text-apple-gray-900 mt-2">{value}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </main>
-      </div>
+        )}
+      </AdminPage>
     </ProtectedRoute>
   );
 }

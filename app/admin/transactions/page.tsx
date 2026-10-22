@@ -2,21 +2,35 @@
 import { adminFetch } from "@/lib/apiClient";
 
 import React, { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
 import ConfirmationModal from "@/components/ConfirmationModal";
-import Logo from "@/components/Logo";
+import {
+  AdminPage,
+  GLASS_INPUT,
+  GLASS_INPUT_ICON,
+  IconButton,
+  Kpi,
+  MobileCard,
+  Panel,
+  ResponsiveTable,
+  SegToggle,
+  TabBar,
+  Td,
+  Th,
+  type Column,
+} from "@/components/admin/ui";
 import {
   AlertTriangle,
   BarChart3,
   Building2,
+  Check,
   ChevronDown,
   ChevronUp,
+  Copy,
   Download,
   Landmark,
   LockKeyhole,
-  LogOut,
   Mail,
   Plus,
   RefreshCw,
@@ -213,130 +227,72 @@ function PlanTypeBadge({ type }: { type: string }) {
 const FALLBACK_MAINTENANCE_PCT = 10;
 const FALLBACK_PAYSTACK_PCT = 1.5;
 
-// ── Shared glass-style building blocks (this page only — see app/globals.css
-// for the page-shell/panel/badge classes these are built to sit alongside) ──
+// ── Page-only presentation helpers. The shared glass pieces (Kpi, Th, Td,
+// SegToggle, GLASS_INPUT, …) come from components/admin/ui. ──
 
-/**
- * Headline number tile, copied from the dashboard's `Kpi` pattern. Tone maps
- * are spelled out in full on purpose: Tailwind scans source text for class
- * names, so a name assembled at runtime (`kpi-${tone}`) is invisible to it
- * and gets purged from the build — this bit the dashboard once already.
- */
-const KPI_TONE_BG: Record<string, string> = {
-  blue: "kpi-blue",
-  green: "kpi-green",
-  orange: "kpi-orange",
-  red: "kpi-red",
-  violet: "kpi-violet",
-  purple: "kpi-purple",
-  slate: "kpi-slate",
-  teal: "kpi-teal",
-};
-const KPI_TONE_RAIL: Record<string, string> = {
-  blue: "bg-blue-500",
-  green: "bg-emerald-500",
-  orange: "bg-amber-500",
-  red: "bg-rose-500",
-  violet: "bg-violet-500",
-  purple: "bg-purple-500",
-  slate: "bg-slate-400",
-  teal: "bg-teal-500",
-};
+function formatDay(d: Date) {
+  return d.toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" });
+}
 
-function Kpi({
-  label,
-  value,
-  note,
-  tone = "blue",
-}: {
-  label: string;
-  value: string | number;
-  note?: string;
-  tone?: string;
-}) {
-  return (
-    <div className={`kpi-card ${KPI_TONE_BG[tone] || KPI_TONE_BG.blue}`}>
-      <span className={`kpi-rail ${KPI_TONE_RAIL[tone] || KPI_TONE_RAIL.blue}`} />
-      <p className="kpi-label">{label}</p>
-      <p className="kpi-value">{value}</p>
-      {note && <p className="kpi-note">{note}</p>}
-    </div>
+function formatTime(d: Date) {
+  return d.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" });
+}
+
+function isBotRow(t: TransactionRow) {
+  return "paymentSource" in t && (t as DataPurchaseRow).paymentSource === "bot";
+}
+
+function SourceChip({ t }: { t: TransactionRow }) {
+  return isBotRow(t) ? (
+    <span className="status-chip inline-flex items-center gap-1">
+      <Smartphone size={12} />
+      Bot
+    </span>
+  ) : (
+    <span className="slate-chip">Site</span>
   );
 }
 
 /**
- * Table header/body cells shared by every tab's tables. Header type matches
- * `.kpi-label` exactly, so table headers and KPI labels read as one language.
- * No zebra striping — every existing glass list (dashboard, tv-users) marks
- * rows with hover-only emphasis on a flat ground, not alternating stripes.
+ * A payment reference you can tap to copy. The full value used to live only
+ * in a hover `title`, which a phone can't reach; `full` prints it whole (for
+ * cards), otherwise it's shortened to 14 characters as the table always was.
  */
-const ALIGN_CLASS: Record<"left" | "right" | "center", string> = {
-  left: "text-left",
-  right: "text-right",
-  center: "text-center",
-};
-
-function Th({ children, align = "left" }: { children: React.ReactNode; align?: "left" | "right" | "center" }) {
+function CopyRef({ value, full = false }: { value: string; full?: boolean }) {
+  const [copied, setCopied] = useState(false);
+  const shown = full ? value : value.length > 14 ? value.slice(0, 14) + "…" : value;
   return (
-    <th className={`px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.13em] text-slate-500 ${ALIGN_CLASS[align]}`}>
-      {children}
-    </th>
+    <button
+      type="button"
+      title={value}
+      aria-label={`Copy payment reference ${value}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        void navigator.clipboard
+          ?.writeText(value)
+          .then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          })
+          .catch(() => {});
+      }}
+      className="inline-flex min-h-[40px] max-w-full items-center gap-1.5 text-left font-mono text-xs text-slate-500 transition hover:text-slate-800">
+      <span className={full ? "min-w-0 break-all" : "whitespace-nowrap"}>{shown}</span>
+      {copied ? (
+        <Check size={12} className="shrink-0 text-emerald-600" />
+      ) : (
+        <Copy size={12} className="shrink-0 opacity-60" />
+      )}
+    </button>
   );
 }
 
-function Td({
-  children,
-  align = "left",
-  className = "",
-}: {
-  children: React.ReactNode;
-  align?: "left" | "right" | "center";
-  className?: string;
-}) {
-  return <td className={`px-5 py-3 text-sm text-slate-700 ${ALIGN_CLASS[align]} ${className}`}>{children}</td>;
-}
-
-/**
- * Glass input/select convention — no dedicated CSS class exists for this yet
- * (every other still-legacy admin page builds its own inline), so it's kept
- * as one string here rather than added to globals.css ahead of adoption
- * elsewhere. Icon-prefixed fields add `pl-11` and position the icon with
- * `GLASS_INPUT_ICON` (mirrors tv-users' one existing icon-in-input field).
- */
-const GLASS_INPUT =
-  "w-full rounded-2xl border border-white/80 bg-white/70 px-4 py-2.5 text-sm text-slate-700 backdrop-blur-xl placeholder:text-slate-400 focus:border-blue-400 focus:outline-none";
-const GLASS_INPUT_ICON = "absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400";
-
-/**
- * Labeled multi-way toggle (all/month, all/day/month/year, Fixed/Ongoing,
- * etc). Distinct from globals.css's `.segmented`/`.segmented-item`, which is
- * icon-only with no room for text labels. `activeClass` lets a specific
- * instance keep meaningful color (e.g. Splits' Fixed/Ongoing toggle uses
- * green for "ongoing" since that's informative, not just decorative).
- */
-function SegToggle<T extends string>({
-  value,
-  onChange,
-  options,
-  activeClass = "bg-slate-900 text-white shadow-sm",
-}: {
-  value: T;
-  onChange: (next: T) => void;
-  options: { value: T; label: string }[];
-  activeClass?: string;
-}) {
+/** A full-width labelled line inside a MobileCard (for long values). */
+function CardLine({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="inline-flex rounded-full border border-white/80 bg-white/70 p-1 backdrop-blur-xl">
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          onClick={() => onChange(opt.value)}
-          className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-            value === opt.value ? activeClass : "text-slate-600 hover:bg-white"
-          }`}>
-          {opt.label}
-        </button>
-      ))}
+    <div className="min-w-0">
+      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-400">{label}</p>
+      <div className="min-w-0 break-words text-slate-700">{children}</div>
     </div>
   );
 }
@@ -362,11 +318,10 @@ export default function AdminTransactionsPage() {
     })();
   }, []);
 
-  const { logout, canWrite, adminProfile } = useAuthStore();
+  const { canWrite, adminProfile } = useAuthStore();
   const isPartner = adminProfile?.isPartner ?? false;
   const isSuperAdmin = adminProfile?.isSuperAdmin ?? false;
   const canEdit = canWrite("transactions");
-  const router = useRouter();
   const [transactions, setTransactions] = useState<TransactionRow[]>([]);
   // The COMPLETE, unfiltered, uncapped ledger — separate from `transactions`
   // above (which the Transactions tab's own filter bar now scopes and caps
@@ -908,11 +863,6 @@ export default function AdminTransactionsPage() {
     } finally {
       setSplitsLoading(false);
     }
-  };
-
-  const handleLogout = () => {
-    logout();
-    router.push("/admin/login");
   };
 
   // ── Transactions computed ─────────────────────────────────────────────────
@@ -1608,301 +1558,806 @@ export default function AdminTransactionsPage() {
     XLSX.writeFile(wb, `splits-${new Date().toISOString().split("T")[0]}.xlsx`);
   };
 
+  // ── Render helpers (presentation only) ─────────────────────────────────────
+  // Transactions table: the same columns as before, shown as a table from `md`
+  // up and as cards below it.
+  const transactionColumns: Column<TransactionRow>[] = [
+    {
+      key: "date",
+      header: "Date",
+      className: "whitespace-nowrap",
+      cell: (t) => (
+        <>
+          {formatDay(t.purchasedAt)}
+          <br />
+          <span className="text-xs text-slate-400">{formatTime(t.purchasedAt)}</span>
+        </>
+      ),
+    },
+    { key: "plan", header: "Plan", className: "font-medium text-slate-900", cell: (t) => t.planName },
+    { key: "type", header: "Type", cell: (t) => <PlanTypeBadge type={t.planType} /> },
+    { key: "hostel", header: "Hostel", cell: (t) => t.hostel ?? <span className="text-slate-400">Unknown</span> },
+    ...(isPartner
+      ? []
+      : ([
+          { key: "source", header: "Source", cell: (t) => <SourceChip t={t} /> },
+          {
+            key: "email",
+            header: "Email",
+            className: "max-w-[180px] truncate",
+            cell: (t) => t.customerEmail ?? <span className="text-slate-400">N/A</span>,
+          },
+          {
+            key: "ref",
+            header: "Ref",
+            cell: (t) => (t.paymentRef ? <CopyRef value={t.paymentRef} /> : <span className="text-slate-400">—</span>),
+          },
+        ] as Column<TransactionRow>[])),
+    {
+      key: "amount",
+      header: isPartner ? "Your Share" : "Amount",
+      align: "right",
+      className: "whitespace-nowrap font-semibold text-slate-900",
+      cell: (t) => `₦${(isPartner ? partnerShareFor(t) : t.price).toLocaleString()}`,
+    },
+  ];
+
+  const renderTransactionCard = (t: TransactionRow) => (
+    <MobileCard
+      title={
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="min-w-0 break-words">{t.planName}</span>
+          <PlanTypeBadge type={t.planType} />
+        </span>
+      }
+      aside={`₦${(isPartner ? partnerShareFor(t) : t.price).toLocaleString()}`}
+      subtitle={`${formatDay(t.purchasedAt)} · ${formatTime(t.purchasedAt)}`}
+      badges={isPartner ? undefined : <SourceChip t={t} />}
+      lines={[
+        { label: "Hostel", value: t.hostel ?? <span className="text-slate-400">Unknown</span> },
+        ...(isPartner
+          ? []
+          : [
+              <CardLine key="email" label="Email">
+                {t.customerEmail ? <span className="break-all">{t.customerEmail}</span> : <span className="text-slate-400">N/A</span>}
+              </CardLine>,
+              <CardLine key="ref" label="Payment ref">
+                {t.paymentRef ? <CopyRef value={t.paymentRef} full /> : <span className="text-slate-400">—</span>}
+              </CardLine>,
+            ]),
+      ]}
+    />
+  );
+
+  // Splits history: each row's figures, computed exactly as the table body
+  // used to compute them inline, so the table, its card and its expanded
+  // detail all read from one place.
+  const buildSplitRow = (s: SplitRecord) => {
+    const allSplitTxns = getSplitTransactions(s);
+    // Default expanded panel month to the active list filter month (unless manually overridden)
+    const activeMonth = expandedSplitMonths[s.id] ?? (splitFilterMonth || "");
+    const displayTxns = activeMonth
+      ? allSplitTxns.filter((t) => {
+          const [y, m] = activeMonth.split("-").map(Number);
+          return t.purchasedAt.getFullYear() === y && t.purchasedAt.getMonth() + 1 === m;
+        })
+      : allSplitTxns;
+    const sMaintPct = s.maintenancePct ?? maintenancePct;
+    // Row revenue: use month-filtered transactions when list filter is active
+    const rowTxns = splitFilterMonth ? getSplitTransactions(s, splitFilterMonth) : allSplitTxns;
+    const grossRev = rowTxns.reduce((a, t) => a + t.price, 0);
+    const mainDed = Math.round((grossRev * sMaintPct) / 100);
+    const paystackDed = Math.round((grossRev * paystackPct) / 100);
+    const splittableRev = grossRev - mainDed - paystackDed;
+    const splittablePctRow = 100 - sMaintPct - paystackPct;
+    const adminShr = Math.round((splittableRev * s.adminPercent) / 100);
+    const partnerShr = Math.round((splittableRev * s.partnerPercent) / 100);
+    const isExpanded = expandedSplitId === s.id;
+    const activeMonthLabel = activeMonth
+      ? new Date(activeMonth + "-01").toLocaleDateString("en-NG", { month: "long", year: "numeric" })
+      : "";
+    const periodLabel = s.isOpen
+      ? activeMonth
+        ? activeMonthLabel
+        : `From ${s.dateFrom} (Ongoing)`
+      : activeMonth
+        ? activeMonthLabel
+        : `${s.dateFrom} → ${s.dateTo}`;
+    return {
+      s,
+      allSplitTxns,
+      activeMonth,
+      displayTxns,
+      sMaintPct,
+      rowTxns,
+      grossRev,
+      mainDed,
+      paystackDed,
+      splittableRev,
+      splittablePctRow,
+      adminShr,
+      partnerShr,
+      isExpanded,
+      activeMonthLabel,
+      periodLabel,
+    };
+  };
+  type SplitRow = ReturnType<typeof buildSplitRow>;
+
+  const splitPeriod = (s: SplitRecord) =>
+    s.isOpen ? (
+      <span className="flex flex-wrap items-center gap-1.5">
+        From {s.dateFrom}
+        <span className="status-chip">● Live</span>
+      </span>
+    ) : (
+      <>
+        {s.dateFrom} → {s.dateTo}
+      </>
+    );
+
+  const splitActions = ({ s, isExpanded, periodLabel }: SplitRow) =>
+    !isPartner && (
+      <div className="flex items-center gap-1.5">
+        <IconButton
+          label={isExpanded ? "Hide transaction log" : "View transaction log"}
+          onClick={() => setExpandedSplitId(isExpanded ? null : s.id)}
+          tone="primary"
+          className={isExpanded ? "!bg-blue-100" : ""}>
+          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </IconButton>
+        {canEdit && (
+          <IconButton
+            label="Delete split"
+            tone="danger"
+            onClick={() =>
+              setConfirmModal({
+                isOpen: true,
+                title: "Delete this split?",
+                message: `This permanently deletes the ${s.hostel} split (${periodLabel}). This can't be undone.`,
+                onConfirm: () => handleDeleteSplit(s.id),
+              })
+            }
+            disabled={deletingSplit === s.id}>
+            <Trash2 size={16} />
+          </IconButton>
+        )}
+      </div>
+    );
+
+  const splitColumns: Column<SplitRow>[] = [
+    { key: "created", header: "Created", className: "whitespace-nowrap", cell: ({ s }) => formatDay(s.createdAt) },
+    { key: "hostel", header: "Hostel", className: "font-medium text-slate-900", cell: ({ s }) => s.hostel },
+    { key: "period", header: "Period", className: "whitespace-nowrap text-xs", cell: ({ s }) => splitPeriod(s) },
+    { key: "txns", header: "Txns", align: "center", cell: ({ rowTxns }) => rowTxns.length },
+    ...(isPartner
+      ? []
+      : ([
+          {
+            key: "revenue",
+            header: (
+              <>
+                Revenue
+                {splitFilterMonth && (
+                  <span className="ml-1 normal-case font-normal text-blue-500">
+                    ({new Date(splitFilterMonth + "-01").toLocaleDateString("en-NG", { month: "short", year: "numeric" })})
+                  </span>
+                )}
+              </>
+            ),
+            align: "right",
+            className: "whitespace-nowrap font-semibold text-slate-900",
+            cell: ({ grossRev }) => `₦${grossRev.toLocaleString()}`,
+          },
+          {
+            key: "yours",
+            header: "Your Share",
+            align: "right",
+            className: "whitespace-nowrap",
+            cell: ({ s, adminShr }) => (
+              <>
+                <span className="text-sm font-semibold text-blue-600">₦{adminShr.toLocaleString()}</span>
+                <span className="ml-1 text-xs text-slate-400">({s.adminPercent}%)</span>
+              </>
+            ),
+          },
+        ] as Column<SplitRow>[])),
+    {
+      key: "partner",
+      header: "Partner Share",
+      align: "right",
+      className: "whitespace-nowrap",
+      cell: ({ s, partnerShr }) => (
+        <>
+          <span className="text-sm font-semibold text-purple-600">₦{partnerShr.toLocaleString()}</span>
+          {!isPartner && <span className="ml-1 text-xs text-slate-400">({s.partnerPercent}%)</span>}
+        </>
+      ),
+    },
+    {
+      key: "notes",
+      header: "Notes",
+      className: "max-w-[140px] truncate",
+      cell: ({ s }) => s.notes || <span className="text-slate-300">—</span>,
+    },
+    { key: "actions", header: "", cell: (row) => splitActions(row) },
+  ];
+
+  const renderSplitCard = (row: SplitRow) => {
+    const { s, rowTxns, grossRev, adminShr, partnerShr } = row;
+    return (
+      <MobileCard
+        title={s.hostel}
+        subtitle={`Created ${formatDay(s.createdAt)}`}
+        aside={isPartner ? undefined : `₦${grossRev.toLocaleString()}`}
+        badges={
+          s.isOpen ? (
+            <span className="status-chip">● Live</span>
+          ) : undefined
+        }
+        lines={[
+          <CardLine key="period" label="Period">
+            {s.isOpen ? `From ${s.dateFrom}` : `${s.dateFrom} → ${s.dateTo}`}
+          </CardLine>,
+          { label: "Txns", value: rowTxns.length },
+          ...(isPartner
+            ? []
+            : [
+                {
+                  label: "Your share",
+                  value: (
+                    <>
+                      <span className="font-semibold text-blue-600">₦{adminShr.toLocaleString()}</span>
+                      <span className="ml-1 text-xs text-slate-400">({s.adminPercent}%)</span>
+                    </>
+                  ),
+                },
+              ]),
+          {
+            label: "Partner share",
+            value: (
+              <>
+                <span className="font-semibold text-purple-600">₦{partnerShr.toLocaleString()}</span>
+                {!isPartner && <span className="ml-1 text-xs text-slate-400">({s.partnerPercent}%)</span>}
+              </>
+            ),
+          },
+          ...(s.notes
+            ? [
+                <CardLine key="notes" label="Notes">
+                  {s.notes}
+                </CardLine>,
+              ]
+            : []),
+        ]}
+        actions={isPartner ? undefined : splitActions(row)}
+      />
+    );
+  };
+
+  const renderSplitDetail = (row: SplitRow) => {
+    const {
+      s,
+      allSplitTxns,
+      activeMonth,
+      displayTxns,
+      sMaintPct,
+      grossRev,
+      mainDed,
+      paystackDed,
+      splittableRev,
+      splittablePctRow,
+      activeMonthLabel,
+      periodLabel,
+    } = row;
+    const logColumns: Column<TransactionRow>[] = [
+      {
+        key: "date",
+        header: "Date",
+        className: "whitespace-nowrap text-xs",
+        cell: (t) => (
+          <>
+            {formatDay(t.purchasedAt)}
+            <br />
+            <span className="text-slate-400">{formatTime(t.purchasedAt)}</span>
+          </>
+        ),
+      },
+      { key: "plan", header: "Plan", className: "text-xs font-medium text-slate-900", cell: (t) => t.planName },
+      { key: "type", header: "Type", cell: (t) => <PlanTypeBadge type={t.planType} /> },
+      {
+        key: "email",
+        header: "Email",
+        className: "max-w-[160px] truncate text-xs",
+        cell: (t) => t.customerEmail ?? <span className="text-slate-400">N/A</span>,
+      },
+      {
+        key: "ref",
+        header: "Ref",
+        cell: (t) => (t.paymentRef ? <CopyRef value={t.paymentRef} /> : <span className="text-slate-400">—</span>),
+      },
+      {
+        key: "total",
+        header: "Total",
+        align: "right",
+        className: "whitespace-nowrap text-xs font-semibold text-slate-900",
+        cell: (t) => `₦${t.price.toLocaleString()}`,
+      },
+      {
+        key: "yours",
+        header: `Yours (${s.adminPercent}%)`,
+        align: "right",
+        className: "whitespace-nowrap text-xs font-semibold text-blue-600",
+        cell: (t) => `₦${Math.round((t.price * s.adminPercent) / 100).toLocaleString()}`,
+      },
+      {
+        key: "partner",
+        header: `Partner (${s.partnerPercent}%)`,
+        align: "right",
+        className: "whitespace-nowrap text-xs font-semibold text-purple-600",
+        cell: (t) => `₦${Math.round((t.price * s.partnerPercent) / 100).toLocaleString()}`,
+      },
+    ];
+    return (
+      <div className="space-y-4 rounded-2xl bg-blue-50/60 p-3 backdrop-blur-sm sm:p-4">
+        {/* Deductions summary bar — same pipeline-chip idiom as the create-form preview */}
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="glass-slate rounded-full px-2.5 py-1 font-semibold">Gross ₦{grossRev.toLocaleString()}</span>
+          <span className="text-slate-400">→</span>
+          <span className="glass-red rounded-full px-2.5 py-1 font-semibold">
+            −₦{mainDed.toLocaleString()} Maint. {sMaintPct}%
+          </span>
+          <span className="text-slate-400">→</span>
+          <span className="glass-orange rounded-full px-2.5 py-1 font-semibold">
+            −₦{paystackDed.toLocaleString()} Paystack {paystackPct}%
+          </span>
+          <span className="text-slate-400">→</span>
+          <span className="glass-green rounded-full px-2.5 py-1 font-bold">
+            ✓ ₦{splittableRev.toLocaleString()} Splittable {splittablePctRow.toFixed(1)}%
+          </span>
+        </div>
+        {/* Month filter + Export */}
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            value={expandedSplitMonths[s.id] ?? ""}
+            onChange={(e) => setExpandedSplitMonths((prev) => ({ ...prev, [s.id]: e.target.value }))}
+            className={`${GLASS_INPUT} sm:w-auto`}>
+            <option value="">All time ({allSplitTxns.length} txns)</option>
+            {getMonthOptions(s).map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => exportSplitLog(s, displayTxns, activeMonth ? activeMonthLabel : undefined)}
+            disabled={displayTxns.length === 0}
+            className="glass-button">
+            <Download size={14} />
+            Export Log
+          </button>
+        </div>
+        {/* Monthly revenue summary — shown only when a month is selected */}
+        {activeMonth &&
+          (() => {
+            const mGross = displayTxns.reduce((a, t) => a + t.price, 0);
+            const mMainDed = Math.round((mGross * sMaintPct) / 100);
+            const mPayDed = Math.round((mGross * paystackPct) / 100);
+            const mSplittable = Math.max(0, mGross - mMainDed - mPayDed);
+            const mAdminShr = Math.round((mSplittable * s.adminPercent) / 100);
+            const mPartnerShr = Math.round((mSplittable * s.partnerPercent) / 100);
+            const tile = "min-w-0 rounded-2xl border border-white/70 px-3 py-2.5 shadow-sm backdrop-blur-xl";
+            const figure = "text-base font-bold [overflow-wrap:anywhere] sm:text-lg";
+            return (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                <div className={`${tile} bg-white/70`}>
+                  <p className="mb-0.5 text-xs text-slate-400">Transactions</p>
+                  <p className={`${figure} text-slate-900`}>{displayTxns.length}</p>
+                </div>
+                <div className={`${tile} bg-white/70`}>
+                  <p className="mb-0.5 text-xs text-slate-400">Gross Revenue</p>
+                  <p className={`${figure} text-slate-900`}>₦{mGross.toLocaleString()}</p>
+                </div>
+                <div className={`${tile} bg-red-50/70`}>
+                  <p className="mb-0.5 text-xs text-red-400">−Maint. {sMaintPct}%</p>
+                  <p className={`${figure} text-red-600`}>−₦{mMainDed.toLocaleString()}</p>
+                </div>
+                <div className={`${tile} bg-orange-50/70`}>
+                  <p className="mb-0.5 text-xs text-orange-400">−Paystack {paystackPct}%</p>
+                  <p className={`${figure} text-orange-600`}>−₦{mPayDed.toLocaleString()}</p>
+                </div>
+                <div className={`${tile} bg-blue-50/70`}>
+                  <p className="mb-0.5 text-xs text-blue-500">Your Share ({s.adminPercent}%)</p>
+                  <p className={`${figure} text-blue-700`}>₦{mAdminShr.toLocaleString()}</p>
+                </div>
+                <div className={`${tile} bg-purple-50/70`}>
+                  <p className="mb-0.5 text-xs text-purple-500">Partner Share ({s.partnerPercent}%)</p>
+                  <p className={`${figure} text-purple-700`}>₦{mPartnerShr.toLocaleString()}</p>
+                </div>
+              </div>
+            );
+          })()}
+        {/* Email section — write permission required */}
+        {canEdit && (
+          <div className="flex flex-col gap-3 rounded-2xl border border-white/70 bg-white/70 px-3 py-3 shadow-sm backdrop-blur-xl sm:px-4">
+            {/* Quick-send buttons for stored emails */}
+            {(s.adminEmail || s.partnerEmail) && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold text-slate-500">Quick send:</span>
+                {s.adminEmail && (
+                  <button
+                    onClick={() => handleSendSplitEmail(s, displayTxns, s.adminEmail!, periodLabel)}
+                    disabled={sendingEmail}
+                    className="glass-blue flex min-h-[40px] max-w-full items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors hover:brightness-95 disabled:opacity-50">
+                    <Mail size={12} className="shrink-0" />
+                    <span className="truncate">To Me ({s.adminEmail.split("@")[0]})</span>
+                  </button>
+                )}
+                {s.partnerEmail && (
+                  <button
+                    onClick={() => handleSendSplitEmail(s, displayTxns, s.partnerEmail!, periodLabel)}
+                    disabled={sendingEmail}
+                    className="glass-purple flex min-h-[40px] max-w-full items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors hover:brightness-95 disabled:opacity-50">
+                    <Mail size={12} className="shrink-0" />
+                    <span className="truncate">To Partner ({s.partnerEmail.split("@")[0]})</span>
+                  </button>
+                )}
+                {s.sendMonthlyEmail && <span className="status-chip text-xs">Monthly emails on</span>}
+              </div>
+            )}
+            {/* Manual email input — stacks on a phone */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+              <Mail size={16} className="hidden shrink-0 text-slate-400 sm:block" />
+              <input
+                type="email"
+                placeholder="Send to any email…"
+                value={emailSplitId === s.id ? emailAddress : ""}
+                onFocus={() => {
+                  setEmailSplitId(s.id);
+                  setEmailSuccess("");
+                }}
+                onChange={(e) => {
+                  setEmailSplitId(s.id);
+                  setEmailAddress(e.target.value);
+                }}
+                className={`${GLASS_INPUT} sm:min-w-[200px] sm:flex-1`}
+              />
+              <button
+                onClick={() => handleSendSplitEmail(s, displayTxns, emailSplitId === s.id ? emailAddress : "", periodLabel)}
+                disabled={sendingEmail || !(emailSplitId === s.id && emailAddress.trim())}
+                className="glass-primary">
+                <Mail size={14} />
+                {sendingEmail && emailSplitId === s.id ? "Sending…" : "Send"}
+              </button>
+              {emailSuccess && emailSplitId === s.id && (
+                <span className="text-xs font-semibold text-emerald-600">{emailSuccess}</span>
+              )}
+            </div>
+          </div>
+        )}
+        {/* Transaction log header */}
+        <p className="break-words text-sm font-semibold text-slate-800">
+          Transaction Log — <span className="text-blue-600">{s.hostel}</span>
+          <span className="ml-2 text-xs font-normal text-slate-500">{periodLabel}</span>
+          <span className="ml-2 text-xs font-normal text-slate-500">
+            ({displayTxns.length} transaction{displayTxns.length !== 1 ? "s" : ""})
+          </span>
+        </p>
+        {displayTxns.length === 0 ? (
+          <p className="py-4 text-center text-sm text-slate-400">No transactions found for this period.</p>
+        ) : (
+          // Cards below `md` (the card list brings its own padding, so this
+          // cancels the detail's); the bordered 8-column table from `md` up.
+          <div className="-mx-3 sm:-mx-4 md:mx-0 md:overflow-hidden md:rounded-2xl md:border md:border-white/70 md:bg-white/70 md:shadow-sm md:backdrop-blur-xl">
+            <ResponsiveTable
+              rows={displayTxns}
+              columns={logColumns}
+              rowKey={(t) => t.id}
+              renderCard={(t) => (
+                <MobileCard
+                  title={
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="min-w-0 break-words">{t.planName}</span>
+                      <PlanTypeBadge type={t.planType} />
+                    </span>
+                  }
+                  aside={`₦${t.price.toLocaleString()}`}
+                  subtitle={`${formatDay(t.purchasedAt)} · ${formatTime(t.purchasedAt)}`}
+                  lines={[
+                    {
+                      label: `Yours (${s.adminPercent}%)`,
+                      value: (
+                        <span className="font-semibold text-blue-600">
+                          ₦{Math.round((t.price * s.adminPercent) / 100).toLocaleString()}
+                        </span>
+                      ),
+                    },
+                    {
+                      label: `Partner (${s.partnerPercent}%)`,
+                      value: (
+                        <span className="font-semibold text-purple-600">
+                          ₦{Math.round((t.price * s.partnerPercent) / 100).toLocaleString()}
+                        </span>
+                      ),
+                    },
+                    <CardLine key="email" label="Email">
+                      {t.customerEmail ? <span className="break-all">{t.customerEmail}</span> : <span className="text-slate-400">N/A</span>}
+                    </CardLine>,
+                    <CardLine key="ref" label="Payment ref">
+                      {t.paymentRef ? <CopyRef value={t.paymentRef} full /> : <span className="text-slate-400">—</span>}
+                    </CardLine>,
+                  ]}
+                />
+              )}
+            />
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <ProtectedRoute module='transactions'>
-      <div className="min-h-screen analytics-shell">
-        <header className="glass-header">
-          <div className="flex min-w-0 items-center gap-3">
-            <Logo variant="dark" />
-            <div>
-              <p className="eyebrow">TRANSACTIONS &amp; PAYOUTS</p>
-              <h1 className="text-xl font-semibold sm:text-2xl">Transaction audit</h1>
-            </div>
+      <AdminPage
+        eyebrow="TRANSACTIONS & PAYOUTS"
+        title="Transaction audit"
+        actions={
+          <button
+            onClick={() => {
+              fetchAll();
+              if (!isPartner) void fetchAllTransactions();
+            }}
+            disabled={loading}
+            title="Refresh transactions"
+            aria-label="Refresh transactions"
+            className="glass-button">
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+        }>
+        {error && (
+          <div className="glass-alert">
+            <AlertTriangle size={18} className="shrink-0" />
+            <span className="min-w-0 break-words">{error}</span>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => {
-                fetchAll();
-                if (!isPartner) void fetchAllTransactions();
-              }}
-              disabled={loading}
-              title="Refresh transactions"
-              className="glass-button">
-              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
-            <button onClick={handleLogout} className="glass-button hidden sm:inline-flex">
-              <LogOut size={16} />
-              Logout
-            </button>
-          </div>
-        </header>
+        )}
 
-        <main className="mx-auto max-w-[1600px] space-y-5 px-4 py-6 sm:px-8">
-          {error && (
-            <div className="glass-alert">
-              <AlertTriangle size={18} />
-              {error}
-            </div>
-          )}
+        {/* Tabs */}
+        <TabBar
+          value={activeTab}
+          onChange={setActiveTab}
+          tabs={[
+            {
+              value: "transactions",
+              label: isPartner ? "My Transactions" : "Transactions",
+              icon: <BarChart3 size={16} />,
+            },
+            {
+              value: "payouts",
+              label: "Partner Payouts",
+              icon: <Wallet size={16} />,
+              count: partners.length,
+              hidden: isPartner,
+            },
+            {
+              value: "splits",
+              label: "Split Counter",
+              icon: <Scissors size={16} />,
+              count: splitRecords.length,
+              hidden: isPartner,
+            },
+            {
+              value: "reserve",
+              label: "Platform Reserve",
+              icon: <Landmark size={16} />,
+              hidden: isPartner || !isSuperAdmin,
+            },
+          ]}
+        />
 
-          {/* Tabs */}
-          <div className="overflow-x-auto">
-            <div className="inline-flex items-center gap-1 rounded-full border border-white/80 bg-white/70 p-1 backdrop-blur-xl min-w-max">
-              <button
-                onClick={() => setActiveTab("transactions")}
-                className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition sm:px-6 ${
-                  activeTab === "transactions" ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:bg-white"
-                }`}>
-                <BarChart3 size={16} />
-                {isPartner ? "My Transactions" : "Transactions"}
-              </button>
-              {!isPartner && (
+        {/* ── TRANSACTIONS TAB ─────────────────────────────────────────── */}
+        {activeTab === "transactions" && (
+          <>
+            {/* Summary cards */}
+            <div className="kpi-grid lg:grid-cols-4">
+              {isPartner ? (
                 <>
-                  <button
-                    onClick={() => setActiveTab("payouts")}
-                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition sm:px-6 ${
-                      activeTab === "payouts" ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:bg-white"
-                    }`}>
-                    <Wallet size={16} />
-                    Partner Payouts
-                    {partners.length > 0 && (
-                      <span
-                        className={`rounded-full px-1.5 py-0.5 text-xs font-semibold ${
-                          activeTab === "payouts" ? "bg-white/20 text-white" : "slate-chip"
-                        }`}>
-                        {partners.length}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("splits")}
-                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition sm:px-6 ${
-                      activeTab === "splits" ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:bg-white"
-                    }`}>
-                    <Scissors size={16} />
-                    Split Counter
-                    {splitRecords.length > 0 && (
-                      <span
-                        className={`rounded-full px-1.5 py-0.5 text-xs font-semibold ${
-                          activeTab === "splits" ? "bg-white/20 text-white" : "slate-chip"
-                        }`}>
-                        {splitRecords.length}
-                      </span>
-                    )}
-                  </button>
-                  {isSuperAdmin && (
-                    <button
-                      onClick={() => setActiveTab("reserve")}
-                      className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition sm:px-6 ${
-                        activeTab === "reserve" ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:bg-white"
-                      }`}>
-                      <Landmark size={16} />
-                      Platform Reserve
-                    </button>
-                  )}
+                  <Kpi label="Transactions" tone="slate" value={loading ? "—" : totalTransactionsCount.toLocaleString()} />
+                  <Kpi
+                    label="Profit"
+                    tone="purple"
+                    value={loading ? "—" : `₦${totalPartnerShare.toLocaleString()}`}
+                  />
+                </>
+              ) : (
+                <>
+                  <Kpi label="Total Transactions" tone="slate" value={loading ? "—" : totalTransactionsCount.toLocaleString()} />
+                  <Kpi label="Total Revenue" tone="green" value={loading ? "—" : `₦${totalRevenue.toLocaleString()}`} />
+                  <Kpi
+                    label="Device Plans"
+                    tone="blue"
+                    value={loading ? "—" : filtered.filter((t) => t.planType === "device").length.toLocaleString()}
+                  />
+                  <Kpi
+                    label="TV Plans"
+                    tone="violet"
+                    value={loading ? "—" : filtered.filter((t) => t.planType === "tv").length.toLocaleString()}
+                  />
                 </>
               )}
             </div>
-          </div>
 
-          {/* ── TRANSACTIONS TAB ─────────────────────────────────────────── */}
-          {activeTab === "transactions" && (
-            <>
-              {/* Summary cards */}
-              <div className="kpi-grid lg:grid-cols-4">
-                {isPartner ? (
-                  <>
-                    <Kpi label="Transactions" tone="slate" value={loading ? "—" : totalTransactionsCount.toLocaleString()} />
-                    <Kpi
-                      label="Profit"
-                      tone="purple"
-                      value={loading ? "—" : `₦${totalPartnerShare.toLocaleString()}`}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <Kpi label="Total Transactions" tone="slate" value={loading ? "—" : totalTransactionsCount.toLocaleString()} />
-                    <Kpi label="Total Revenue" tone="green" value={loading ? "—" : `₦${totalRevenue.toLocaleString()}`} />
-                    <Kpi
-                      label="Device Plans"
-                      tone="blue"
-                      value={loading ? "—" : filtered.filter((t) => t.planType === "device").length.toLocaleString()}
-                    />
-                    <Kpi
-                      label="TV Plans"
-                      tone="violet"
-                      value={loading ? "—" : filtered.filter((t) => t.planType === "tv").length.toLocaleString()}
-                    />
-                  </>
-                )}
-              </div>
-
-              {/* Per-controller breakdown — server-computed, unaffected by the
-                  filters below (it reflects the whole ledger, not `filtered`).
-                  Shown before Revenue by Hostel — the controller rollup is
-                  the primary view. Collapsed by default: the grid below is
-                  only rendered once expanded, not just hidden, so a long
-                  controller list costs nothing until someone opens it. */}
-              {!isPartner && !loading && byController.length > 0 && (
-                <section className="glass-panel">
-                  <div className="panel-heading">
-                    <div>
-                      <p className="eyebrow">TRANSACTIONS</p>
-                      <h3 className="flex items-center gap-2">
-                        <Router size={18} className="text-blue-500" />
-                        Revenue by controller
-                      </h3>
-                      {!showControllerRevenue && (
-                        <p className="mt-1 text-xs text-slate-500">
-                          ₦{byController.reduce((sum, row) => sum + row.revenue, 0).toLocaleString()} across {byController.length}{" "}
-                          controller{byController.length !== 1 ? "s" : ""}
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => setShowControllerRevenue((v) => !v)}
-                      className="glass-icon !h-9 !w-9"
-                      aria-expanded={showControllerRevenue}
-                      title={showControllerRevenue ? "Collapse" : "Expand"}>
-                      {showControllerRevenue ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    </button>
-                  </div>
-                  {showControllerRevenue && (
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                      {byController.map((row) => (
-                        <div key={row.controllerId} className="glass-controller">
-                          <p className="truncate text-sm font-medium text-slate-700">{row.controllerName}</p>
-                          <p className="mt-1 text-lg font-bold text-slate-900">₦{row.revenue.toLocaleString()}</p>
-                          <p className="text-xs text-slate-500">
-                            {row.transactions} transaction{row.transactions !== 1 ? "s" : ""} ·{" "}
-                            {row.hostelCount} hostel{row.hostelCount !== 1 ? "s" : ""}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
-              )}
-
-              {/* Per-hostel breakdown — same collapse-by-default treatment. */}
-              {!isPartner && !loading && byHostel.length > 0 && (
-                <section className="glass-panel">
-                  <div className="panel-heading">
-                    <div>
-                      <p className="eyebrow">TRANSACTIONS</p>
-                      <h3 className="flex items-center gap-2">
-                        <Building2 size={18} className="text-blue-500" />
-                        Revenue by hostel
-                      </h3>
-                      {!showHostelRevenue && (
-                        <p className="mt-1 text-xs text-slate-500">
-                          ₦{totalRevenue.toLocaleString()} across {byHostel.length} hostel{byHostel.length !== 1 ? "s" : ""}
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => setShowHostelRevenue((v) => !v)}
-                      className="glass-icon !h-9 !w-9"
-                      aria-expanded={showHostelRevenue}
-                      title={showHostelRevenue ? "Collapse" : "Expand"}>
-                      {showHostelRevenue ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    </button>
-                  </div>
-                  {showHostelRevenue && (
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                      {byHostel.map((row) => (
-                        <div key={row.hostel} className="glass-controller">
-                          <p className="truncate text-sm font-medium text-slate-700">{row.hostel}</p>
-                          <p className="mt-1 text-lg font-bold text-slate-900">₦{row.revenue.toLocaleString()}</p>
-                          <p className="text-xs text-slate-500">
-                            {row.count} transaction{row.count !== 1 ? "s" : ""}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
-              )}
-
-              {/* Filters + Export */}
+            {/* Per-controller breakdown — server-computed, unaffected by the
+                filters below (it reflects the whole ledger, not `filtered`).
+                Shown before Revenue by Hostel — the controller rollup is
+                the primary view. Collapsed by default: the grid below is
+                only rendered once expanded, not just hidden, so a long
+                controller list costs nothing until someone opens it. */}
+            {!isPartner && !loading && byController.length > 0 && (
               <section className="glass-panel">
-                <div className="flex flex-col gap-4">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-                    <div className="relative">
-                      <Search className={GLASS_INPUT_ICON} />
-                      <input
-                        type="text"
-                        placeholder="Search email, plan, ref…"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className={`${GLASS_INPUT} pl-11`}
-                      />
-                    </div>
-                    <select value={filterHostel} onChange={(e) => setFilterHostel(e.target.value)} className={GLASS_INPUT}>
-                      <option value="all">All Hostels</option>
-                      {knownHostels.map((h) => (
-                        <option key={h} value={h}>
-                          {h}
+                <div className="panel-heading flex-nowrap">
+                  <div className="min-w-0">
+                    <p className="eyebrow">TRANSACTIONS</p>
+                    <h3 className="flex items-center gap-2">
+                      <Router size={18} className="shrink-0 text-blue-500" />
+                      Revenue by controller
+                    </h3>
+                    {!showControllerRevenue && (
+                      <p className="mt-1 text-xs text-slate-500">
+                        ₦{byController.reduce((sum, row) => sum + row.revenue, 0).toLocaleString()} across {byController.length}{" "}
+                        controller{byController.length !== 1 ? "s" : ""}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setShowControllerRevenue((v) => !v)}
+                    className="glass-icon shrink-0"
+                    aria-expanded={showControllerRevenue}
+                    aria-label={showControllerRevenue ? "Collapse" : "Expand"}
+                    title={showControllerRevenue ? "Collapse" : "Expand"}>
+                    {showControllerRevenue ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+                </div>
+                {showControllerRevenue && (
+                  <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+                    {byController.map((row) => (
+                      <div key={row.controllerId} className="glass-controller min-w-0">
+                        <p className="break-words text-sm font-medium text-slate-700">{row.controllerName}</p>
+                        <p className="mt-1 text-lg font-bold text-slate-900 [overflow-wrap:anywhere]">₦{row.revenue.toLocaleString()}</p>
+                        <p className="text-xs text-slate-500">
+                          {row.transactions} transaction{row.transactions !== 1 ? "s" : ""} ·{" "}
+                          {row.hostelCount} hostel{row.hostelCount !== 1 ? "s" : ""}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* Per-hostel breakdown — same collapse-by-default treatment. */}
+            {!isPartner && !loading && byHostel.length > 0 && (
+              <section className="glass-panel">
+                <div className="panel-heading flex-nowrap">
+                  <div className="min-w-0">
+                    <p className="eyebrow">TRANSACTIONS</p>
+                    <h3 className="flex items-center gap-2">
+                      <Building2 size={18} className="shrink-0 text-blue-500" />
+                      Revenue by hostel
+                    </h3>
+                    {!showHostelRevenue && (
+                      <p className="mt-1 text-xs text-slate-500">
+                        ₦{totalRevenue.toLocaleString()} across {byHostel.length} hostel{byHostel.length !== 1 ? "s" : ""}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setShowHostelRevenue((v) => !v)}
+                    className="glass-icon shrink-0"
+                    aria-expanded={showHostelRevenue}
+                    aria-label={showHostelRevenue ? "Collapse" : "Expand"}
+                    title={showHostelRevenue ? "Collapse" : "Expand"}>
+                    {showHostelRevenue ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+                </div>
+                {showHostelRevenue && (
+                  <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+                    {byHostel.map((row) => (
+                      <div key={row.hostel} className="glass-controller min-w-0">
+                        <p className="break-words text-sm font-medium text-slate-700">{row.hostel}</p>
+                        <p className="mt-1 text-lg font-bold text-slate-900 [overflow-wrap:anywhere]">₦{row.revenue.toLocaleString()}</p>
+                        <p className="text-xs text-slate-500">
+                          {row.count} transaction{row.count !== 1 ? "s" : ""}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* Filters + Export */}
+            <section className="glass-panel">
+              <div className="flex flex-col gap-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                  <div className="relative">
+                    <Search className={GLASS_INPUT_ICON} />
+                    <input
+                      type="text"
+                      placeholder="Search email, plan, ref…"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className={`${GLASS_INPUT} pl-11`}
+                    />
+                  </div>
+                  <select value={filterHostel} onChange={(e) => setFilterHostel(e.target.value)} className={GLASS_INPUT}>
+                    <option value="all">All Hostels</option>
+                    {knownHostels.map((h) => (
+                      <option key={h} value={h}>
+                        {h}
+                      </option>
+                    ))}
+                  </select>
+                  {!isPartner && (
+                    <select value={controllerFilter} onChange={(e) => setControllerFilter(e.target.value)} className={GLASS_INPUT}>
+                      <option value="all">All Controllers</option>
+                      {byController.map((row) => (
+                        <option key={row.controllerId} value={row.controllerId}>
+                          {row.controllerName}
                         </option>
                       ))}
                     </select>
-                    {!isPartner && (
-                      <select value={controllerFilter} onChange={(e) => setControllerFilter(e.target.value)} className={GLASS_INPUT}>
-                        <option value="all">All Controllers</option>
-                        {byController.map((row) => (
-                          <option key={row.controllerId} value={row.controllerId}>
-                            {row.controllerName}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                    <select
-                      value={filterPlanType}
-                      onChange={(e) => setFilterPlanType(e.target.value as typeof filterPlanType)}
-                      className={GLASS_INPUT}>
-                      <option value="all">All Plan Types</option>
-                      <option value="device">Device Plan</option>
-                      <option value="tv">TV Plan</option>
-                      <option value="unlimited">Unlimited</option>
-                    </select>
-                    <select
-                      value={filterPaymentSource}
-                      onChange={(e) => setFilterPaymentSource(e.target.value as typeof filterPaymentSource)}
-                      className={GLASS_INPUT}>
-                      <option value="all">All Sources</option>
-                      <option value="bot">Paid with Bot</option>
-                      <option value="site">Paid on Site</option>
-                    </select>
-                    <div className="flex gap-2">
-                      <input
-                        type="date"
-                        value={filterDateFrom}
-                        onChange={(e) => setFilterDateFrom(e.target.value)}
-                        className={`${GLASS_INPUT} flex-1`}
-                        title="Date from"
-                      />
-                      <input
-                        type="date"
-                        value={filterDateTo}
-                        onChange={(e) => setFilterDateTo(e.target.value)}
-                        className={`${GLASS_INPUT} flex-1`}
-                        title="Date to"
-                      />
-                    </div>
+                  )}
+                  <select
+                    value={filterPlanType}
+                    onChange={(e) => setFilterPlanType(e.target.value as typeof filterPlanType)}
+                    className={GLASS_INPUT}>
+                    <option value="all">All Plan Types</option>
+                    <option value="device">Device Plan</option>
+                    <option value="tv">TV Plan</option>
+                    <option value="unlimited">Unlimited</option>
+                  </select>
+                  <select
+                    value={filterPaymentSource}
+                    onChange={(e) => setFilterPaymentSource(e.target.value as typeof filterPaymentSource)}
+                    className={GLASS_INPUT}>
+                    <option value="all">All Sources</option>
+                    <option value="bot">Paid with Bot</option>
+                    <option value="site">Paid on Site</option>
+                  </select>
+                  {/* From/to stack on a phone, sit side by side from `sm`. */}
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <input
+                      type="date"
+                      value={filterDateFrom}
+                      onChange={(e) => setFilterDateFrom(e.target.value)}
+                      className={`${GLASS_INPUT} min-w-0 sm:flex-1`}
+                      title="Date from"
+                      aria-label="Date from"
+                    />
+                    <input
+                      type="date"
+                      value={filterDateTo}
+                      onChange={(e) => setFilterDateTo(e.target.value)}
+                      className={`${GLASS_INPUT} min-w-0 sm:flex-1`}
+                      title="Date to"
+                      aria-label="Date to"
+                    />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-slate-500">
-                      {isPartner
-                        ? `${totalTransactionsCount.toLocaleString()} transaction${totalTransactionsCount !== 1 ? "s" : ""} • ₦${totalPartnerShare.toLocaleString()} your share`
-                        : `${totalTransactionsCount.toLocaleString()} transaction${totalTransactionsCount !== 1 ? "s" : ""} • ₦${totalRevenue.toLocaleString()} total`}
-                      {hasMoreTransactions && (
-                        <span className="ml-1 text-slate-400">
-                          — showing {filtered.length.toLocaleString()} below
-                        </span>
-                      )}
-                    </p>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                  <p className="min-w-0 break-words text-sm text-slate-500">
+                    {isPartner
+                      ? `${totalTransactionsCount.toLocaleString()} transaction${totalTransactionsCount !== 1 ? "s" : ""} • ₦${totalPartnerShare.toLocaleString()} your share`
+                      : `${totalTransactionsCount.toLocaleString()} transaction${totalTransactionsCount !== 1 ? "s" : ""} • ₦${totalRevenue.toLocaleString()} total`}
+                    {hasMoreTransactions && (
+                      <span className="ml-1 text-slate-400">
+                        — showing {filtered.length.toLocaleString()} below
+                      </span>
+                    )}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
                     {/* Until now this count sat beside no control at all: the
                         only ways past the newest page were narrowing the date
                         filter or exporting the whole ledger. */}
@@ -1910,1136 +2365,799 @@ export default function AdminTransactionsPage() {
                       <button
                         onClick={() => void loadMoreTransactions()}
                         disabled={loadingMore}
-                        className="flex items-center gap-2 rounded-xl border border-white/90 bg-white/70 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:bg-white hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50">
+                        className="glass-button flex-1 sm:flex-none">
                         {loadingMore ? "Loading…" : "Load more"}
                       </button>
                     )}
                     <button
                       onClick={() => void exportToExcel()}
                       disabled={filtered.length === 0 || exporting}
-                      className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50">
+                      className="glass-primary flex-1 sm:flex-none">
                       <Download size={16} />
                       {exporting ? "Exporting…" : "Export Excel"}
                     </button>
                   </div>
                 </div>
-              </section>
-
-              {/* Transactions table */}
-              <section className="glass-panel !p-0">
-                {loading ? (
-                  <div className="py-16 text-center text-sm text-slate-400">Loading transactions…</div>
-                ) : filtered.length === 0 ? (
-                  <div className="py-16 text-center text-sm text-slate-400">No transactions match your filters.</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-white/70">
-                          <Th>Date</Th>
-                          <Th>Plan</Th>
-                          <Th>Type</Th>
-                          <Th>Hostel</Th>
-                          {!isPartner && (
-                            <>
-                              <Th>Source</Th>
-                              <Th>Email</Th>
-                              <Th>Ref</Th>
-                            </>
-                          )}
-                          <Th align="right">{isPartner ? "Your Share" : "Amount"}</Th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/60">
-                        {filtered.map((t) => (
-                          <tr key={t.id} className="transition hover:bg-white/70">
-                            <Td className="whitespace-nowrap">
-                              {t.purchasedAt.toLocaleDateString("en-NG", {
-                                day: "2-digit",
-                                month: "short",
-                                year: "numeric",
-                              })}
-                              <br />
-                              <span className="text-xs text-slate-400">
-                                {t.purchasedAt.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}
-                              </span>
-                            </Td>
-                            <Td className="font-medium text-slate-900">{t.planName}</Td>
-                            <Td>
-                              <PlanTypeBadge type={t.planType} />
-                            </Td>
-                            <Td>{t.hostel ?? <span className="text-slate-400">Unknown</span>}</Td>
-                            {!isPartner && (
-                              <>
-                                <Td>
-                                  {"paymentSource" in t && (t as DataPurchaseRow).paymentSource === "bot" ? (
-                                    <span className="status-chip inline-flex items-center gap-1">
-                                      <Smartphone size={12} />
-                                      Bot
-                                    </span>
-                                  ) : (
-                                    <span className="slate-chip">Site</span>
-                                  )}
-                                </Td>
-                                <Td className="max-w-[180px] truncate">
-                                  {t.customerEmail ?? <span className="text-slate-400">N/A</span>}
-                                </Td>
-                                <Td className="font-mono text-xs text-slate-500">
-                                  {t.paymentRef ? (
-                                    <span title={t.paymentRef}>
-                                      {t.paymentRef.length > 14 ? t.paymentRef.slice(0, 14) + "…" : t.paymentRef}
-                                    </span>
-                                  ) : (
-                                    <span className="text-slate-400">—</span>
-                                  )}
-                                </Td>
-                              </>
-                            )}
-                            <Td align="right" className="whitespace-nowrap font-semibold text-slate-900">
-                              ₦{(isPartner ? partnerShareFor(t) : t.price).toLocaleString()}
-                            </Td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </section>
-            </>
-          )}
-
-          {/* ── PARTNER PAYOUTS TAB (admin-only) ─────────────────────────── */}
-          {!isPartner && activeTab === "payouts" && (
-            <>
-              {/* Period control */}
-              <div className="flex flex-wrap items-center gap-3">
-                <SegToggle
-                  value={payoutMode}
-                  onChange={setPayoutMode}
-                  options={[
-                    { value: "all", label: "All time" },
-                    { value: "month", label: "By month" },
-                  ]}
-                />
-                {payoutMode === "month" && (
-                  <input
-                    type="month"
-                    value={payoutMonth}
-                    onChange={(e) => setPayoutMonth(e.target.value)}
-                    className={`${GLASS_INPUT} w-auto`}
-                    aria-label="Payout month"
-                  />
-                )}
               </div>
+            </section>
 
-              {/* Grand totals */}
-              <div className="kpi-grid lg:grid-cols-4">
-                <Kpi
-                  label="Total to pay partners"
-                  tone="purple"
-                  value={loading ? "—" : `₦${payoutTotals.partnerTotal.toLocaleString()}`}
-                  note={payoutMode === "all" ? "All time" : payoutMonth}
-                />
-                <Kpi
-                  label="Your share from partnered hostels"
-                  tone="slate"
-                  value={loading ? "—" : `₦${payoutTotals.adminTotal.toLocaleString()}`}
-                />
-              </div>
-
-              {/* Per-partner breakdown */}
-              {partners.length === 0 ? (
-                <section className="glass-panel text-center text-sm text-slate-500">
-                  No partner accounts yet. Mark an admin as a partner (in Admin Management) to see their payouts here.
-                </section>
+            {/* Transactions table — cards below `md` */}
+            <Panel flush>
+              {loading ? (
+                <div className="py-16 text-center text-sm text-slate-400">Loading transactions…</div>
+              ) : filtered.length === 0 ? (
+                <div className="py-16 text-center text-sm text-slate-400">No transactions match your filters.</div>
               ) : (
-                <div className="space-y-4">
-                  {partnerPayouts.map((p) => (
-                    <section key={p.id} className="glass-panel !p-0">
-                      <div className="flex items-center justify-between gap-4 border-b border-white/70 p-5">
-                        <div className="flex items-center gap-3">
-                          <div className="controller-icon shrink-0 !bg-purple-100 !text-purple-600">
-                            <Wallet size={18} />
-                          </div>
-                          <div>
-                            <p className="font-semibold text-slate-900">{p.username}</p>
-                            <p className="text-xs text-slate-500">
-                              {p.mode === "perHostel" ? "Per-hostel split" : "Same split for all hostels"}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <p className="text-xs text-slate-500">You pay</p>
-                          <p className="text-xl font-bold text-purple-600">₦{p.totalCut.toLocaleString()}</p>
-                        </div>
-                      </div>
-
-                      {p.rows.length === 0 ? (
-                        <div className="p-5 text-sm text-slate-500">No revenue in this period.</div>
-                      ) : (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="border-b border-white/70">
-                                <Th>Hostel</Th>
-                                <Th align="right">Revenue</Th>
-                                <Th align="right">Split</Th>
-                                <Th align="right">Partner cut</Th>
-                                <Th align="right">Your share</Th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/60">
-                              {p.rows.map((r) => (
-                                <tr key={r.hostelId}>
-                                  <Td className="text-slate-900">{r.name}</Td>
-                                  <Td align="right">₦{r.gross.toLocaleString()}</Td>
-                                  <Td align="right" className="text-slate-500">
-                                    {r.pct}%
-                                  </Td>
-                                  <Td align="right" className="font-semibold text-purple-600">
-                                    ₦{r.cut.toLocaleString()}
-                                  </Td>
-                                  <Td align="right">₦{r.adminGain.toLocaleString()}</Td>
-                                </tr>
-                              ))}
-                            </tbody>
-                            <tfoot>
-                              <tr className="border-t border-white/70 font-semibold text-slate-900">
-                                <Td>Total</Td>
-                                <Td align="right">₦{p.totalGross.toLocaleString()}</Td>
-                                <Td>{""}</Td>
-                                <Td align="right" className="text-purple-600">
-                                  ₦{p.totalCut.toLocaleString()}
-                                </Td>
-                                <Td align="right">₦{p.adminGain.toLocaleString()}</Td>
-                              </tr>
-                            </tfoot>
-                          </table>
-                        </div>
-                      )}
-                    </section>
-                  ))}
-                </div>
+                <ResponsiveTable
+                  rows={filtered}
+                  columns={transactionColumns}
+                  rowKey={(t) => t.id}
+                  renderCard={renderTransactionCard}
+                />
               )}
-            </>
-          )}
+            </Panel>
+          </>
+        )}
 
-          {isSuperAdmin && activeTab === "reserve" && (
-            <section className="space-y-5">
-              {reserveError && <div className="glass-alert"><AlertTriangle size={18} />{reserveError}</div>}
-              {reserveLoading || !reserveState ? (
-                <div className="glass-panel p-8 text-center text-sm text-slate-500">Loading platform reserve…</div>
-              ) : (
-                <>
-                  <div className="kpi-grid lg:grid-cols-4">
-                    <Kpi label="Reserve rate" value={`${reserveState.reservePercent}%`} tone="blue" />
-                    <Kpi label="Total allocated" value={`₦${(reserveState.totalAllocatedKobo / 100).toLocaleString()}`} tone="green" />
-                    <Kpi label="Withdrawn" value={`₦${(reserveState.totalWithdrawnKobo / 100).toLocaleString()}`} tone="violet" />
-                    <Kpi label="Available in period" value={`₦${(reserveState.availableKobo / 100).toLocaleString()}`} tone="teal" />
-                  </div>
+        {/* ── PARTNER PAYOUTS TAB (admin-only) ─────────────────────────── */}
+        {!isPartner && activeTab === "payouts" && (
+          <>
+            {/* Period control */}
+            <div className="flex flex-wrap items-center gap-3">
+              <SegToggle
+                value={payoutMode}
+                onChange={setPayoutMode}
+                options={[
+                  { value: "all", label: "All time" },
+                  { value: "month", label: "By month" },
+                ]}
+              />
+              {payoutMode === "month" && (
+                <input
+                  type="month"
+                  value={payoutMonth}
+                  onChange={(e) => setPayoutMonth(e.target.value)}
+                  className={`${GLASS_INPUT} sm:w-auto`}
+                  aria-label="Payout month"
+                />
+              )}
+            </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="eyebrow">RESERVE PERIOD</p>
-                      <p className="text-sm text-slate-500">2.5% of every sale, split to the reserve account at payment.</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {reservePeriod === "month" && (
-                        <input
-                          type="month"
-                          value={reserveMonth}
-                          onChange={(e) => setReserveMonth(e.target.value)}
-                          className={`${GLASS_INPUT} w-auto`}
-                          aria-label="Reserve month"
-                        />
-                      )}
-                      <SegToggle
-                        value={reservePeriod}
-                        onChange={setReservePeriod}
-                        options={[{ value: "day", label: "Day" }, { value: "month", label: "Month" }, { value: "year", label: "Year" }, { value: "all", label: "All time" }]}
-                      />
-                    </div>
-                  </div>
+            {/* Grand totals */}
+            <div className="kpi-grid lg:grid-cols-4">
+              <Kpi
+                label="Total to pay partners"
+                tone="purple"
+                value={loading ? "—" : `₦${payoutTotals.partnerTotal.toLocaleString()}`}
+                note={payoutMode === "all" ? "All time" : payoutMonth}
+              />
+              <Kpi
+                label="Your share from partnered hostels"
+                tone="slate"
+                value={loading ? "—" : `₦${payoutTotals.adminTotal.toLocaleString()}`}
+              />
+            </div>
 
-                  <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
-                    <div className="glass-panel p-5">
-                      <div className="mb-4 flex items-center justify-between gap-3">
-                        <div>
-                          <p className="eyebrow">RESERVE ACCOUNT</p>
-                          <h2 className="text-lg font-bold text-slate-900">Superadmin bank details</h2>
+            {/* Per-partner breakdown */}
+            {partners.length === 0 ? (
+              <section className="glass-panel text-center text-sm text-slate-500">
+                No partner accounts yet. Mark an admin as a partner (in Admin Management) to see their payouts here.
+              </section>
+            ) : (
+              <div className="space-y-4">
+                {partnerPayouts.map((p) => (
+                  <section key={p.id} className="glass-panel !p-0">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/70 p-4 sm:p-5">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="controller-icon shrink-0 !bg-purple-100 !text-purple-600">
+                          <Wallet size={18} />
                         </div>
-                        <Landmark className="text-blue-500" size={20} />
+                        <div className="min-w-0">
+                          <p className="break-words font-semibold text-slate-900">{p.username}</p>
+                          <p className="text-xs text-slate-500">
+                            {p.mode === "perHostel" ? "Per-hostel split" : "Same split for all hostels"}
+                          </p>
+                        </div>
                       </div>
-                      {reserveState.bank && <p className="mb-4 rounded-2xl bg-blue-50 px-4 py-3 text-sm text-blue-800">{reserveState.bank.accountName} · {reserveState.bank.bankName} · {reserveState.bank.accountNumberMasked}</p>}
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <select
-                          className={GLASS_INPUT}
-                          value={bankForm.bankCode}
-                          onChange={(e) => {
-                            const bank = banks.find((b) => b.code === e.target.value);
-                            setBankForm({ ...bankForm, bankCode: e.target.value, bankName: bank?.name ?? "", accountName: "" });
-                            setManualName(false);
-                          }}
-                        >
-                          <option value="">{banksLoading ? "Loading banks…" : "Select bank"}</option>
-                          {banks.map((b) => (
-                            <option key={b.code} value={b.code}>{b.name}</option>
-                          ))}
-                        </select>
-                        <input
-                          className={GLASS_INPUT}
-                          placeholder="Account number"
-                          inputMode="numeric"
-                          maxLength={10}
-                          value={bankForm.accountNumber}
-                          onChange={(e) => setBankForm({ ...bankForm, accountNumber: e.target.value.replace(/\D/g, ""), accountName: manualName ? bankForm.accountName : "" })}
-                        />
+                      <div className="shrink-0 text-right">
+                        <p className="text-xs text-slate-500">You pay</p>
+                        <p className="text-xl font-bold text-purple-600">₦{p.totalCut.toLocaleString()}</p>
                       </div>
-                      <div className="mt-3">
-                        {resolveStatus === "checking" && <p className="text-sm text-slate-500">Verifying account name…</p>}
-                        {resolveStatus === "resolved" && (
-                          <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">{bankForm.accountName}</p>
-                        )}
-                        {resolveStatus === "failed" && !manualName && (
-                          <div className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                            <p>{resolveError}</p>
-                            <button type="button" className="mt-1 font-semibold underline" onClick={() => setManualName(true)}>
-                              Enter the account name myself
-                            </button>
-                          </div>
-                        )}
-                        {manualName && (
-                          <input
-                            className={GLASS_INPUT}
-                            placeholder="Account name"
-                            value={bankForm.accountName}
-                            onChange={(e) => setBankForm({ ...bankForm, accountName: e.target.value })}
+                    </div>
+
+                    {p.rows.length === 0 ? (
+                      <div className="p-5 text-sm text-slate-500">No revenue in this period.</div>
+                    ) : (
+                      <ResponsiveTable
+                        rows={p.rows}
+                        rowKey={(r) => r.hostelId}
+                        columns={[
+                          { key: "hostel", header: "Hostel", className: "text-slate-900", cell: (r) => r.name },
+                          { key: "revenue", header: "Revenue", align: "right", cell: (r) => `₦${r.gross.toLocaleString()}` },
+                          { key: "split", header: "Split", align: "right", className: "text-slate-500", cell: (r) => `${r.pct}%` },
+                          {
+                            key: "cut",
+                            header: "Partner cut",
+                            align: "right",
+                            className: "font-semibold text-purple-600",
+                            cell: (r) => `₦${r.cut.toLocaleString()}`,
+                          },
+                          { key: "yours", header: "Your share", align: "right", cell: (r) => `₦${r.adminGain.toLocaleString()}` },
+                        ]}
+                        renderCard={(r) => (
+                          <MobileCard
+                            title={r.name}
+                            aside={<span className="text-purple-600">₦{r.cut.toLocaleString()}</span>}
+                            subtitle="Partner cut"
+                            lines={[
+                              { label: "Revenue", value: `₦${r.gross.toLocaleString()}` },
+                              { label: "Split", value: `${r.pct}%` },
+                              { label: "Your share", value: `₦${r.adminGain.toLocaleString()}` },
+                            ]}
                           />
                         )}
-                      </div>
-                      <button onClick={saveReserveBank} disabled={reserveActionLoading || !canSaveBank} className="glass-button mt-4">Save bank details</button>
-                    </div>
-
-                    <div className="glass-panel p-5">
-                      <div className="mb-4 flex items-center justify-between gap-3">
-                        <div>
-                          <p className="eyebrow">PAYSTACK SUBACCOUNT · BOT PAYMENTS</p>
-                          <h2 className="text-lg font-bold text-slate-900">Reserve subaccount</h2>
-                        </div>
-                        <LockKeyhole className="text-amber-500" size={20} />
-                      </div>
-                      {reserveState.reserveSubaccount && (
-                        <div className="mb-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                          <p className="font-semibold">{reserveState.reserveSubaccount.code}</p>
-                          {reserveState.reserveSubaccount.source === "admin" ? (
-                            <p>{reserveState.reserveSubaccount.accountName} · {reserveState.reserveSubaccount.bankName} · {reserveState.reserveSubaccount.accountNumberMasked}</p>
-                          ) : (
-                            <p>Set from the server&apos;s environment. Create one here to manage it from this page.</p>
-                          )}
-                          <p className="mt-1 text-xs">Card payments send exactly 2.5% of the plan price; bank transfers send 2.3% of the amount paid (the same reserve, measured on the larger total).</p>
-                        </div>
-                      )}
-                      {!reserveState.pinConfigured ? (
-                        <div className="rounded-2xl bg-amber-50 p-4">
-                          <p className="mb-3 text-sm text-amber-900">Set your reserve PIN once. It confirms changes to where the reserve is paid, is hashed, and is never returned to the browser.</p>
-                          <div className="flex gap-2">
-                            <input className={GLASS_INPUT} type="password" inputMode="numeric" placeholder="4–6 digit PIN" value={pin} onChange={(e) => setPin(e.target.value)} />
-                            <button onClick={setReservePin} disabled={reserveActionLoading} className="glass-button whitespace-nowrap">Set PIN</button>
-                          </div>
-                        </div>
-                      ) : reserveState.reserveSubaccount?.source === "admin" && reserveState.reserveSubaccount.matchesSavedBank ? (
-                        <p className="text-sm text-slate-500">Bot payments split the reserve to this account. To change it, save different bank details, then confirm with your PIN here.</p>
-                      ) : (
-                        <div className="space-y-3">
-                          <p className="text-sm text-slate-600">
-                            {reserveState.reserveSubaccount?.source === "admin"
-                              ? "The saved bank details differ from the subaccount's. Confirm to move the subaccount onto them."
-                              : "Creates the Paystack subaccount for the saved bank details. Bot payments start splitting the reserve to it straight away."}
-                          </p>
-                          <input className={GLASS_INPUT} type="password" inputMode="numeric" placeholder="Reserve PIN" value={subaccountPin} onChange={(e) => setSubaccountPin(e.target.value)} />
-                          <button onClick={saveReserveSubaccount} disabled={reserveActionLoading || !reserveState.bank || !subaccountPin} className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50">
-                            {reserveState.reserveSubaccount?.source === "admin" ? "Move subaccount to saved bank" : "Create reserve subaccount"}
-                          </button>
-                          {!reserveState.bank && <p className="text-xs text-amber-700">Save bank details first.</p>}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="glass-panel overflow-hidden">
-                    <div className="panel-heading"><div><p className="eyebrow">AUDIT TRAIL</p><h2 className="text-lg font-bold text-slate-900">Reserve allocations</h2></div></div>
-                    <div className="overflow-x-auto"><table className="w-full"><thead><tr><Th>Transaction</Th><Th>Plan</Th><Th>Hostel</Th><Th align="right">Gross</Th><Th align="right">2.5% reserve</Th><Th>Date</Th></tr></thead><tbody>
-                      {reserveState.allocations.slice(0, 200).map((row) => <tr key={row.id} className="border-t border-slate-100 hover:bg-white/50"><Td>{row.source.toUpperCase()} · {row.transactionId.slice(0, 10)}</Td><Td>{row.planName}</Td><Td>{row.hostel || "—"}</Td><Td align="right">₦{row.grossNaira.toLocaleString()}</Td><Td align="right" className="font-semibold text-emerald-700">₦{(row.reserveKobo / 100).toLocaleString()}</Td><Td>{row.occurredAt ? new Date(row.occurredAt).toLocaleDateString() : "—"}</Td></tr>)}
-                    </tbody></table></div>
-                  </div>
-
-                  {reserveState.withdrawals.length > 0 && <div className="glass-panel overflow-hidden"><div className="panel-heading"><div><p className="eyebrow">WITHDRAWALS</p><h2 className="text-lg font-bold text-slate-900">Withdrawal history</h2></div></div><div className="overflow-x-auto"><table className="w-full"><thead><tr><Th>Reference</Th><Th>Provider</Th><Th>Status</Th><Th align="right">Amount</Th><Th>Date</Th></tr></thead><tbody>{reserveState.withdrawals.slice().reverse().map((row) => <tr key={row.id} className="border-t border-slate-100"><Td>{row.reference}</Td><Td>{row.provider}</Td><Td>{row.status}</Td><Td align="right">₦{(row.amountKobo / 100).toLocaleString()}</Td><Td>{new Date(row.createdAt).toLocaleDateString()}</Td></tr>)}</tbody></table></div></div>}
-                </>
-              )}
-            </section>
-          )}
-
-          {/* ── SPLITS TAB ───────────────────────────────────────────────── */}
-          {activeTab === "splits" && (
-            <>
-              {splitsError && (
-                <div className="glass-alert">
-                  <AlertTriangle size={18} />
-                  {splitsError}
-                </div>
-              )}
-              {splitSuccess && (
-                <div className="glass-alert border-emerald-200 bg-emerald-50/90 text-emerald-800">
-                  <AlertTriangle size={18} />
-                  {splitSuccess}
-                </div>
-              )}
-
-              {/* Create Split form */}
-              {canEdit && !isPartner && (
-                <section className="glass-panel">
-                  <div className="panel-heading">
-                    <div>
-                      <p className="eyebrow">SPLITS</p>
-                      <h3 className="flex items-center gap-2">
-                        <Plus size={18} className="text-blue-500" />
-                        Create new split
-                      </h3>
-                    </div>
-                  </div>
-                  {/* Deductions info banner — maintenance % editable. .glass-alert
-                      is already amber/orange by default, a direct fit here. */}
-                  <div className="glass-alert mb-5 flex-wrap gap-x-4 gap-y-2 text-xs font-semibold">
-                    <span className="flex items-center gap-1.5">
-                      🔧 Maintenance:
-                      <input
-                        type="number"
-                        min={0}
-                        max={50}
-                        value={splitMaintenancePct}
-                        onChange={(e) => setSplitMaintenancePct(e.target.value === "" ? "" : Number(e.target.value))}
-                        className="w-14 rounded-lg border border-amber-300/60 bg-white/70 px-1.5 py-0.5 text-center font-bold text-amber-900 backdrop-blur-xl focus:outline-none focus:ring-1 focus:ring-amber-400"
+                        footer={{
+                          cells: (
+                            <tr className="font-semibold text-slate-900">
+                              <Td className="font-semibold text-slate-900">Total</Td>
+                              <Td align="right" className="font-semibold text-slate-900">
+                                ₦{p.totalGross.toLocaleString()}
+                              </Td>
+                              <Td>{""}</Td>
+                              <Td align="right" className="font-semibold text-purple-600">
+                                ₦{p.totalCut.toLocaleString()}
+                              </Td>
+                              <Td align="right" className="font-semibold text-slate-900">
+                                ₦{p.adminGain.toLocaleString()}
+                              </Td>
+                            </tr>
+                          ),
+                          card: (
+                            <MobileCard
+                              title="Total"
+                              aside={<span className="text-purple-600">₦{p.totalCut.toLocaleString()}</span>}
+                              subtitle="Partner cut"
+                              lines={[
+                                { label: "Revenue", value: `₦${p.totalGross.toLocaleString()}` },
+                                { label: "Your share", value: `₦${p.adminGain.toLocaleString()}` },
+                              ]}
+                            />
+                          ),
+                        }}
                       />
-                      %
-                    </span>
-                    <span className="opacity-40">|</span>
-                    <span>
-                      💳 Paystack: <span className="font-bold">{paystackPct}%</span>
-                    </span>
-                    <span className="opacity-40">|</span>
-                    <span className="text-emerald-700">
-                      ✓ Available:{" "}
-                      <span className="font-bold">
-                        {typeof splitMaintenancePct === "number" ? (100 - splitMaintenancePct - paystackPct).toFixed(1) : "—"}%
-                      </span>
-                    </span>
+                    )}
+                  </section>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {isSuperAdmin && activeTab === "reserve" && (
+          <section className="space-y-5">
+            {reserveError && (
+              <div className="glass-alert">
+                <AlertTriangle size={18} className="shrink-0" />
+                <span className="min-w-0 break-words">{reserveError}</span>
+              </div>
+            )}
+            {reserveLoading || !reserveState ? (
+              <div className="glass-panel p-8 text-center text-sm text-slate-500">Loading platform reserve…</div>
+            ) : (
+              <>
+                <div className="kpi-grid lg:grid-cols-4">
+                  <Kpi label="Reserve rate" value={`${reserveState.reservePercent}%`} tone="blue" />
+                  <Kpi label="Total allocated" value={`₦${(reserveState.totalAllocatedKobo / 100).toLocaleString()}`} tone="green" />
+                  <Kpi label="Withdrawn" value={`₦${(reserveState.totalWithdrawnKobo / 100).toLocaleString()}`} tone="violet" />
+                  <Kpi label="Available in period" value={`₦${(reserveState.availableKobo / 100).toLocaleString()}`} tone="teal" />
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="eyebrow">RESERVE PERIOD</p>
+                    <p className="text-sm text-slate-500">2.5% of every sale, split to the reserve account at payment.</p>
                   </div>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Hostel</label>
-                      <select value={splitHostel} onChange={(e) => setSplitHostel(e.target.value)} className={GLASS_INPUT}>
-                        <option value="">Select hostel…</option>
-                        {knownHostels.map((h) => (
-                          <option key={h} value={h}>
-                            {h}
-                          </option>
+                  <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
+                    {reservePeriod === "month" && (
+                      <input
+                        type="month"
+                        value={reserveMonth}
+                        onChange={(e) => setReserveMonth(e.target.value)}
+                        className={`${GLASS_INPUT} sm:w-auto`}
+                        aria-label="Reserve month"
+                      />
+                    )}
+                    <SegToggle
+                      value={reservePeriod}
+                      onChange={setReservePeriod}
+                      options={[{ value: "day", label: "Day" }, { value: "month", label: "Month" }, { value: "year", label: "Year" }, { value: "all", label: "All time" }]}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
+                  <div className="glass-panel min-w-0 sm:p-5">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="eyebrow">RESERVE ACCOUNT</p>
+                        <h2 className="text-lg font-bold text-slate-900">Superadmin bank details</h2>
+                      </div>
+                      <Landmark className="shrink-0 text-blue-500" size={20} />
+                    </div>
+                    {reserveState.bank && <p className="mb-4 break-words rounded-2xl bg-blue-50 px-4 py-3 text-sm text-blue-800">{reserveState.bank.accountName} · {reserveState.bank.bankName} · {reserveState.bank.accountNumberMasked}</p>}
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <select
+                        className={GLASS_INPUT}
+                        value={bankForm.bankCode}
+                        onChange={(e) => {
+                          const bank = banks.find((b) => b.code === e.target.value);
+                          setBankForm({ ...bankForm, bankCode: e.target.value, bankName: bank?.name ?? "", accountName: "" });
+                          setManualName(false);
+                        }}
+                      >
+                        <option value="">{banksLoading ? "Loading banks…" : "Select bank"}</option>
+                        {banks.map((b) => (
+                          <option key={b.code} value={b.code}>{b.name}</option>
                         ))}
                       </select>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Split Type</label>
-                      <SegToggle
-                        value={splitIsOpen ? "open" : "fixed"}
-                        onChange={(v) => setSplitIsOpen(v === "open")}
-                        options={[
-                          { value: "fixed", label: "Fixed Period" },
-                          { value: "open", label: "Ongoing ●" },
-                        ]}
-                        activeClass={splitIsOpen ? "bg-emerald-500 text-white shadow-sm" : "bg-blue-500 text-white shadow-sm"}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">
-                        {splitIsOpen ? "Count From" : "Period From"}
-                      </label>
                       <input
-                        type="date"
-                        value={splitDateFrom}
-                        onChange={(e) => setSplitDateFrom(e.target.value)}
                         className={GLASS_INPUT}
+                        placeholder="Account number"
+                        inputMode="numeric"
+                        maxLength={10}
+                        value={bankForm.accountNumber}
+                        onChange={(e) => setBankForm({ ...bankForm, accountNumber: e.target.value.replace(/\D/g, ""), accountName: manualName ? bankForm.accountName : "" })}
                       />
                     </div>
-                    {!splitIsOpen && (
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Period To</label>
-                        <input
-                          type="date"
-                          value={splitDateTo}
-                          onChange={(e) => setSplitDateTo(e.target.value)}
-                          className={GLASS_INPUT}
-                        />
-                      </div>
-                    )}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Your Share (%)</label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={splitAdminPct}
-                        onChange={(e) => {
-                          const v = e.target.value === "" ? "" : Number(e.target.value);
-                          setSplitAdminPct(v);
-                          if (typeof v === "number" && v >= 0 && v <= 100) setSplitPartnerPct(100 - v);
-                        }}
-                        className={GLASS_INPUT}
-                        placeholder="50"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Partner&apos;s Share (%)</label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={splitPartnerPct}
-                        onChange={(e) => {
-                          const v = e.target.value === "" ? "" : Number(e.target.value);
-                          setSplitPartnerPct(v);
-                          if (typeof v === "number" && v >= 0 && v <= 100) setSplitAdminPct(100 - v);
-                        }}
-                        className={GLASS_INPUT}
-                        placeholder="50"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Notes (optional)</label>
-                      <input
-                        type="text"
-                        value={splitNotes}
-                        onChange={(e) => setSplitNotes(e.target.value)}
-                        placeholder="e.g. March 2026 split"
-                        className={GLASS_INPUT}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Your Email (reports)</label>
-                      <input
-                        type="email"
-                        value={splitAdminEmail}
-                        onChange={(e) => setSplitAdminEmail(e.target.value)}
-                        placeholder="your@email.com"
-                        className={GLASS_INPUT}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Partner Email (reports)</label>
-                      <input
-                        type="email"
-                        value={splitPartnerEmail}
-                        onChange={(e) => setSplitPartnerEmail(e.target.value)}
-                        placeholder="partner@email.com"
-                        className={GLASS_INPUT}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Monthly Report Email</label>
-                      <label className={`flex cursor-pointer items-center gap-3 ${GLASS_INPUT} hover:bg-white/90`}>
-                        <div className="relative shrink-0">
-                          <input
-                            type="checkbox"
-                            checked={splitSendMonthlyEmail}
-                            onChange={(e) => setSplitSendMonthlyEmail(e.target.checked)}
-                            className="sr-only"
-                          />
-                          <div className={`h-6 w-10 rounded-full transition-colors ${splitSendMonthlyEmail ? "bg-blue-500" : "bg-slate-300"}`} />
-                          <div
-                            className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-all ${splitSendMonthlyEmail ? "left-5" : "left-1"}`}
-                          />
+                    <div className="mt-3">
+                      {resolveStatus === "checking" && <p className="text-sm text-slate-500">Verifying account name…</p>}
+                      {resolveStatus === "resolved" && (
+                        <p className="break-words rounded-xl bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">{bankForm.accountName}</p>
+                      )}
+                      {resolveStatus === "failed" && !manualName && (
+                        <div className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                          <p className="break-words">{resolveError}</p>
+                          <button type="button" className="inline-flex min-h-[40px] items-center font-semibold underline" onClick={() => setManualName(true)}>
+                            Enter the account name myself
+                          </button>
                         </div>
-                        <span className="text-sm text-slate-700">{splitSendMonthlyEmail ? "Enabled — send monthly" : "Disabled"}</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Live preview */}
-                  {splitPreview && (
-                    <div className="mt-5 rounded-2xl bg-white/60 p-4">
-                      {splitPreview.count === 0 ? (
-                        <p className="py-2 text-center text-sm text-slate-500">No transactions found for this hostel and period.</p>
-                      ) : (
-                        <>
-                          {/* Deduction pipeline chips */}
-                          <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
-                            <span className="glass-slate rounded-full px-2.5 py-1 font-semibold">
-                              Gross ₦{splitPreview.totalRevenue.toLocaleString()}
-                            </span>
-                            <span className="text-slate-400">→</span>
-                            <span className="glass-red rounded-full px-2.5 py-1 font-semibold">
-                              −₦{splitPreview.maintenanceDeduction.toLocaleString()} Maint.
-                            </span>
-                            <span className="text-slate-400">→</span>
-                            <span className="glass-orange rounded-full px-2.5 py-1 font-semibold">
-                              −₦{splitPreview.paystackDeduction.toLocaleString()} Paystack
-                            </span>
-                            <span className="text-slate-400">→</span>
-                            <span className="glass-green rounded-full px-2.5 py-1 font-bold">
-                              ✓ ₦{splitPreview.splittableRevenue.toLocaleString()} Splittable
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                            <div>
-                              <p className="text-xs text-slate-500">Transactions</p>
-                              <p className="text-2xl font-bold text-slate-900">{splitPreview.count}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-slate-500">Splittable Revenue</p>
-                              <p className="text-2xl font-bold text-emerald-700">₦{splitPreview.splittableRevenue.toLocaleString()}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-slate-500">Your Share ({splitAdminPct}%)</p>
-                              <p className="text-2xl font-bold text-blue-600">₦{splitPreview.adminShare.toLocaleString()}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-slate-500">Partner Share ({splitPartnerPct}%)</p>
-                              <p className="text-2xl font-bold text-purple-600">₦{splitPreview.partnerShare.toLocaleString()}</p>
-                            </div>
-                          </div>
-                        </>
+                      )}
+                      {manualName && (
+                        <input
+                          className={GLASS_INPUT}
+                          placeholder="Account name"
+                          value={bankForm.accountName}
+                          onChange={(e) => setBankForm({ ...bankForm, accountName: e.target.value })}
+                        />
                       )}
                     </div>
-                  )}
-
-                  <div className="mt-5 flex justify-end">
-                    <button
-                      onClick={handleCreateSplit}
-                      disabled={creatingSplit || !splitHostel || !splitDateFrom || (!splitIsOpen && !splitDateTo)}
-                      className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50">
-                      <Scissors size={16} />
-                      {creatingSplit ? "Saving…" : "Save Split"}
-                    </button>
+                    <button onClick={saveReserveBank} disabled={reserveActionLoading || !canSaveBank} className="glass-button mt-4 w-full sm:w-auto">Save bank details</button>
                   </div>
-                </section>
-              )}
 
-              {/* Splits history */}
+                  <div className="glass-panel min-w-0 sm:p-5">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="eyebrow">PAYSTACK SUBACCOUNT · BOT PAYMENTS</p>
+                        <h2 className="text-lg font-bold text-slate-900">Reserve subaccount</h2>
+                      </div>
+                      <LockKeyhole className="shrink-0 text-amber-500" size={20} />
+                    </div>
+                    {reserveState.reserveSubaccount && (
+                      <div className="mb-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                        <p className="break-all font-semibold">{reserveState.reserveSubaccount.code}</p>
+                        {reserveState.reserveSubaccount.source === "admin" ? (
+                          <p className="break-words">{reserveState.reserveSubaccount.accountName} · {reserveState.reserveSubaccount.bankName} · {reserveState.reserveSubaccount.accountNumberMasked}</p>
+                        ) : (
+                          <p>Set from the server&apos;s environment. Create one here to manage it from this page.</p>
+                        )}
+                        <p className="mt-1 text-xs">Card payments send exactly 2.5% of the plan price; bank transfers send 2.3% of the amount paid (the same reserve, measured on the larger total).</p>
+                      </div>
+                    )}
+                    {!reserveState.pinConfigured ? (
+                      <div className="rounded-2xl bg-amber-50 p-4">
+                        <p className="mb-3 text-sm text-amber-900">Set your reserve PIN once. It confirms changes to where the reserve is paid, is hashed, and is never returned to the browser.</p>
+                        <div className="flex flex-col gap-2 min-[400px]:flex-row">
+                          <input className={`${GLASS_INPUT} min-w-0`} type="password" inputMode="numeric" placeholder="4–6 digit PIN" value={pin} onChange={(e) => setPin(e.target.value)} />
+                          <button onClick={setReservePin} disabled={reserveActionLoading} className="glass-button whitespace-nowrap">Set PIN</button>
+                        </div>
+                      </div>
+                    ) : reserveState.reserveSubaccount?.source === "admin" && reserveState.reserveSubaccount.matchesSavedBank ? (
+                      <p className="text-sm text-slate-500">Bot payments split the reserve to this account. To change it, save different bank details, then confirm with your PIN here.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        <p className="text-sm text-slate-600">
+                          {reserveState.reserveSubaccount?.source === "admin"
+                            ? "The saved bank details differ from the subaccount's. Confirm to move the subaccount onto them."
+                            : "Creates the Paystack subaccount for the saved bank details. Bot payments start splitting the reserve to it straight away."}
+                        </p>
+                        <input className={GLASS_INPUT} type="password" inputMode="numeric" placeholder="Reserve PIN" value={subaccountPin} onChange={(e) => setSubaccountPin(e.target.value)} />
+                        <button onClick={saveReserveSubaccount} disabled={reserveActionLoading || !reserveState.bank || !subaccountPin} className="glass-primary w-full">
+                          {reserveState.reserveSubaccount?.source === "admin" ? "Move subaccount to saved bank" : "Create reserve subaccount"}
+                        </button>
+                        {!reserveState.bank && <p className="text-xs text-amber-700">Save bank details first.</p>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <Panel flush eyebrow="AUDIT TRAIL" title="Reserve allocations">
+                  <ResponsiveTable
+                    rows={reserveState.allocations.slice(0, 200)}
+                    rowKey={(row) => row.id}
+                    columns={[
+                      {
+                        key: "txn",
+                        header: "Transaction",
+                        cell: (row) => `${row.source.toUpperCase()} · ${row.transactionId.slice(0, 10)}`,
+                      },
+                      { key: "plan", header: "Plan", cell: (row) => row.planName },
+                      { key: "hostel", header: "Hostel", cell: (row) => row.hostel || "—" },
+                      { key: "gross", header: "Gross", align: "right", cell: (row) => `₦${row.grossNaira.toLocaleString()}` },
+                      {
+                        key: "reserve",
+                        header: "2.5% reserve",
+                        align: "right",
+                        className: "font-semibold text-emerald-700",
+                        cell: (row) => `₦${(row.reserveKobo / 100).toLocaleString()}`,
+                      },
+                      {
+                        key: "date",
+                        header: "Date",
+                        cell: (row) => (row.occurredAt ? new Date(row.occurredAt).toLocaleDateString() : "—"),
+                      },
+                    ]}
+                    renderCard={(row) => (
+                      <MobileCard
+                        title={row.planName}
+                        subtitle={row.hostel || "—"}
+                        aside={<span className="text-emerald-700">₦{(row.reserveKobo / 100).toLocaleString()}</span>}
+                        lines={[
+                          { label: "Gross", value: `₦${row.grossNaira.toLocaleString()}` },
+                          { label: "Date", value: row.occurredAt ? new Date(row.occurredAt).toLocaleDateString() : "—" },
+                          <span key="txn" className="break-all font-mono text-xs text-slate-500">
+                            {row.source.toUpperCase()} · {row.transactionId.slice(0, 10)}
+                          </span>,
+                        ]}
+                      />
+                    )}
+                  />
+                </Panel>
+
+                {/* Five short columns — stays a table, scrolling sideways on a phone. */}
+                {reserveState.withdrawals.length > 0 && (
+                  <Panel flush eyebrow="WITHDRAWALS" title="Withdrawal history">
+                    <div className="overflow-x-auto pb-2">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-slate-200/70">
+                            <Th>Reference</Th>
+                            <Th>Provider</Th>
+                            <Th>Status</Th>
+                            <Th align="right">Amount</Th>
+                            <Th>Date</Th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {reserveState.withdrawals
+                            .slice()
+                            .reverse()
+                            .map((row) => (
+                              <tr key={row.id} className="border-t border-slate-100 transition hover:bg-white/50">
+                                <Td className="whitespace-nowrap font-mono text-xs">{row.reference}</Td>
+                                <Td className="whitespace-nowrap">{row.provider}</Td>
+                                <Td className="whitespace-nowrap">{row.status}</Td>
+                                <Td align="right" className="whitespace-nowrap font-semibold text-slate-900">
+                                  ₦{(row.amountKobo / 100).toLocaleString()}
+                                </Td>
+                                <Td className="whitespace-nowrap">{new Date(row.createdAt).toLocaleDateString()}</Td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </Panel>
+                )}
+              </>
+            )}
+          </section>
+        )}
+
+        {/* ── SPLITS TAB ───────────────────────────────────────────────── */}
+        {activeTab === "splits" && (
+          <>
+            {splitsError && (
+              <div className="glass-alert">
+                <AlertTriangle size={18} className="shrink-0" />
+                <span className="min-w-0 break-words">{splitsError}</span>
+              </div>
+            )}
+            {splitSuccess && (
+              <div className="glass-alert border-emerald-200 bg-emerald-50/90 text-emerald-800">
+                <AlertTriangle size={18} className="shrink-0" />
+                {splitSuccess}
+              </div>
+            )}
+
+            {/* Create Split form */}
+            {canEdit && !isPartner && (
               <section className="glass-panel">
-                <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center">
-                  <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-                    <BarChart3 size={18} className="text-blue-500" />
-                    Splits History
-                    <span className="ml-1 text-sm font-normal text-slate-500">({filteredSplits.length})</span>
-                  </h3>
-                  <div className="flex flex-wrap gap-3 sm:ml-auto">
-                    <select
-                      value={splitFilterHostel}
-                      onChange={(e) => setSplitFilterHostel(e.target.value)}
-                      className={`${GLASS_INPUT} w-auto`}>
-                      <option value="all">All Hostels</option>
+                <div className="panel-heading">
+                  <div className="min-w-0">
+                    <p className="eyebrow">SPLITS</p>
+                    <h3 className="flex items-center gap-2">
+                      <Plus size={18} className="text-blue-500" />
+                      Create new split
+                    </h3>
+                  </div>
+                </div>
+                {/* Deductions info banner — maintenance % editable. .glass-alert
+                    is already amber/orange by default, a direct fit here. */}
+                <div className="glass-alert mb-5 flex-wrap gap-x-4 gap-y-2 text-xs font-semibold">
+                  <span className="flex items-center gap-1.5">
+                    🔧 Maintenance:
+                    <input
+                      type="number"
+                      min={0}
+                      max={50}
+                      value={splitMaintenancePct}
+                      onChange={(e) => setSplitMaintenancePct(e.target.value === "" ? "" : Number(e.target.value))}
+                      className="min-h-[36px] w-16 rounded-lg border border-amber-300/60 bg-white/70 px-1.5 py-0.5 text-center font-bold text-amber-900 backdrop-blur-xl focus:outline-none focus:ring-1 focus:ring-amber-400"
+                    />
+                    %
+                  </span>
+                  <span className="opacity-40">|</span>
+                  <span>
+                    💳 Paystack: <span className="font-bold">{paystackPct}%</span>
+                  </span>
+                  <span className="opacity-40">|</span>
+                  <span className="text-emerald-700">
+                    ✓ Available:{" "}
+                    <span className="font-bold">
+                      {typeof splitMaintenancePct === "number" ? (100 - splitMaintenancePct - paystackPct).toFixed(1) : "—"}%
+                    </span>
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Hostel</label>
+                    <select value={splitHostel} onChange={(e) => setSplitHostel(e.target.value)} className={GLASS_INPUT}>
+                      <option value="">Select hostel…</option>
                       {knownHostels.map((h) => (
                         <option key={h} value={h}>
                           {h}
                         </option>
                       ))}
                     </select>
-                    <select
-                      value={splitFilterMonth}
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Split Type</label>
+                    <SegToggle
+                      value={splitIsOpen ? "open" : "fixed"}
+                      onChange={(v) => setSplitIsOpen(v === "open")}
+                      options={[
+                        { value: "fixed", label: "Fixed Period" },
+                        { value: "open", label: "Ongoing ●" },
+                      ]}
+                      activeClass={splitIsOpen ? "bg-emerald-500 text-white shadow-sm" : "bg-blue-500 text-white shadow-sm"}
+                    />
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                      {splitIsOpen ? "Count From" : "Period From"}
+                    </label>
+                    <input
+                      type="date"
+                      value={splitDateFrom}
+                      onChange={(e) => setSplitDateFrom(e.target.value)}
+                      className={GLASS_INPUT}
+                    />
+                  </div>
+                  {!splitIsOpen && (
+                    <div className="flex min-w-0 flex-col gap-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Period To</label>
+                      <input
+                        type="date"
+                        value={splitDateTo}
+                        onChange={(e) => setSplitDateTo(e.target.value)}
+                        className={GLASS_INPUT}
+                      />
+                    </div>
+                  )}
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Your Share (%)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={splitAdminPct}
                       onChange={(e) => {
-                        setSplitFilterMonth(e.target.value);
-                        if (e.target.value) {
-                          setSplitFilterFrom("");
-                          setSplitFilterTo("");
-                        }
+                        const v = e.target.value === "" ? "" : Number(e.target.value);
+                        setSplitAdminPct(v);
+                        if (typeof v === "number" && v >= 0 && v <= 100) setSplitPartnerPct(100 - v);
                       }}
-                      className={`${GLASS_INPUT} w-auto`}>
-                      <option value="">All Months</option>
-                      {Array.from({ length: 18 }, (_, i) => {
-                        const d = new Date();
-                        d.setDate(1);
-                        d.setMonth(d.getMonth() - i);
-                        const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-                        const label = d.toLocaleDateString("en-NG", { month: "long", year: "numeric" });
-                        return (
-                          <option key={val} value={val}>
-                            {label}
-                          </option>
-                        );
-                      })}
-                    </select>
-                    {!splitFilterMonth && (
-                      <>
+                      className={GLASS_INPUT}
+                      placeholder="50"
+                    />
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Partner&apos;s Share (%)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={splitPartnerPct}
+                      onChange={(e) => {
+                        const v = e.target.value === "" ? "" : Number(e.target.value);
+                        setSplitPartnerPct(v);
+                        if (typeof v === "number" && v >= 0 && v <= 100) setSplitAdminPct(100 - v);
+                      }}
+                      className={GLASS_INPUT}
+                      placeholder="50"
+                    />
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Notes (optional)</label>
+                    <input
+                      type="text"
+                      value={splitNotes}
+                      onChange={(e) => setSplitNotes(e.target.value)}
+                      placeholder="e.g. March 2026 split"
+                      className={GLASS_INPUT}
+                    />
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Your Email (reports)</label>
+                    <input
+                      type="email"
+                      value={splitAdminEmail}
+                      onChange={(e) => setSplitAdminEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      className={GLASS_INPUT}
+                    />
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Partner Email (reports)</label>
+                    <input
+                      type="email"
+                      value={splitPartnerEmail}
+                      onChange={(e) => setSplitPartnerEmail(e.target.value)}
+                      placeholder="partner@email.com"
+                      className={GLASS_INPUT}
+                    />
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Monthly Report Email</label>
+                    <label className={`flex cursor-pointer items-center gap-3 ${GLASS_INPUT} hover:bg-white/90`}>
+                      <div className="relative shrink-0">
                         <input
-                          type="date"
-                          value={splitFilterFrom}
-                          onChange={(e) => setSplitFilterFrom(e.target.value)}
-                          title="Created from"
-                          className={`${GLASS_INPUT} w-auto`}
+                          type="checkbox"
+                          checked={splitSendMonthlyEmail}
+                          onChange={(e) => setSplitSendMonthlyEmail(e.target.checked)}
+                          className="sr-only"
                         />
-                        <input
-                          type="date"
-                          value={splitFilterTo}
-                          onChange={(e) => setSplitFilterTo(e.target.value)}
-                          title="Created to"
-                          className={`${GLASS_INPUT} w-auto`}
+                        <div className={`h-6 w-10 rounded-full transition-colors ${splitSendMonthlyEmail ? "bg-blue-500" : "bg-slate-300"}`} />
+                        <div
+                          className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-all ${splitSendMonthlyEmail ? "left-5" : "left-1"}`}
                         />
-                      </>
-                    )}
-                    {!isPartner && (
-                      <button
-                        onClick={exportSplitsToExcel}
-                        disabled={filteredSplits.length === 0}
-                        className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50">
-                        <Download size={16} />
-                        Export Excel
-                      </button>
-                    )}
+                      </div>
+                      <span className="min-w-0 text-sm text-slate-700">{splitSendMonthlyEmail ? "Enabled — send monthly" : "Disabled"}</span>
+                    </label>
                   </div>
                 </div>
 
-                {splitsLoading ? (
-                  <div className="py-12 text-center text-sm text-slate-400">Loading splits…</div>
-                ) : filteredSplits.length === 0 ? (
-                  <div className="py-12 text-center text-sm text-slate-400">
-                    {isPartner ? "No splits yet." : "No splits yet. Create one above."}
-                  </div>
-                ) : (
-                  <>
-                    {/* Totals summary */}
-                    {(() => {
-                      const activeMonthLabel = splitFilterMonth
-                        ? new Date(splitFilterMonth + "-01").toLocaleDateString("en-NG", { month: "long", year: "numeric" })
-                        : "";
-                      return (
-                        <div className={`mb-5 grid grid-cols-2 gap-3 ${isPartner ? "sm:grid-cols-2" : "sm:grid-cols-4"}`}>
-                          <div className="stat">
-                            <p className="stat-label">Splits Shown</p>
-                            <p className="stat-value">{filteredSplits.length}</p>
+                {/* Live preview */}
+                {splitPreview && (
+                  <div className="mt-5 rounded-2xl bg-white/60 p-4">
+                    {splitPreview.count === 0 ? (
+                      <p className="py-2 text-center text-sm text-slate-500">No transactions found for this hostel and period.</p>
+                    ) : (
+                      <>
+                        {/* Deduction pipeline chips */}
+                        <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
+                          <span className="glass-slate rounded-full px-2.5 py-1 font-semibold">
+                            Gross ₦{splitPreview.totalRevenue.toLocaleString()}
+                          </span>
+                          <span className="text-slate-400">→</span>
+                          <span className="glass-red rounded-full px-2.5 py-1 font-semibold">
+                            −₦{splitPreview.maintenanceDeduction.toLocaleString()} Maint.
+                          </span>
+                          <span className="text-slate-400">→</span>
+                          <span className="glass-orange rounded-full px-2.5 py-1 font-semibold">
+                            −₦{splitPreview.paystackDeduction.toLocaleString()} Paystack
+                          </span>
+                          <span className="text-slate-400">→</span>
+                          <span className="glass-green rounded-full px-2.5 py-1 font-bold">
+                            ✓ ₦{splitPreview.splittableRevenue.toLocaleString()} Splittable
+                          </span>
+                        </div>
+                        {/* One column on a narrow phone, so a long naira
+                            figure never runs past the card. */}
+                        <div className="grid grid-cols-1 gap-4 min-[400px]:grid-cols-2 sm:grid-cols-4">
+                          <div className="min-w-0">
+                            <p className="text-xs text-slate-500">Transactions</p>
+                            <p className="text-xl font-bold text-slate-900 [overflow-wrap:anywhere] sm:text-2xl">{splitPreview.count}</p>
                           </div>
-                          {!isPartner && (
-                            <div className="stat">
-                              <p className="stat-label">{splitFilterMonth ? `Revenue — ${activeMonthLabel}` : "Total Revenue"}</p>
-                              <p className="stat-value">₦{splitsTotals.revenue.toLocaleString()}</p>
-                            </div>
-                          )}
-                          {!isPartner && (
-                            <div className="rounded-2xl bg-blue-50/70 px-3 py-3">
-                              <p className="text-[11px] font-medium text-blue-600">
-                                {splitFilterMonth ? `Your Share — ${activeMonthLabel}` : "Your Total"}
-                              </p>
-                              <p className="mt-1 text-lg font-semibold tracking-tight text-blue-700">₦{splitsTotals.admin.toLocaleString()}</p>
-                            </div>
-                          )}
-                          <div className="rounded-2xl bg-purple-50/70 px-3 py-3">
-                            <p className="text-[11px] font-medium text-purple-600">
-                              {splitFilterMonth ? `Partner Share — ${activeMonthLabel}` : "Partner Total"}
-                            </p>
-                            <p className="mt-1 text-lg font-semibold tracking-tight text-purple-700">₦{splitsTotals.partner.toLocaleString()}</p>
+                          <div className="min-w-0">
+                            <p className="text-xs text-slate-500">Splittable Revenue</p>
+                            <p className="text-xl font-bold text-emerald-700 [overflow-wrap:anywhere] sm:text-2xl">₦{splitPreview.splittableRevenue.toLocaleString()}</p>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs text-slate-500">Your Share ({splitAdminPct}%)</p>
+                            <p className="text-xl font-bold text-blue-600 [overflow-wrap:anywhere] sm:text-2xl">₦{splitPreview.adminShare.toLocaleString()}</p>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs text-slate-500">Partner Share ({splitPartnerPct}%)</p>
+                            <p className="text-xl font-bold text-purple-600 [overflow-wrap:anywhere] sm:text-2xl">₦{splitPreview.partnerShare.toLocaleString()}</p>
                           </div>
                         </div>
-                      );
-                    })()}
-
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b border-white/70">
-                            <Th>Created</Th>
-                            <Th>Hostel</Th>
-                            <Th>Period</Th>
-                            <Th align="center">Txns</Th>
-                            {!isPartner && (
-                              <Th align="right">
-                                Revenue
-                                {splitFilterMonth && (
-                                  <span className="ml-1 normal-case font-normal text-blue-500">
-                                    ({new Date(splitFilterMonth + "-01").toLocaleDateString("en-NG", { month: "short", year: "numeric" })})
-                                  </span>
-                                )}
-                              </Th>
-                            )}
-                            {!isPartner && <Th align="right">Your Share</Th>}
-                            <Th align="right">Partner Share</Th>
-                            <Th>Notes</Th>
-                            <th className="px-5 py-3" />
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/60">
-                          {filteredSplits.map((s) => {
-                            const allSplitTxns = getSplitTransactions(s);
-                            // Default expanded panel month to the active list filter month (unless manually overridden)
-                            const activeMonth =
-                              expandedSplitMonths[s.id] ??
-                              (splitFilterMonth || "");
-                            const displayTxns = activeMonth
-                              ? allSplitTxns.filter((t) => {
-                                  const [y, m] = activeMonth
-                                    .split("-")
-                                    .map(Number);
-                                  return (
-                                    t.purchasedAt.getFullYear() === y &&
-                                    t.purchasedAt.getMonth() + 1 === m
-                                  );
-                                })
-                              : allSplitTxns;
-                            const sMaintPct =
-                              s.maintenancePct ?? maintenancePct;
-                            // Row revenue: use month-filtered transactions when list filter is active
-                            const rowTxns = splitFilterMonth
-                              ? getSplitTransactions(s, splitFilterMonth)
-                              : allSplitTxns;
-                            const grossRev = rowTxns.reduce(
-                              (a, t) => a + t.price,
-                              0,
-                            );
-                            const mainDed = Math.round(
-                              (grossRev * sMaintPct) / 100,
-                            );
-                            const paystackDed = Math.round(
-                              (grossRev * paystackPct) / 100,
-                            );
-                            const splittableRev =
-                              grossRev - mainDed - paystackDed;
-                            const splittablePctRow =
-                              100 - sMaintPct - paystackPct;
-                            const adminShr = Math.round(
-                              (splittableRev * s.adminPercent) / 100,
-                            );
-                            const partnerShr = Math.round(
-                              (splittableRev * s.partnerPercent) / 100,
-                            );
-                            const isExpanded = expandedSplitId === s.id;
-                            const activeMonthLabel = activeMonth
-                              ? new Date(
-                                  activeMonth + "-01",
-                                ).toLocaleDateString("en-NG", {
-                                  month: "long",
-                                  year: "numeric",
-                                })
-                              : "";
-                            const periodLabel = s.isOpen
-                              ? activeMonth
-                                ? activeMonthLabel
-                                : `From ${s.dateFrom} (Ongoing)`
-                              : activeMonth
-                                ? activeMonthLabel
-                                : `${s.dateFrom} → ${s.dateTo}`;
-                            return (
-                              <React.Fragment key={s.id}>
-                                <tr className={`transition-colors ${isExpanded ? "bg-blue-50/60 backdrop-blur-sm" : "hover:bg-white/70"}`}>
-                                  <Td className="whitespace-nowrap">
-                                    {s.createdAt.toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" })}
-                                  </Td>
-                                  <Td className="font-medium text-slate-900">{s.hostel}</Td>
-                                  <Td className="whitespace-nowrap text-xs">
-                                    {s.isOpen ? (
-                                      <span className="flex items-center gap-1.5">
-                                        From {s.dateFrom}
-                                        <span className="status-chip">● Live</span>
-                                      </span>
-                                    ) : (
-                                      <>
-                                        {s.dateFrom} → {s.dateTo}
-                                      </>
-                                    )}
-                                  </Td>
-                                  <Td align="center">{rowTxns.length}</Td>
-                                  {!isPartner && (
-                                    <Td align="right" className="whitespace-nowrap font-semibold text-slate-900">
-                                      ₦{grossRev.toLocaleString()}
-                                    </Td>
-                                  )}
-                                  {!isPartner && (
-                                    <Td align="right" className="whitespace-nowrap">
-                                      <span className="text-sm font-semibold text-blue-600">₦{adminShr.toLocaleString()}</span>
-                                      <span className="ml-1 text-xs text-slate-400">({s.adminPercent}%)</span>
-                                    </Td>
-                                  )}
-                                  <Td align="right" className="whitespace-nowrap">
-                                    <span className="text-sm font-semibold text-purple-600">₦{partnerShr.toLocaleString()}</span>
-                                    {!isPartner && <span className="ml-1 text-xs text-slate-400">({s.partnerPercent}%)</span>}
-                                  </Td>
-                                  <Td className="max-w-[140px] truncate">{s.notes || <span className="text-slate-300">—</span>}</Td>
-                                  <Td>
-                                    {!isPartner && (
-                                      <div className="flex items-center gap-1">
-                                        <button
-                                          onClick={() => setExpandedSplitId(isExpanded ? null : s.id)}
-                                          className={`rounded-lg p-1.5 transition-colors ${
-                                            isExpanded ? "bg-blue-100 text-blue-500" : "text-slate-400 hover:bg-blue-50 hover:text-blue-500"
-                                          }`}
-                                          title={isExpanded ? "Hide transaction log" : "View transaction log"}>
-                                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                        </button>
-                                        {canEdit && (
-                                          <button
-                                            onClick={() =>
-                                              setConfirmModal({
-                                                isOpen: true,
-                                                title: "Delete this split?",
-                                                message: `This permanently deletes the ${s.hostel} split (${periodLabel}). This can't be undone.`,
-                                                onConfirm: () => handleDeleteSplit(s.id),
-                                              })
-                                            }
-                                            disabled={deletingSplit === s.id}
-                                            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40"
-                                            title="Delete split">
-                                            <Trash2 size={16} />
-                                          </button>
-                                        )}
-                                      </div>
-                                    )}
-                                  </Td>
-                                </tr>
-                                {isExpanded && (
-                                  <tr>
-                                    <td colSpan={9} className="border-b border-blue-100 px-0 py-0">
-                                      <div className="space-y-4 bg-blue-50/60 px-5 py-4 backdrop-blur-sm">
-                                        {/* Deductions summary bar — same pipeline-chip idiom as the create-form preview */}
-                                        <div className="flex flex-wrap items-center gap-2 text-xs">
-                                          <span className="glass-slate rounded-full px-2.5 py-1 font-semibold">
-                                            Gross ₦{grossRev.toLocaleString()}
-                                          </span>
-                                          <span className="text-slate-400">→</span>
-                                          <span className="glass-red rounded-full px-2.5 py-1 font-semibold">
-                                            −₦{mainDed.toLocaleString()} Maint. {sMaintPct}%
-                                          </span>
-                                          <span className="text-slate-400">→</span>
-                                          <span className="glass-orange rounded-full px-2.5 py-1 font-semibold">
-                                            −₦{paystackDed.toLocaleString()} Paystack {paystackPct}%
-                                          </span>
-                                          <span className="text-slate-400">→</span>
-                                          <span className="glass-green rounded-full px-2.5 py-1 font-bold">
-                                            ✓ ₦{splittableRev.toLocaleString()} Splittable {splittablePctRow.toFixed(1)}%
-                                          </span>
-                                        </div>
-                                        {/* Month filter + Export */}
-                                        <div className="flex flex-wrap items-center gap-3">
-                                          <select
-                                            value={expandedSplitMonths[s.id] ?? ""}
-                                            onChange={(e) => setExpandedSplitMonths((prev) => ({ ...prev, [s.id]: e.target.value }))}
-                                            className={`${GLASS_INPUT} w-auto`}>
-                                            <option value="">All time ({allSplitTxns.length} txns)</option>
-                                            {getMonthOptions(s).map((opt) => (
-                                              <option key={opt.value} value={opt.value}>
-                                                {opt.label}
-                                              </option>
-                                            ))}
-                                          </select>
-                                          <button
-                                            onClick={() => exportSplitLog(s, displayTxns, activeMonth ? activeMonthLabel : undefined)}
-                                            disabled={displayTxns.length === 0}
-                                            className="flex items-center gap-1.5 rounded-xl border border-white/80 bg-white/70 px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur-xl transition-colors hover:bg-white disabled:opacity-50">
-                                            <Download size={14} />
-                                            Export Log
-                                          </button>
-                                        </div>
-                                        {/* Monthly revenue summary — shown only when a month is selected */}
-                                        {activeMonth &&
-                                          (() => {
-                                            const mGross = displayTxns.reduce(
-                                              (a, t) => a + t.price,
-                                              0,
-                                            );
-                                            const mMainDed = Math.round(
-                                              (mGross * sMaintPct) / 100,
-                                            );
-                                            const mPayDed = Math.round(
-                                              (mGross * paystackPct) / 100,
-                                            );
-                                            const mSplittable = Math.max(
-                                              0,
-                                              mGross - mMainDed - mPayDed,
-                                            );
-                                            const mAdminShr = Math.round(
-                                              (mSplittable * s.adminPercent) /
-                                                100,
-                                            );
-                                            const mPartnerShr = Math.round(
-                                              (mSplittable * s.partnerPercent) /
-                                                100,
-                                            );
-                                            return (
-                                              <div className="grid grid-cols-2 gap-3 px-1 sm:grid-cols-3 lg:grid-cols-6">
-                                                <div className="rounded-2xl border border-white/70 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur-xl">
-                                                  <p className="mb-0.5 text-xs text-slate-400">Transactions</p>
-                                                  <p className="text-lg font-bold text-slate-900">{displayTxns.length}</p>
-                                                </div>
-                                                <div className="rounded-2xl border border-white/70 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur-xl">
-                                                  <p className="mb-0.5 text-xs text-slate-400">Gross Revenue</p>
-                                                  <p className="text-lg font-bold text-slate-900">₦{mGross.toLocaleString()}</p>
-                                                </div>
-                                                <div className="rounded-2xl border border-white/70 bg-red-50/70 px-3 py-2.5 shadow-sm backdrop-blur-xl">
-                                                  <p className="mb-0.5 text-xs text-red-400">−Maint. {sMaintPct}%</p>
-                                                  <p className="text-lg font-bold text-red-600">−₦{mMainDed.toLocaleString()}</p>
-                                                </div>
-                                                <div className="rounded-2xl border border-white/70 bg-orange-50/70 px-3 py-2.5 shadow-sm backdrop-blur-xl">
-                                                  <p className="mb-0.5 text-xs text-orange-400">−Paystack {paystackPct}%</p>
-                                                  <p className="text-lg font-bold text-orange-600">−₦{mPayDed.toLocaleString()}</p>
-                                                </div>
-                                                <div className="rounded-2xl border border-white/70 bg-blue-50/70 px-3 py-2.5 shadow-sm backdrop-blur-xl">
-                                                  <p className="mb-0.5 text-xs text-blue-500">Your Share ({s.adminPercent}%)</p>
-                                                  <p className="text-lg font-bold text-blue-700">₦{mAdminShr.toLocaleString()}</p>
-                                                </div>
-                                                <div className="rounded-2xl border border-white/70 bg-purple-50/70 px-3 py-2.5 shadow-sm backdrop-blur-xl">
-                                                  <p className="mb-0.5 text-xs text-purple-500">Partner Share ({s.partnerPercent}%)</p>
-                                                  <p className="text-lg font-bold text-purple-700">₦{mPartnerShr.toLocaleString()}</p>
-                                                </div>
-                                              </div>
-                                            );
-                                          })()}
-                                        {/* Email section — write permission required */}
-                                        {canEdit && (
-                                          <div className="flex flex-col gap-3 rounded-2xl border border-white/70 bg-white/70 px-4 py-3 shadow-sm backdrop-blur-xl">
-                                            {/* Quick-send buttons for stored emails */}
-                                            {(s.adminEmail || s.partnerEmail) && (
-                                              <div className="flex flex-wrap items-center gap-2">
-                                                <span className="text-xs font-semibold text-slate-500">Quick send:</span>
-                                                {s.adminEmail && (
-                                                  <button
-                                                    onClick={() => handleSendSplitEmail(s, displayTxns, s.adminEmail!, periodLabel)}
-                                                    disabled={sendingEmail}
-                                                    className="glass-blue flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors hover:brightness-95 disabled:opacity-50">
-                                                    <Mail size={12} />
-                                                    To Me ({s.adminEmail.split("@")[0]})
-                                                  </button>
-                                                )}
-                                                {s.partnerEmail && (
-                                                  <button
-                                                    onClick={() => handleSendSplitEmail(s, displayTxns, s.partnerEmail!, periodLabel)}
-                                                    disabled={sendingEmail}
-                                                    className="glass-purple flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors hover:brightness-95 disabled:opacity-50">
-                                                    <Mail size={12} />
-                                                    To Partner ({s.partnerEmail.split("@")[0]})
-                                                  </button>
-                                                )}
-                                                {s.sendMonthlyEmail && <span className="status-chip">Monthly emails on</span>}
-                                              </div>
-                                            )}
-                                            {/* Manual email input */}
-                                            <div className="flex flex-wrap items-center gap-3">
-                                              <Mail size={16} className="shrink-0 text-slate-400" />
-                                              <input
-                                                type="email"
-                                                placeholder="Send to any email…"
-                                                value={emailSplitId === s.id ? emailAddress : ""}
-                                                onFocus={() => {
-                                                  setEmailSplitId(s.id);
-                                                  setEmailSuccess("");
-                                                }}
-                                                onChange={(e) => {
-                                                  setEmailSplitId(s.id);
-                                                  setEmailAddress(e.target.value);
-                                                }}
-                                                className={`${GLASS_INPUT} min-w-[200px] flex-1`}
-                                              />
-                                              <button
-                                                onClick={() =>
-                                                  handleSendSplitEmail(s, displayTxns, emailSplitId === s.id ? emailAddress : "", periodLabel)
-                                                }
-                                                disabled={sendingEmail || !(emailSplitId === s.id && emailAddress.trim())}
-                                                className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50">
-                                                <Mail size={14} />
-                                                {sendingEmail && emailSplitId === s.id ? "Sending…" : "Send"}
-                                              </button>
-                                              {emailSuccess && emailSplitId === s.id && (
-                                                <span className="text-xs font-semibold text-emerald-600">{emailSuccess}</span>
-                                              )}
-                                            </div>
-                                          </div>
-                                        )}
-                                        {/* Transaction table header */}
-                                        <p className="text-sm font-semibold text-slate-800">
-                                          Transaction Log — <span className="text-blue-600">{s.hostel}</span>
-                                          <span className="ml-2 text-xs font-normal text-slate-500">{periodLabel}</span>
-                                          <span className="ml-2 text-xs font-normal text-slate-500">
-                                            ({displayTxns.length} transaction{displayTxns.length !== 1 ? "s" : ""})
-                                          </span>
-                                        </p>
-                                        {displayTxns.length === 0 ? (
-                                          <p className="py-4 text-center text-sm text-slate-400">No transactions found for this period.</p>
-                                        ) : (
-                                          <div className="overflow-x-auto rounded-2xl border border-white/70 bg-white/70 shadow-sm backdrop-blur-xl">
-                                            <table className="w-full">
-                                              <thead>
-                                                <tr className="border-b border-white/70">
-                                                  <Th>Date</Th>
-                                                  <Th>Plan</Th>
-                                                  <Th>Type</Th>
-                                                  <Th>Email</Th>
-                                                  <Th>Ref</Th>
-                                                  <Th align="right">Total</Th>
-                                                  <Th align="right">Yours ({s.adminPercent}%)</Th>
-                                                  <Th align="right">Partner ({s.partnerPercent}%)</Th>
-                                                </tr>
-                                              </thead>
-                                              <tbody className="divide-y divide-white/60">
-                                                {displayTxns.map((t) => (
-                                                  <tr key={t.id} className="transition hover:bg-white/70">
-                                                    <Td className="whitespace-nowrap text-xs">
-                                                      {t.purchasedAt.toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" })}
-                                                      <br />
-                                                      <span className="text-slate-400">
-                                                        {t.purchasedAt.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}
-                                                      </span>
-                                                    </Td>
-                                                    <Td className="text-xs font-medium text-slate-900">{t.planName}</Td>
-                                                    <Td>
-                                                      <PlanTypeBadge type={t.planType} />
-                                                    </Td>
-                                                    <Td className="max-w-[160px] truncate text-xs">
-                                                      {t.customerEmail ?? <span className="text-slate-400">N/A</span>}
-                                                    </Td>
-                                                    <Td className="font-mono text-xs text-slate-500">
-                                                      {t.paymentRef ? (
-                                                        <span title={t.paymentRef}>
-                                                          {t.paymentRef.length > 14 ? t.paymentRef.slice(0, 14) + "…" : t.paymentRef}
-                                                        </span>
-                                                      ) : (
-                                                        <span className="text-slate-400">—</span>
-                                                      )}
-                                                    </Td>
-                                                    <Td align="right" className="whitespace-nowrap text-xs font-semibold text-slate-900">
-                                                      ₦{t.price.toLocaleString()}
-                                                    </Td>
-                                                    <Td align="right" className="whitespace-nowrap text-xs font-semibold text-blue-600">
-                                                      ₦{Math.round((t.price * s.adminPercent) / 100).toLocaleString()}
-                                                    </Td>
-                                                    <Td align="right" className="whitespace-nowrap text-xs font-semibold text-purple-600">
-                                                      ₦{Math.round((t.price * s.partnerPercent) / 100).toLocaleString()}
-                                                    </Td>
-                                                  </tr>
-                                                ))}
-                                              </tbody>
-                                            </table>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </td>
-                                  </tr>
-                                )}
-                              </React.Fragment>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </>
+                      </>
+                    )}
+                  </div>
                 )}
-              </section>
-            </>
-          )}
-        </main>
 
-        <ConfirmationModal
-          isOpen={confirmModal.isOpen}
-          onClose={() => setConfirmModal((m) => ({ ...m, isOpen: false }))}
-          onConfirm={confirmModal.onConfirm}
-          title={confirmModal.title}
-          message={confirmModal.message}
-          confirmText="Delete split"
-          type="danger"
-        />
-      </div>
+                <div className="mt-5 flex justify-end">
+                  <button
+                    onClick={handleCreateSplit}
+                    disabled={creatingSplit || !splitHostel || !splitDateFrom || (!splitIsOpen && !splitDateTo)}
+                    className="glass-primary w-full sm:w-auto">
+                    <Scissors size={16} />
+                    {creatingSplit ? "Saving…" : "Save Split"}
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {/* Splits history */}
+            <section className="glass-panel">
+              <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center">
+                <h3 className="flex flex-wrap items-center gap-2 text-lg font-semibold text-slate-900">
+                  <BarChart3 size={18} className="text-blue-500" />
+                  Splits History
+                  <span className="ml-1 text-sm font-normal text-slate-500">({filteredSplits.length})</span>
+                </h3>
+                <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap lg:ml-auto">
+                  <select
+                    value={splitFilterHostel}
+                    onChange={(e) => setSplitFilterHostel(e.target.value)}
+                    className={`${GLASS_INPUT} sm:w-auto`}
+                    aria-label="Filter splits by hostel">
+                    <option value="all">All Hostels</option>
+                    {knownHostels.map((h) => (
+                      <option key={h} value={h}>
+                        {h}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={splitFilterMonth}
+                    onChange={(e) => {
+                      setSplitFilterMonth(e.target.value);
+                      if (e.target.value) {
+                        setSplitFilterFrom("");
+                        setSplitFilterTo("");
+                      }
+                    }}
+                    className={`${GLASS_INPUT} sm:w-auto`}
+                    aria-label="Filter splits by month">
+                    <option value="">All Months</option>
+                    {Array.from({ length: 18 }, (_, i) => {
+                      const d = new Date();
+                      d.setDate(1);
+                      d.setMonth(d.getMonth() - i);
+                      const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+                      const label = d.toLocaleDateString("en-NG", { month: "long", year: "numeric" });
+                      return (
+                        <option key={val} value={val}>
+                          {label}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  {!splitFilterMonth && (
+                    <>
+                      <input
+                        type="date"
+                        value={splitFilterFrom}
+                        onChange={(e) => setSplitFilterFrom(e.target.value)}
+                        title="Created from"
+                        aria-label="Created from"
+                        className={`${GLASS_INPUT} sm:w-auto`}
+                      />
+                      <input
+                        type="date"
+                        value={splitFilterTo}
+                        onChange={(e) => setSplitFilterTo(e.target.value)}
+                        title="Created to"
+                        aria-label="Created to"
+                        className={`${GLASS_INPUT} sm:w-auto`}
+                      />
+                    </>
+                  )}
+                  {!isPartner && (
+                    <button
+                      onClick={exportSplitsToExcel}
+                      disabled={filteredSplits.length === 0}
+                      className="glass-primary">
+                      <Download size={16} />
+                      Export Excel
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {splitsLoading ? (
+                <div className="py-12 text-center text-sm text-slate-400">Loading splits…</div>
+              ) : filteredSplits.length === 0 ? (
+                <div className="py-12 text-center text-sm text-slate-400">
+                  {isPartner ? "No splits yet." : "No splits yet. Create one above."}
+                </div>
+              ) : (
+                <>
+                  {/* Totals summary */}
+                  {(() => {
+                    const activeMonthLabel = splitFilterMonth
+                      ? new Date(splitFilterMonth + "-01").toLocaleDateString("en-NG", { month: "long", year: "numeric" })
+                      : "";
+                    return (
+                      <div className={`mb-5 grid grid-cols-2 gap-3 ${isPartner ? "sm:grid-cols-2" : "sm:grid-cols-4"}`}>
+                        <div className="stat min-w-0">
+                          <p className="stat-label">Splits Shown</p>
+                          <p className="stat-value [overflow-wrap:anywhere]">{filteredSplits.length}</p>
+                        </div>
+                        {!isPartner && (
+                          <div className="stat min-w-0">
+                            <p className="stat-label">{splitFilterMonth ? `Revenue — ${activeMonthLabel}` : "Total Revenue"}</p>
+                            <p className="stat-value [overflow-wrap:anywhere]">₦{splitsTotals.revenue.toLocaleString()}</p>
+                          </div>
+                        )}
+                        {!isPartner && (
+                          <div className="min-w-0 rounded-2xl bg-blue-50/70 px-3 py-3">
+                            <p className="text-[11px] font-medium text-blue-600">
+                              {splitFilterMonth ? `Your Share — ${activeMonthLabel}` : "Your Total"}
+                            </p>
+                            <p className="mt-1 text-lg font-semibold tracking-tight text-blue-700 [overflow-wrap:anywhere]">₦{splitsTotals.admin.toLocaleString()}</p>
+                          </div>
+                        )}
+                        <div className="min-w-0 rounded-2xl bg-purple-50/70 px-3 py-3">
+                          <p className="text-[11px] font-medium text-purple-600">
+                            {splitFilterMonth ? `Partner Share — ${activeMonthLabel}` : "Partner Total"}
+                          </p>
+                          <p className="mt-1 text-lg font-semibold tracking-tight text-purple-700 [overflow-wrap:anywhere]">₦{splitsTotals.partner.toLocaleString()}</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Cards below `md`, with each split's log opening under its
+                      card; the table from `md` up. The card list brings its
+                      own padding, so it cancels the panel's on a phone. */}
+                  <div className="-mx-4 sm:-mx-7 md:mx-0">
+                    <ResponsiveTable
+                      rows={filteredSplits.map(buildSplitRow)}
+                      columns={splitColumns}
+                      rowKey={(row) => row.s.id}
+                      renderCard={renderSplitCard}
+                      isExpanded={(row) => row.isExpanded}
+                      renderExpanded={renderSplitDetail}
+                      rowClassName={(row) => (row.isExpanded ? "!bg-blue-50/60" : "")}
+                    />
+                  </div>
+                </>
+              )}
+            </section>
+          </>
+        )}
+      </AdminPage>
+
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal((m) => ({ ...m, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText="Delete split"
+        type="danger"
+      />
     </ProtectedRoute>
   );
 }

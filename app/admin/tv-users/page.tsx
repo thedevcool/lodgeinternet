@@ -15,9 +15,7 @@
 import { adminFetch } from "@/lib/apiClient";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
-import Logo from "@/components/Logo";
 import { useAuthStore } from "@/store/authStore";
-import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -26,7 +24,6 @@ import {
   Eye,
   EyeOff,
   KeyRound,
-  LogOut,
   RefreshCw,
   Router,
   Trash2,
@@ -36,6 +33,17 @@ import {
 import { useToast } from "@/components/Toast";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import type { Hostel, TVSubscription } from "@/types";
+import {
+  AdminPage,
+  EmptyState,
+  GLASS_INPUT,
+  GLASS_INPUT_ICON,
+  IconButton,
+  Kpi,
+  Modal,
+  Panel,
+  TabBar,
+} from "@/components/admin/ui";
 
 interface TVPlanOption {
   id: string;
@@ -105,44 +113,6 @@ const shortDate = (value: unknown) =>
       })
     : "—";
 
-/** A single figure, sitting on its own tinted ground. */
-function Stat({
-  label,
-  value,
-  hint,
-  tone,
-  icon: Icon,
-}: {
-  label: string;
-  value: string | number;
-  hint?: string;
-  tone: "blue" | "green" | "amber" | "rose" | "slate";
-  icon: React.ComponentType<{ className?: string }>;
-}) {
-  // Written out in full: Tailwind scans source text, so a class assembled at
-  // runtime is never found and the rule is purged from the stylesheet.
-  const grounds = {
-    blue: "bg-blue-50/80 text-blue-700 ring-blue-100",
-    green: "bg-emerald-50/80 text-emerald-700 ring-emerald-100",
-    amber: "bg-amber-50/80 text-amber-700 ring-amber-100",
-    rose: "bg-rose-50/80 text-rose-700 ring-rose-100",
-    slate: "bg-slate-50/80 text-slate-600 ring-slate-200",
-  }[tone];
-
-  return (
-    <div className={`rounded-[22px] p-4 ring-1 backdrop-blur-xl sm:p-5 ${grounds}`}>
-      <div className="flex items-center gap-2">
-        <Icon className="h-4 w-4" />
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em]">{label}</p>
-      </div>
-      <p className="mt-3 text-[28px] font-semibold leading-none tracking-tight text-slate-900">
-        {value}
-      </p>
-      {hint && <p className="mt-2 text-xs opacity-80">{hint}</p>}
-    </div>
-  );
-}
-
 function StatusPill({ status, expiresAt }: { status?: string | null; expiresAt?: unknown }) {
   const left = daysLeft(expiresAt);
   const map: Record<string, { cls: string; label: string }> = {
@@ -168,9 +138,8 @@ function StatusPill({ status, expiresAt }: { status?: string | null; expiresAt?:
 }
 
 export default function AdminTVUsersPage() {
-  const { logout, canWrite, adminProfile } = useAuthStore();
+  const { canWrite, adminProfile } = useAuthStore();
   const canEdit = canWrite("tv-users");
-  const router = useRouter();
   const { addToast } = useToast();
 
   const [subscriptions, setSubscriptions] = useState<TVSubscription[]>([]);
@@ -442,16 +411,11 @@ export default function AdminTVUsersPage() {
 
   return (
     <ProtectedRoute module="tv-users">
-      <div className="min-h-screen analytics-shell">
-        <header className="glass-header">
-          <div className="flex min-w-0 items-center gap-3">
-            <Logo variant="dark" />
-            <div>
-              <p className="eyebrow">TELEVISION</p>
-              <h1 className="text-xl font-semibold sm:text-2xl">TV subscriptions</h1>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+      <AdminPage
+        eyebrow="TELEVISION"
+        title="TV subscriptions"
+        actions={
+          <>
             <button
               onClick={() => {
                 void fetchSubscriptions();
@@ -465,381 +429,350 @@ export default function AdminTVUsersPage() {
             <button
               onClick={() => void handleCheckExpiry()}
               disabled={checkingExpiry}
-              className="glass-button hidden md:flex"
+              className="glass-button"
               title="Remind those expiring, expire those due, and revoke their devices"
             >
               <Clock size={16} />
               {checkingExpiry ? "Checking…" : "Run expiry"}
             </button>
-            <button
-              onClick={() => {
-                logout();
-                router.push("/admin/login");
-              }}
-              className="glass-button hidden sm:flex"
-            >
-              <LogOut size={16} />
-              Logout
-            </button>
-          </div>
-        </header>
-
-        <main className="mx-auto max-w-[1600px] space-y-5 px-4 py-6 sm:px-8">
-          {error && (
-            <div className="glass-alert">
-              <AlertTriangle size={18} />
-              {error}
-            </div>
-          )}
-
-          <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-            <Stat label="Watching now" value={running.length} icon={Tv} tone="green"
-              hint={`${money(monthlyRevenue)} of active plans`} />
-            <Stat label="Expiring soon" value={expiringSoon.length} icon={Clock} tone="amber"
-              hint={`within ${EXPIRING_WITHIN_DAYS} days`} />
-            <Stat label="Expired" value={expired.length} icon={XCircle} tone="slate" />
-            <Stat label="Free access" value={unmatchedCount} icon={Router} tone="rose"
-              hint="on a controller, nobody paying" />
-            <Stat label="Paid, no access" value={missingCount} icon={AlertTriangle} tone="rose"
-              hint="paying but not on any list" />
-          </section>
-
-          {/* Activation password. Sent with every activation email. */}
-          <section className="glass-panel">
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">ACTIVATION</p>
-                <h3>TV password</h3>
-              </div>
-              {tvPasswordMeta.updatedAt && (
-                <p className="text-xs text-slate-500">
-                  Set {new Date(tvPasswordMeta.updatedAt).toLocaleDateString()}
-                  {tvPasswordMeta.updatedBy ? ` by ${tvPasswordMeta.updatedBy}` : ""}
-                </p>
-              )}
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <div className="relative flex-1">
-                <KeyRound className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  type={showTvPassword ? "text" : "password"}
-                  value={tvPassword}
-                  onChange={(e) => setTvPassword(e.target.value)}
-                  maxLength={128}
-                  placeholder="e.g. LODGE2026"
-                  aria-label="TV activation password"
-                  className="w-full rounded-2xl border border-white/80 bg-white/70 py-3 pl-11 pr-16 font-mono tracking-wider backdrop-blur-xl focus:border-blue-400 focus:outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowTvPassword((v) => !v)}
-                  aria-label={showTvPassword ? "Hide password" : "Show password"}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
-                >
-                  {showTvPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-              <button
-                onClick={() => void handleSaveTvPassword()}
-                disabled={savingTvPassword || tvPassword === savedTvPassword || !canEdit}
-                className="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40"
-              >
-                {savingTvPassword ? "Saving…" : "Save"}
-              </button>
-            </div>
-            <p className="mt-3 text-xs text-slate-500">
-              Sent to every customer with their activation email. Leave empty to send none.
-            </p>
-          </section>
-
-          {/* Segmented control, iOS-style. */}
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex gap-1 overflow-x-auto rounded-full border border-white/80 bg-white/70 p-1 backdrop-blur-xl">
-              {TABS.map((t) => (
-                <button
-                  key={t.key}
-                  onClick={() => setTab(t.key)}
-                  aria-pressed={tab === t.key}
-                  className={`inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
-                    tab === t.key
-                      ? "bg-slate-900 text-white shadow-sm"
-                      : "text-slate-600 hover:bg-white"
-                  }`}
-                >
-                  {t.label}
-                  {t.count > 0 && (
-                    <span
-                      className={`rounded-full px-1.5 text-xs font-semibold ${
-                        tab === t.key ? "bg-white/20" : "bg-slate-100 text-slate-600"
-                      }`}
-                    >
-                      {t.count}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {tab !== "devices" && (
-              <div className="flex gap-2">
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search email, name, plan…"
-                  className="w-full rounded-2xl border border-white/80 bg-white/70 px-4 py-2 text-sm backdrop-blur-xl focus:border-blue-400 focus:outline-none lg:w-64"
-                />
-                {allowedHostels.length > 0 && (
-                  <select
-                    value={filterHostel}
-                    onChange={(e) => setFilterHostel(e.target.value)}
-                    className="rounded-2xl border border-white/80 bg-white/70 px-4 py-2 text-sm backdrop-blur-xl focus:outline-none"
-                  >
-                    <option value="all">All hostels</option>
-                    {allowedHostels.map((h) => (
-                      <option key={h.id} value={h.name}>{h.name}</option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* ── Controllers ─────────────────────────────────────────────── */}
-          {tab === "devices" ? (
-            <div className="space-y-4">
-              {missingCount > 0 && (
-                <section className="glass-panel ring-1 ring-rose-200">
-                  <div className="panel-heading">
-                    <div>
-                      <p className="eyebrow text-rose-600">PAYING, NO ACCESS</p>
-                      <h3>Not on any controller</h3>
-                    </div>
-                  </div>
-                  <p className="mb-4 text-sm text-slate-500">
-                    These subscriptions are running and paid for, but the device is on no
-                    allow list — so the customer is getting nothing.
-                  </p>
-                  <div className="space-y-2">
-                    {devices?.missingFromControllers.map((m) => (
-                      <div key={m.subscriptionId}
-                        className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-rose-50/70 px-4 py-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-slate-900">{m.email}</p>
-                          <p className="text-xs text-slate-500">
-                            {m.hostel} · {m.planName} · until {shortDate(m.expiresAt)}
-                          </p>
-                        </div>
-                        <code className="rounded-lg bg-white/80 px-2 py-1 text-xs">{m.macAddress}</code>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              {(devices?.controllers || []).map((c) => (
-                <section key={c.controller} className="glass-panel">
-                  <div className="panel-heading">
-                    <div>
-                      <p className="eyebrow">CONTROLLER</p>
-                      <h3>{c.controller}</h3>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <span className="status-chip">{c.allow.length} allowed</span>
-                      <span className="slate-chip">{c.deny.length} denied</span>
-                      {c.allow.some((d) => d.unmatched) && (
-                        <span className="warning-chip">
-                          {c.allow.filter((d) => d.unmatched).length} unmatched
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {c.error ? (
-                    <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{c.error}</p>
-                  ) : (
-                    <div className="grid gap-4 lg:grid-cols-2">
-                      {(["allow", "deny"] as const).map((kind) => (
-                        <div key={kind}>
-                          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                            {kind === "allow" ? "Allow list" : "Deny list"}
-                            {c[`${kind}GroupName` as const] && (
-                              <span className="ml-2 font-normal normal-case tracking-normal text-slate-400">
-                                {c[`${kind}GroupName` as const]}
-                              </span>
-                            )}
-                            {!!c[`${kind}HiddenCount` as const] && (
-                              <span
-                                className="ml-2 font-normal normal-case tracking-normal text-slate-400"
-                                title="Devices with no subscription and no Name(Hostel) label — staff devices, one-off manual grants — hidden to keep this list readable."
-                              >
-                                · {c[`${kind}HiddenCount` as const]} legacy hidden
-                              </span>
-                            )}
-                          </p>
-                          <div className="space-y-1.5">
-                            {c[kind].length === 0 && (
-                              <p className="rounded-2xl bg-white/50 px-4 py-3 text-sm text-slate-400">
-                                {!c[`${kind}GroupName` as const]
-                                  ? kind === "deny"
-                                    ? "No deny list on this controller yet."
-                                    : "Empty."
-                                  : `All entries are legacy (${c[`${kind}HiddenCount` as const] || 0} hidden).`}
-                              </p>
-                            )}
-                            {c[kind].map((d) => (
-                              <div key={`${d.macAddress}-${d.ruleId}`}
-                                className={`flex items-center justify-between gap-3 rounded-2xl px-4 py-2.5 ${
-                                  d.unmatched ? "bg-amber-50/70" : "bg-white/60"
-                                }`}>
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-medium text-slate-900">
-                                    {d.label || "(no label)"}
-                                  </p>
-                                  <code className="text-[11px] text-slate-500">{d.macAddress}</code>
-                                </div>
-                                {d.unmatched ? (
-                                  <span className="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-700">
-                                    no subscription
-                                  </span>
-                                ) : (
-                                  <StatusPill status={d.status} expiresAt={d.expiresAt} />
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
-              ))}
-            </div>
-          ) : (
-            /* ── Subscriptions ──────────────────────────────────────────── */
-            <section className="glass-panel">
-              {loading ? (
-                <p className="py-12 text-center text-sm text-slate-400">Loading…</p>
-              ) : rows.length === 0 ? (
-                <div className="py-12 text-center">
-                  <CheckCircle2 className="mx-auto mb-3 h-8 w-8 text-slate-300" />
-                  <p className="text-sm text-slate-400">Nothing here.</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {rows.map((s) => {
-                    const left = daysLeft(s.expiresAt);
-                    return (
-                      <div key={s.id}
-                        className="flex flex-wrap items-center gap-3 rounded-2xl bg-white/60 px-4 py-3 transition hover:bg-white/90">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="truncate text-sm font-semibold text-slate-900">
-                              {s.name || s.email}
-                            </p>
-                            <StatusPill status={s.subscriptionStatus} expiresAt={s.expiresAt} />
-                          </div>
-                          <p className="mt-0.5 truncate text-xs text-slate-500">
-                            {s.email} · {s.hostel || "—"}
-                          </p>
-                        </div>
-
-                        <div className="text-right">
-                          <p className="text-sm font-medium text-slate-900">{s.planName}</p>
-                          <p className="text-xs text-slate-500">{money(s.price)}</p>
-                        </div>
-
-                        <div className="w-32 text-right">
-                          <p className="text-xs text-slate-500">
-                            {s.expiresAt ? shortDate(s.expiresAt) : "not started"}
-                          </p>
-                          {left !== null && left >= 0 && (
-                            <p className={`text-xs ${left <= 3 ? "font-semibold text-amber-600" : "text-slate-400"}`}>
-                              {left === 0 ? "today" : `${left} days`}
-                            </p>
-                          )}
-                        </div>
-
-                        {canEdit && (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => {
-                                setPlanModal({
-                                  subId: s.id,
-                                  subName: s.name || s.email,
-                                  currentPlanId: s.planId,
-                                });
-                                setSelectedPlanId(s.planId);
-                              }}
-                              aria-label="Change plan"
-                              className="rounded-xl p-2 text-slate-500 transition hover:bg-white hover:text-slate-900"
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() =>
-                                setConfirmModal({
-                                  isOpen: true,
-                                  title: "Delete subscription",
-                                  message: `Remove ${s.email}'s record? Their device is not taken off the controller by this.`,
-                                  onConfirm: () => confirmDelete(s.id),
-                                })
-                              }
-                              disabled={deleting === s.id}
-                              aria-label="Delete subscription"
-                              className="rounded-xl p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
-          )}
-        </main>
-
-        {planModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 p-4 backdrop-blur-sm">
-            <div className="glass-drawer w-full max-w-md p-6">
-              <h3 className="text-lg font-semibold">Change plan</h3>
-              <p className="mt-1 text-sm text-slate-500">{planModal.subName}</p>
-              <select
-                value={selectedPlanId}
-                onChange={(e) => setSelectedPlanId(e.target.value)}
-                className="mt-4 w-full rounded-2xl border border-white/80 bg-white/70 px-4 py-3 text-sm focus:outline-none"
-              >
-                {tvPlans.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} — {money(p.price)} · {p.duration} days
-                  </option>
-                ))}
-              </select>
-              <div className="mt-6 flex gap-2">
-                <button onClick={() => setPlanModal(null)}
-                  className="flex-1 rounded-2xl border border-slate-200 py-3 text-sm font-semibold text-slate-700">
-                  Cancel
-                </button>
-                <button onClick={() => void handleUpdatePlan()} disabled={updatingPlan}
-                  className="flex-1 rounded-2xl bg-slate-900 py-3 text-sm font-semibold text-white disabled:opacity-40">
-                  {updatingPlan ? "Saving…" : "Change plan"}
-                </button>
-              </div>
-            </div>
+          </>
+        }
+      >
+        {error && (
+          <div className="glass-alert">
+            <AlertTriangle size={18} className="shrink-0" />
+            <span className="min-w-0 flex-1 break-words">{error}</span>
           </div>
         )}
 
-        <ConfirmationModal
-          isOpen={confirmModal.isOpen}
-          onClose={() => setConfirmModal((m) => ({ ...m, isOpen: false }))}
-          onConfirm={confirmModal.onConfirm}
-          title={confirmModal.title}
-          message={confirmModal.message}
-          type="danger"
-        />
-      </div>
+        {/* Five tiles: on a two-column phone grid the last spans the row
+            rather than sitting alone in half of it. */}
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <Kpi label="Watching now" value={running.length} icon={<Tv size={16} />} tone="green"
+            note={`${money(monthlyRevenue)} of active plans`} />
+          <Kpi label="Expiring soon" value={expiringSoon.length} icon={<Clock size={16} />} tone="orange"
+            note={`within ${EXPIRING_WITHIN_DAYS} days`} />
+          <Kpi label="Expired" value={expired.length} icon={<XCircle size={16} />} tone="slate" />
+          <Kpi label="Free access" value={unmatchedCount} icon={<Router size={16} />} tone="red"
+            note="on a controller, nobody paying" />
+          <div className="col-span-2 lg:col-span-1">
+            <Kpi label="Paid, no access" value={missingCount} icon={<AlertTriangle size={16} />} tone="red"
+              note="paying but not on any list" />
+          </div>
+        </section>
+
+        {/* Activation password. Sent with every activation email. */}
+        <Panel
+          eyebrow="ACTIVATION"
+          title="TV password"
+          actions={
+            tvPasswordMeta.updatedAt && (
+              <p className="text-xs text-slate-500">
+                Set {new Date(tvPasswordMeta.updatedAt).toLocaleDateString()}
+                {tvPasswordMeta.updatedBy ? ` by ${tvPasswordMeta.updatedBy}` : ""}
+              </p>
+            )
+          }
+        >
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="relative min-w-0 flex-1">
+              <KeyRound className={GLASS_INPUT_ICON} />
+              <input
+                type={showTvPassword ? "text" : "password"}
+                value={tvPassword}
+                onChange={(e) => setTvPassword(e.target.value)}
+                maxLength={128}
+                placeholder="e.g. LODGE2026"
+                aria-label="TV activation password"
+                className={`${GLASS_INPUT} pl-11 pr-14 font-mono tracking-wider`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowTvPassword((v) => !v)}
+                aria-label={showTvPassword ? "Hide password" : "Show password"}
+                className="absolute right-1 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 hover:text-slate-700"
+              >
+                {showTvPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            <button
+              onClick={() => void handleSaveTvPassword()}
+              disabled={savingTvPassword || tvPassword === savedTvPassword || !canEdit}
+              className="glass-primary"
+            >
+              {savingTvPassword ? "Saving…" : "Save"}
+            </button>
+          </div>
+          <p className="mt-3 text-xs text-slate-500">
+            Sent to every customer with their activation email. Leave empty to send none.
+          </p>
+        </Panel>
+
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <TabBar
+            tabs={TABS.map((t) => ({ value: t.key, label: t.label, count: t.count }))}
+            value={tab}
+            onChange={setTab}
+          />
+
+          {tab !== "devices" && (
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search email, name, plan…"
+                className={`${GLASS_INPUT} sm:flex-1 lg:w-64 lg:flex-none`}
+              />
+              {allowedHostels.length > 0 && (
+                <select
+                  value={filterHostel}
+                  onChange={(e) => setFilterHostel(e.target.value)}
+                  className={`${GLASS_INPUT} sm:w-auto`}
+                >
+                  <option value="all">All hostels</option>
+                  {allowedHostels.map((h) => (
+                    <option key={h.id} value={h.name}>{h.name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Controllers ─────────────────────────────────────────────── */}
+        {tab === "devices" ? (
+          <div className="space-y-4">
+            {missingCount > 0 && (
+              <Panel className="ring-1 ring-rose-200">
+                <div className="panel-heading">
+                  <div className="min-w-0">
+                    <p className="eyebrow text-rose-600">PAYING, NO ACCESS</p>
+                    <h3>Not on any controller</h3>
+                  </div>
+                </div>
+                <p className="mb-4 text-sm text-slate-500">
+                  These subscriptions are running and paid for, but the device is on no
+                  allow list — so the customer is getting nothing.
+                </p>
+                <div className="space-y-2">
+                  {devices?.missingFromControllers.map((m) => (
+                    <div key={m.subscriptionId}
+                      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-2xl bg-rose-50/70 px-3 py-3 sm:px-4">
+                      <div className="min-w-0 max-w-full">
+                        <p className="truncate text-sm font-semibold text-slate-900">{m.email}</p>
+                        <p className="break-words text-xs text-slate-500">
+                          {m.hostel} · {m.planName} · until {shortDate(m.expiresAt)}
+                        </p>
+                      </div>
+                      <code className="max-w-full break-all rounded-lg bg-white/80 px-2 py-1 text-xs">{m.macAddress}</code>
+                    </div>
+                  ))}
+                </div>
+              </Panel>
+            )}
+
+            {(devices?.controllers || []).map((c) => (
+              <Panel
+                key={c.controller}
+                eyebrow="CONTROLLER"
+                title={<span className="break-words [overflow-wrap:anywhere]">{c.controller}</span>}
+                actions={
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="status-chip">{c.allow.length} allowed</span>
+                    <span className="slate-chip">{c.deny.length} denied</span>
+                    {c.allow.some((d) => d.unmatched) && (
+                      <span className="warning-chip">
+                        {c.allow.filter((d) => d.unmatched).length} unmatched
+                      </span>
+                    )}
+                  </div>
+                }
+              >
+                {c.error ? (
+                  <p className="break-words rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{c.error}</p>
+                ) : (
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    {(["allow", "deny"] as const).map((kind) => (
+                      <div key={kind} className="min-w-0">
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                          {kind === "allow" ? "Allow list" : "Deny list"}
+                          {c[`${kind}GroupName` as const] && (
+                            <span className="ml-2 break-words font-normal normal-case tracking-normal text-slate-400">
+                              {c[`${kind}GroupName` as const]}
+                            </span>
+                          )}
+                          {!!c[`${kind}HiddenCount` as const] && (
+                            <span
+                              className="ml-2 font-normal normal-case tracking-normal text-slate-400"
+                              title="Devices with no subscription and no Name(Hostel) label — staff devices, one-off manual grants — hidden to keep this list readable."
+                            >
+                              · {c[`${kind}HiddenCount` as const]} legacy hidden
+                            </span>
+                          )}
+                        </p>
+                        <div className="space-y-1.5">
+                          {c[kind].length === 0 && (
+                            <p className="rounded-2xl bg-white/50 px-4 py-3 text-sm text-slate-400">
+                              {!c[`${kind}GroupName` as const]
+                                ? kind === "deny"
+                                  ? "No deny list on this controller yet."
+                                  : "Empty."
+                                : `All entries are legacy (${c[`${kind}HiddenCount` as const] || 0} hidden).`}
+                            </p>
+                          )}
+                          {c[kind].map((d) => (
+                            <div key={`${d.macAddress}-${d.ruleId}`}
+                              className={`flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 sm:px-4 ${
+                                d.unmatched ? "bg-amber-50/70" : "bg-white/60"
+                              }`}>
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-slate-900">
+                                  {d.label || "(no label)"}
+                                </p>
+                                <code className="break-all text-[11px] text-slate-500">{d.macAddress}</code>
+                              </div>
+                              {d.unmatched ? (
+                                <span className="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-700">
+                                  no subscription
+                                </span>
+                              ) : (
+                                <span className="shrink-0">
+                                  <StatusPill status={d.status} expiresAt={d.expiresAt} />
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Panel>
+            ))}
+          </div>
+        ) : (
+          /* ── Subscriptions ──────────────────────────────────────────── */
+          <Panel>
+            {loading ? (
+              <EmptyState title="Loading…" />
+            ) : rows.length === 0 ? (
+              <EmptyState icon={<CheckCircle2 className="h-8 w-8 text-slate-300" />} title="Nothing here." />
+            ) : (
+              <div className="space-y-2">
+                {rows.map((s) => {
+                  const left = daysLeft(s.expiresAt);
+                  return (
+                    // Phone: who on top, then plan / expiry / actions in a row
+                    // underneath. From md the four sit side by side.
+                    <div key={s.id}
+                      className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl bg-white/60 px-3 py-3 transition hover:bg-white/90 sm:px-4 md:flex-nowrap">
+                      <div className="min-w-0 basis-full md:basis-auto md:flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="min-w-0 truncate text-sm font-semibold text-slate-900">
+                            {s.name || s.email}
+                          </p>
+                          <StatusPill status={s.subscriptionStatus} expiresAt={s.expiresAt} />
+                        </div>
+                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                          {s.email} · {s.hostel || "—"}
+                        </p>
+                      </div>
+
+                      <div className="min-w-0 flex-1 md:flex-none md:text-right">
+                        <p className="truncate text-sm font-medium text-slate-900">{s.planName}</p>
+                        <p className="text-xs text-slate-500">{money(s.price)}</p>
+                      </div>
+
+                      <div className="shrink-0 text-right md:w-32">
+                        <p className="text-xs text-slate-500">
+                          {s.expiresAt ? shortDate(s.expiresAt) : "not started"}
+                        </p>
+                        {left !== null && left >= 0 && (
+                          <p className={`text-xs ${left <= 3 ? "font-semibold text-amber-600" : "text-slate-400"}`}>
+                            {left === 0 ? "today" : `${left} days`}
+                          </p>
+                        )}
+                      </div>
+
+                      {canEdit && (
+                        <div className="flex shrink-0 items-center gap-1">
+                          <IconButton
+                            label="Change plan"
+                            onClick={() => {
+                              setPlanModal({
+                                subId: s.id,
+                                subName: s.name || s.email,
+                                currentPlanId: s.planId,
+                              });
+                              setSelectedPlanId(s.planId);
+                            }}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </IconButton>
+                          <IconButton
+                            label="Delete subscription"
+                            tone="danger"
+                            onClick={() =>
+                              setConfirmModal({
+                                isOpen: true,
+                                title: "Delete subscription",
+                                message: `Remove ${s.email}'s record? Their device is not taken off the controller by this.`,
+                                onConfirm: () => confirmDelete(s.id),
+                              })
+                            }
+                            disabled={deleting === s.id}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </IconButton>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Panel>
+        )}
+      </AdminPage>
+
+      <Modal
+        open={!!planModal}
+        onClose={() => setPlanModal(null)}
+        title="Change plan"
+        footer={
+          <>
+            <button onClick={() => setPlanModal(null)} className="glass-button">
+              Cancel
+            </button>
+            <button onClick={() => void handleUpdatePlan()} disabled={updatingPlan} className="glass-primary">
+              {updatingPlan ? "Saving…" : "Change plan"}
+            </button>
+          </>
+        }
+      >
+        <p className="break-words text-sm text-slate-500">{planModal?.subName}</p>
+        <select
+          value={selectedPlanId}
+          onChange={(e) => setSelectedPlanId(e.target.value)}
+          aria-label="Plan"
+          className={`${GLASS_INPUT} mt-4`}
+        >
+          {tvPlans.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name} — {money(p.price)} · {p.duration} days
+            </option>
+          ))}
+        </select>
+      </Modal>
+
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal((m) => ({ ...m, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type="danger"
+      />
     </ProtectedRoute>
   );
 }

@@ -23,7 +23,12 @@ export default function ProtectedRoute({
   const pathname = usePathname() ?? "";
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    // Read the store directly, not the rendered value. While React hydrates
+    // the server's HTML, the hook reports the server's view — signed out,
+    // since the session lives in browser storage — and redirecting on that
+    // sent every full page load or refresh back to the login screen. The
+    // store itself was restored from storage before this ran.
+    if (!useAuthStore.getState().isAuthenticated) {
       // Carry the current page so signing in returns here.
       router.replace(`/admin/login?next=${encodeURIComponent(pathname)}`);
     }
@@ -31,10 +36,10 @@ export default function ProtectedRoute({
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
+      <div className="analytics-shell min-h-dvh flex items-center justify-center px-4">
+        <div className="glass-panel w-full max-w-sm text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-apple-gray-600">Checking authentication...</p>
+          <p className="mt-4 text-sm text-slate-600">Checking authentication...</p>
         </div>
       </div>
     );
@@ -57,8 +62,8 @@ export default function ProtectedRoute({
   // Write-permission check (optional — individual pages use canWrite() directly)
   if (module && requireWrite && !canWrite(module)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-apple-gray-50">
-        <div className="text-center p-8 max-w-sm">
+      <div className="analytics-shell min-h-dvh flex items-center justify-center px-4">
+        <div className="glass-panel w-full max-w-sm text-center">
           <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg
               className="w-8 h-8 text-amber-500"
@@ -74,16 +79,16 @@ export default function ProtectedRoute({
               />
             </svg>
           </div>
-          <h2 className="text-xl font-bold text-apple-gray-900 mb-2">
+          <h2 className="text-xl font-semibold text-slate-900 mb-2">
             Read-Only Access
           </h2>
-          <p className="text-apple-gray-600 mb-6 text-sm">
+          <p className="text-slate-600 mb-6 text-sm">
             You only have read access to this section. Write actions are
             restricted.
           </p>
           <button
             onClick={() => router.push("/admin/dashboard")}
-            className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:opacity-90 transition-opacity"
+            className="glass-primary w-full sm:w-auto"
           >
             Back to Dashboard
           </button>
@@ -98,8 +103,8 @@ export default function ProtectedRoute({
 /** Shown when an admin opens a page they may not use. */
 function AccessDenied({ router }: { router: ReturnType<typeof useRouter> }) {
   return (
-      <div className="min-h-screen flex items-center justify-center bg-apple-gray-50">
-        <div className="text-center p-8 max-w-sm">
+      <div className="analytics-shell min-h-dvh flex items-center justify-center px-4">
+        <div className="glass-panel w-full max-w-sm text-center">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg
               className="w-8 h-8 text-red-500"
@@ -115,16 +120,16 @@ function AccessDenied({ router }: { router: ReturnType<typeof useRouter> }) {
               />
             </svg>
           </div>
-          <h2 className="text-xl font-bold text-apple-gray-900 mb-2">
+          <h2 className="text-xl font-semibold text-slate-900 mb-2">
             Access Denied
           </h2>
-          <p className="text-apple-gray-600 mb-6 text-sm">
+          <p className="text-slate-600 mb-6 text-sm">
             You don&apos;t have permission to access this section. Contact the
             super-admin to request access.
           </p>
           <button
             onClick={() => router.push("/admin/dashboard")}
-            className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:opacity-90 transition-opacity"
+            className="glass-primary w-full sm:w-auto"
           >
             Back to Dashboard
           </button>

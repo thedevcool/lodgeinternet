@@ -2,15 +2,21 @@
 import { adminFetch } from "@/lib/apiClient";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
-import Logo from "@/components/Logo";
 import { useAuthStore } from "@/store/authStore";
 import ConfirmationModal from "@/components/ConfirmationModal";
+import {
+  AdminPage,
+  Kpi,
+  SegToggle,
+  ResponsiveTable,
+  MobileCard,
+  Modal,
+  EmptyState,
+} from "@/components/admin/ui";
 import { useRouter } from "next/navigation";
 import {
   KeyRound,
-  LogOut,
   RefreshCw,
   Trash2,
   Pencil,
@@ -18,7 +24,6 @@ import {
   MessageSquare,
   Star,
   Tv,
-  ArrowLeft,
   Copy,
   X,
   ArrowRight,
@@ -1338,12 +1343,11 @@ export default function AdminDataCodesPage() {
 
   return (
     <ProtectedRoute module="data-codes">
-      <div className="min-h-screen bg-apple-gray-50">
         {/* Success Toast Notification */}
         {successMessage && (
-          <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 fade-in duration-300">
-            <div className="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-4 rounded-2xl shadow-lg flex items-center gap-3 max-w-md">
-              <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+          <div className="fixed left-4 right-4 top-4 z-50 sm:left-auto sm:max-w-md">
+            <div className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-3 text-white shadow-lg sm:px-5 sm:py-4">
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white/20">
                 <svg
                   className="w-5 h-5 text-white"
                   fill="none"
@@ -1358,10 +1362,11 @@ export default function AdminDataCodesPage() {
                   />
                 </svg>
               </div>
-              <p className="font-medium">{successMessage}</p>
+              <p className="min-w-0 flex-1 break-words font-medium">{successMessage}</p>
               <button
                 onClick={() => setSuccessMessage("")}
-                className="ml-2 text-white/80 hover:text-white transition-colors"
+                aria-label="Dismiss"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/15 hover:text-white"
               >
                 <svg
                   className="w-5 h-5"
@@ -1380,98 +1385,66 @@ export default function AdminDataCodesPage() {
             </div>
           </div>
         )}
-        <header className="bg-white shadow-sm sticky top-0 z-10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3">
-                <Logo variant="dark" />
-                <div>
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 via-blue-500 to-black-400 bg-clip-text text-transparent">
-                    Data Codes
-                  </h1>
-                  <p className="text-sm text-apple-gray-600">
-                    Lodge Internet • Fast and Reliable Hostel Internet
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Link
-                  href="/admin/dashboard"
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-apple-gray-700 hover:bg-apple-gray-100 rounded-lg transition-colors"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span className="hidden sm:inline">Dashboard</span>
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-apple-gray-700 hover:bg-apple-gray-100 rounded-lg transition-colors"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span className="hidden sm:inline">Logout</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <AdminPage
+        eyebrow="CATALOGUE"
+        title="Data Codes"
+        subtitle="Lodge Internet • Fast and Reliable Hostel Internet"
+      >
           {/* Catalogue command centre */}
-          <section id="catalogue-control-centre" className="relative mb-8 overflow-hidden rounded-[2rem] border border-white/80 bg-white/75 p-6 shadow-[0_20px_70px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-            <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-blue-200/40 blur-3xl" />
-            <div className="pointer-events-none absolute -bottom-32 left-1/3 h-64 w-64 rounded-full bg-purple-200/30 blur-3xl" />
-            <div className="relative flex flex-col gap-5 lg:flex-row lg:flex-nowrap lg:items-end lg:justify-between">
-              <div>
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-blue-600"><ShieldCheck className="h-4 w-4" /> Catalogue control centre</div>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">Plans, pools &amp; code access</h2>
+          <section id="catalogue-control-centre" className="glass-panel">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+              <div className="min-w-0">
+                <div className="eyebrow flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> CATALOGUE CONTROL CENTRE</div>
+                <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950 sm:text-3xl">Plans, pools &amp; code access</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">Manage standalone inventory and controller-owned pools from one place. A controller hostel inherits its parent catalogue; pricing and availability stay visible at every decision point.</p>
               </div>
-              <div className="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-3 lg:flex lg:flex-nowrap">
-                {adminProfile?.isSuperAdmin && <button onClick={() => router.push("/admin/controllers")} className="inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-blue-200 bg-blue-50/80 px-4 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"><SlidersHorizontal className="h-4 w-4" /> Manage controllers <ExternalLink className="h-3.5 w-3.5" /></button>}
-                <button onClick={openControllerWalkthrough} className="inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white/80 px-4 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50"><Sparkles className="h-4 w-4 text-blue-600" /> Controller walkthrough</button>
-                <button onClick={() => { setShowSync(true); fetchSyncStatus(); }} className="inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"><RefreshCw className="h-4 w-4" /> Sync centre</button>
+              <div className="grid shrink-0 grid-cols-1 gap-2 sm:flex sm:flex-wrap lg:flex-nowrap">
+                {adminProfile?.isSuperAdmin && <button onClick={() => router.push("/admin/controllers")} className="glass-button whitespace-nowrap font-semibold text-blue-700"><SlidersHorizontal className="h-4 w-4" /> Manage controllers <ExternalLink className="h-3.5 w-3.5" /></button>}
+                <button onClick={openControllerWalkthrough} className="glass-button whitespace-nowrap font-semibold"><Sparkles className="h-4 w-4 text-blue-600" /> Controller walkthrough</button>
+                <button onClick={() => { setShowSync(true); fetchSyncStatus(); }} className="glass-primary whitespace-nowrap"><RefreshCw className="h-4 w-4" /> Sync centre</button>
               </div>
             </div>
-            <div className="relative mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-              {[
-                ["Active plans", catalogueSummary.activePlans, "text-blue-700 bg-blue-50"],
-                ["Controller plans", catalogueSummary.controllerPlans, "text-indigo-700 bg-indigo-50"],
-                ["Approved for sale", catalogueSummary.approvedForSale, "text-emerald-700 bg-emerald-50"],
-                ["Needs metadata", catalogueSummary.unresolved, "text-amber-700 bg-amber-50"],
-                ["Needs price", catalogueSummary.needsPrice, "text-orange-700 bg-orange-50"],
-                ["Disabled / retired", catalogueSummary.inactive, "text-slate-600 bg-slate-100"],
-                ["Controllers", activeControllers.length, "text-purple-700 bg-purple-50"],
-                ["Hostels", catalogueSummary.hostels, "text-emerald-700 bg-emerald-50"],
-              ].map(([label, value, tone]) => <div key={String(label)} className={`rounded-2xl px-3 py-3 ${tone}`}><p className="text-xl font-bold">{value}</p><p className="mt-0.5 text-[11px] font-medium opacity-80">{label}</p></div>)}
+            <div className="kpi-grid mt-5 sm:mt-6">
+              {([
+                ["Active plans", catalogueSummary.activePlans, "blue"],
+                ["Controller plans", catalogueSummary.controllerPlans, "violet"],
+                ["Approved for sale", catalogueSummary.approvedForSale, "green"],
+                ["Needs metadata", catalogueSummary.unresolved, "orange"],
+                ["Needs price", catalogueSummary.needsPrice, "red"],
+                ["Disabled / retired", catalogueSummary.inactive, "slate"],
+                ["Controllers", activeControllers.length, "purple"],
+                ["Hostels", catalogueSummary.hostels, "teal"],
+              ] as const).map(([label, value, tone]) => <Kpi key={label} label={label} value={value} tone={tone} small />)}
             </div>
           </section>
 
           {/* Quick Action Buttons */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <button
               onClick={() => router.push("/admin/tv-users")}
-              className="flex items-center justify-between p-6 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all border-2 border-transparent hover:border-purple-200"
+              className="glass-card flex items-center justify-between gap-3 text-left transition hover:-translate-y-0.5 hover:bg-white/90"
             >
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 rounded-xl">
-                  <Tv className="w-6 h-6 text-white" />
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="shrink-0 rounded-2xl bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 p-2.5">
+                  <Tv className="h-5 w-5 text-white" />
                 </div>
-                <div className="text-left">
-                  <h3 className="text-lg font-semibold text-apple-gray-900">
+                <div className="min-w-0 text-left">
+                  <h3 className="text-base font-semibold text-slate-900">
                     TV Users
                   </h3>
-                  <p className="text-sm text-apple-gray-600">
+                  <p className="text-sm text-slate-500">
                     Manage TV subscriptions
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
                 {pendingCount > 0 && (
-                  <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full font-semibold">
+                  <span className="drawer-badge">
                     {pendingCount}
                   </span>
                 )}
                 <svg
-                  className="w-5 h-5 text-apple-gray-400"
+                  className="w-5 h-5 text-slate-400"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -1490,23 +1463,23 @@ export default function AdminDataCodesPage() {
                 setShowSync(!showSync);
                 if (!showSync) fetchSyncStatus();
               }}
-              className="flex items-center justify-between p-6 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all border-2 border-transparent hover:border-green-200"
+              className="glass-card flex items-center justify-between gap-3 text-left transition hover:-translate-y-0.5 hover:bg-white/90"
             >
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-gradient-to-r from-green-500 to-green-600 rounded-xl">
-                  <RefreshCw className="w-6 h-6 text-white" />
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="shrink-0 rounded-2xl bg-gradient-to-r from-green-500 to-green-600 p-2.5">
+                  <RefreshCw className="h-5 w-5 text-white" />
                 </div>
-                <div className="text-left">
-                  <h3 className="text-lg font-semibold text-apple-gray-900">
+                <div className="min-w-0 text-left">
+                  <h3 className="text-base font-semibold text-slate-900">
                     Sync Data Codes
                   </h3>
-                  <p className="text-sm text-apple-gray-600">
+                  <p className="text-sm text-slate-500">
                     {showSync ? "Hide" : "View"} Omada sync status &amp; report
                   </p>
                 </div>
               </div>
               <div
-                className="text-2xl font-bold text-green-600"
+                className="shrink-0 text-2xl font-bold text-green-600"
                 title="Controllers"
               >
                 {syncStatus.filter((c) => c.needsPriceResolve.length > 0).length}
@@ -1515,22 +1488,22 @@ export default function AdminDataCodesPage() {
 
             <button
               onClick={() => setShowFeedback(!showFeedback)}
-              className="flex items-center justify-between p-6 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all border-2 border-transparent hover:border-purple-200"
+              className="glass-card flex items-center justify-between gap-3 text-left transition hover:-translate-y-0.5 hover:bg-white/90"
             >
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl">
-                  <MessageSquare className="w-6 h-6 text-white" />
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="shrink-0 rounded-2xl bg-gradient-to-r from-purple-500 to-purple-600 p-2.5">
+                  <MessageSquare className="h-5 w-5 text-white" />
                 </div>
-                <div className="text-left">
-                  <h3 className="text-lg font-semibold text-apple-gray-900">
+                <div className="min-w-0 text-left">
+                  <h3 className="text-base font-semibold text-slate-900">
                     Customer Feedback
                   </h3>
-                  <p className="text-sm text-apple-gray-600">
+                  <p className="text-sm text-slate-500">
                     {showFeedback ? "Hide" : "View"} reviews & complaints
                   </p>
                 </div>
               </div>
-              <div className="text-2xl font-bold text-purple-600">
+              <div className="shrink-0 text-2xl font-bold text-purple-600">
                 {feedback.length}
               </div>
             </button>
@@ -1543,23 +1516,23 @@ export default function AdminDataCodesPage() {
                   setDupTo("");
                   setDupResult("");
                 }}
-                className="flex items-center justify-between p-6 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all border-2 border-transparent hover:border-blue-200"
+                className="glass-card flex items-center justify-between gap-3 text-left transition hover:-translate-y-0.5 hover:bg-white/90"
               >
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl">
-                    <Copy className="w-6 h-6 text-white" />
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="shrink-0 rounded-2xl bg-gradient-to-r from-blue-500 to-cyan-500 p-2.5">
+                    <Copy className="h-5 w-5 text-white" />
                   </div>
-                  <div className="text-left">
-                    <h3 className="text-lg font-semibold text-apple-gray-900">
+                  <div className="min-w-0 text-left">
+                    <h3 className="text-base font-semibold text-slate-900">
                       Duplicate Plans
                     </h3>
-                    <p className="text-sm text-apple-gray-600">
+                    <p className="text-sm text-slate-500">
                       Copy plans & codes to another hostel
                     </p>
                   </div>
                 </div>
                 <svg
-                  className="w-5 h-5 text-apple-gray-400"
+                  className="w-5 h-5 shrink-0 text-slate-400"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -1577,42 +1550,44 @@ export default function AdminDataCodesPage() {
 
           {/* Omada Sync Section */}
           {showSync && (
-            <section id="omada-sync-section" className="relative mb-8 overflow-hidden rounded-[2rem] border border-white/90 bg-white/75 p-6 shadow-[0_20px_70px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2">
-                  <RefreshCw className="w-5 h-5 text-green-500" />
-                  <h2 className="text-lg font-semibold text-apple-gray-800">
+            <section id="omada-sync-section" className="glass-panel">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <RefreshCw className="h-5 w-5 shrink-0 text-green-500" />
+                  <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">
                     Omada Sync Report
                   </h2>
                 </div>
-                <button
-                  onClick={() => fetchSyncStatus()}
-                  className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  Refresh
-                </button>
-                {adminProfile?.isSuperAdmin && (
+                <div className="flex flex-wrap items-center gap-2">
                   <button
-                    onClick={handleSyncAllControllers}
-                    disabled={syncingAllControllers || syncingController !== null}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-slate-950 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                    onClick={() => fetchSyncStatus()}
+                    className="glass-button text-blue-700"
                   >
-                    <RefreshCw className={`h-3.5 w-3.5 ${syncingAllControllers ? "animate-spin" : ""}`} />
-                    {syncingAllControllers ? "Syncing all…" : "Sync all"}
+                    <RefreshCw className="h-4 w-4" />
+                    Refresh
                   </button>
-                )}
+                  {adminProfile?.isSuperAdmin && (
+                    <button
+                      onClick={handleSyncAllControllers}
+                      disabled={syncingAllControllers || syncingController !== null}
+                      className="glass-primary"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${syncingAllControllers ? "animate-spin" : ""}`} />
+                      {syncingAllControllers ? "Syncing all…" : "Sync all"}
+                    </button>
+                  )}
+                </div>
               </div>
 
               {!loadingSync && syncStatus.length > 0 && (
-                <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="mb-5 grid gap-3 sm:mb-6 sm:grid-cols-2 xl:grid-cols-3">
                   {syncStatus.map((ctrl, controllerIndex) => {
                     const needs = ctrl.needsPriceResolve.length;
                     const last = ctrl.lastSync;
                     return (
-                      <div id={controllerIndex === 0 ? "controller-sync-card" : undefined} key={ctrl.id} role="button" tabIndex={0} onClick={() => openSyncController(ctrl.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openSyncController(ctrl.id); }} className="group rounded-[1.5rem] border border-white/90 bg-white/80 p-4 text-left shadow-[0_12px_35px_rgba(15,23,42,0.07)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-lg">
+                      <div id={controllerIndex === 0 ? "controller-sync-card" : undefined} key={ctrl.id} role="button" tabIndex={0} onClick={() => openSyncController(ctrl.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openSyncController(ctrl.id); }} className="glass-card group min-w-0 cursor-pointer text-left transition hover:-translate-y-0.5 hover:bg-white/90">
                         <div className="flex items-start justify-between gap-3">
-                          <div className="flex min-w-0 items-center gap-2"><div className="rounded-xl bg-blue-50 p-2 text-blue-600"><Server className="h-4 w-4" /></div><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900">{ctrl.name}</p><p className="text-xs text-slate-500">{ctrl.memberHostels.length} hostel{ctrl.memberHostels.length === 1 ? "" : "s"} · {last?.groups ?? 0} groups</p></div></div>
+                          <div className="flex min-w-0 items-center gap-2"><div className="shrink-0 rounded-xl bg-blue-50 p-2 text-blue-600"><Server className="h-4 w-4" /></div><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900">{ctrl.name}</p><p className="text-xs text-slate-500">{ctrl.memberHostels.length} hostel{ctrl.memberHostels.length === 1 ? "" : "s"} · {last?.groups ?? 0} groups</p></div></div>
                           <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-1" />
                         </div>
                         <div className="mt-4 flex flex-wrap gap-1.5">
@@ -1626,18 +1601,18 @@ export default function AdminDataCodesPage() {
                             label={ctrl.syncProgress.detail || ctrl.syncProgress.stage || "Working…"}
                           />
                         )}
-                        <div className="mt-3 grid grid-cols-4 gap-1.5 border-t border-slate-100 pt-3 text-[10px] text-slate-500">
+                        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-200/60 pt-3 text-[11px] text-slate-500 sm:grid-cols-4 sm:gap-1.5">
                           <span><b className="block text-sm text-slate-900">{last?.added ?? 0}</b>Added</span>
                           <span><b className="block text-sm text-slate-900">{last?.skipped ?? 0}</b>Skipped</span>
                           <span><b className="block text-sm text-slate-900">{last?.filteredOut ?? 0}</b>Used/expired</span>
                           <span><b className="block text-sm text-slate-900">{last?.entitlements?.updated ?? 0}</b>Updated</span>
                         </div>
-                        {adminProfile?.isSuperAdmin && <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3" onClick={(event) => event.stopPropagation()}>
-                          <button type="button" onClick={() => handleSyncController(ctrl.id, ctrl.name)} disabled={syncingController !== null || syncingAllControllers} className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 px-3 py-2 text-[11px] font-semibold text-white hover:opacity-90 disabled:opacity-50">
+                        {adminProfile?.isSuperAdmin && <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-200/60 pt-3" onClick={(event) => event.stopPropagation()}>
+                          <button type="button" onClick={() => handleSyncController(ctrl.id, ctrl.name)} disabled={syncingController !== null || syncingAllControllers} className="glass-primary !px-4 text-xs">
                             <RefreshCw className={`h-3.5 w-3.5 ${syncingController === ctrl.id ? "animate-spin" : ""}`} />
                             {syncingController === ctrl.id ? "Syncing…" : "Sync now"}
                           </button>
-                          <button type="button" onClick={() => setCleanSyncTarget({ id: ctrl.id, name: ctrl.name })} disabled={syncingController !== null || syncingAllControllers} className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50">
+                          <button type="button" onClick={() => setCleanSyncTarget({ id: ctrl.id, name: ctrl.name })} disabled={syncingController !== null || syncingAllControllers} className="glass-button text-xs font-semibold text-rose-700">
                             <Trash2 className="h-3.5 w-3.5" /> Clean & resync
                           </button>
                         </div>}
@@ -1648,46 +1623,34 @@ export default function AdminDataCodesPage() {
               )}
 
               {adminProfile?.isSuperAdmin && (
-                <div id="sync-filter-policy" className="mb-6 rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
+                <div id="sync-filter-policy" className="mb-5 rounded-2xl border border-white/80 bg-white/60 p-3 sm:mb-6 sm:p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div><p className="text-sm font-semibold text-slate-900">Omada sync filters</p><p className="text-xs text-slate-500">Groups containing these words are skipped before pools and codes are created.</p></div>
-                    <div className="flex flex-wrap items-center gap-2"><button type="button" onClick={() => setShowNamingGuide(true)} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm hover:bg-blue-100"><BookOpen className="h-3.5 w-3.5" /> Naming guide</button><div className="flex rounded-full bg-white p-1 text-xs font-semibold shadow-sm"><button type="button" onClick={() => { setSyncFilterScope("global"); fetchSyncFilters(); }} className={`rounded-full px-3 py-1.5 ${syncFilterScope === "global" ? "bg-slate-950 text-white" : "text-slate-600"}`}>Global</button><button type="button" onClick={() => { setSyncFilterScope("controller"); if (syncFilterController) fetchSyncFilters(syncFilterController); }} className={`rounded-full px-3 py-1.5 ${syncFilterScope === "controller" ? "bg-slate-950 text-white" : "text-slate-600"}`}>Controller</button></div></div>
+                    <div className="min-w-0"><p className="text-sm font-semibold text-slate-900">Omada sync filters</p><p className="text-xs text-slate-500">Groups containing these words are skipped before pools and codes are created.</p></div>
+                    <div className="flex flex-wrap items-center gap-2"><button type="button" onClick={() => setShowNamingGuide(true)} className="glass-button text-xs font-semibold text-blue-700"><BookOpen className="h-3.5 w-3.5" /> Naming guide</button><SegToggle
+                      value={syncFilterScope}
+                      onChange={(next) => {
+                        if (next === "global") { setSyncFilterScope("global"); fetchSyncFilters(); }
+                        else { setSyncFilterScope("controller"); if (syncFilterController) fetchSyncFilters(syncFilterController); }
+                      }}
+                      options={[{ value: "global", label: "Global" }, { value: "controller", label: "Controller" }]}
+                    /></div>
                   </div>
-                  {syncFilterScope === "controller" && <select value={syncFilterController} onChange={(e) => { setSyncFilterController(e.target.value); fetchSyncFilters(e.target.value); }} className="mt-3 w-full rounded-xl border border-blue-100 bg-white px-3 py-2 text-sm"><option value="">Select controller</option>{controllers.map((controller) => <option key={controller.id} value={controller.id}>{controller.name}</option>)}</select>}
-                  <div className="mt-3 flex flex-wrap items-center gap-2"><input value={syncFilterPatterns.join(", ")} onChange={(e) => setSyncFilterPatterns(e.target.value.split(",").map((item) => item.trim()).filter(Boolean))} className="min-w-[14rem] flex-1 rounded-xl border border-blue-100 bg-white px-3 py-2 text-sm" placeholder="test, testing, staging" /><label className="flex items-center gap-2 rounded-xl border border-blue-100 bg-white px-3 py-2 text-xs text-slate-600">Low-stock alert / refill at <input type="number" min="1" value={syncLowStockThreshold} onChange={(e) => setSyncLowStockThreshold(Number(e.target.value))} className="w-16 border-0 p-0 text-sm font-semibold outline-none" /></label><button type="button" onClick={saveSyncFilters} disabled={savingSyncFilters || (syncFilterScope === "controller" && !syncFilterController)} className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{savingSyncFilters ? "Saving…" : "Save policy"}</button></div>
-                </div>
-              )}
-
-              {showNamingGuide && (
-                <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/25 backdrop-blur-sm" onClick={() => setShowNamingGuide(false)}>
-                  <aside className="h-full w-full max-w-xl overflow-y-auto border-l border-white/70 bg-white/95 p-6 shadow-2xl backdrop-blur-2xl sm:p-8" onClick={(event) => event.stopPropagation()}>
-                    <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-5">
-                      <div><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-blue-600"><BookOpen className="h-4 w-4" /> Omada plan guide</div><h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">How to name a plan</h2><p className="mt-2 text-sm leading-6 text-slate-500">Use one clear name for each plan. The sync reads the name and automatically understands the plan type, data size, devices, duration and price.</p></div>
-                      <button type="button" onClick={() => setShowNamingGuide(false)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X className="h-5 w-5" /></button>
-                    </div>
-                    <div className="mt-6 space-y-6 text-sm text-slate-700">
-                      <section><h3 className="font-semibold text-slate-950">The short pattern</h3><p className="mt-2 leading-6">Put five items in this order and separate them with the vertical line <code className="rounded bg-slate-100 px-1 font-mono">|</code>:</p><code className="mt-3 block overflow-x-auto rounded-xl bg-slate-950 p-3 text-xs leading-6 text-blue-100">PLAN NAME | DATA | TYPE | DURATION | PRICE</code></section>
-                      <section className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4"><h3 className="font-semibold text-slate-950">Device plan — copy this</h3><code className="mt-3 block overflow-x-auto rounded-xl bg-slate-950 p-3 text-xs leading-6 text-blue-100">ONLINE|20GB|5|7|2000</code><p className="mt-3 text-xs leading-5 text-slate-600">This means: ONLINE, 20GB, usable on 5 devices, valid for 7 days, sold for ₦2,000. You can also write <code>3k</code> instead of <code>3000</code>.</p></section>
-                      <section className="rounded-2xl border border-purple-100 bg-purple-50/70 p-4"><h3 className="font-semibold text-slate-950">Unlimited plan — copy this</h3><code className="mt-3 block overflow-x-auto rounded-xl bg-slate-950 p-3 text-xs leading-6 text-purple-100">ONLINE Weekly Unlimited||WU||5000</code><p className="mt-3 text-xs leading-5 text-slate-600">Use <code>DU</code> for daily, <code>WU</code> for weekly, <code>MU</code> for monthly, or <code>YU</code> for yearly. Leave data and duration empty because the system knows the period and duration automatically.</p></section>
-                      <section><h3 className="font-semibold text-slate-950">Type shortcuts</h3><div className="mt-3 space-y-2">{[["3 or 5", "Device plan for 3 or 5 devices."], ["DU / WU / MU / YU", "Daily, weekly, monthly or yearly unlimited."], ["DTV / WTV / MTV / YTV", "Daily, weekly, monthly or yearly TV plan."]].map(([term, explanation]) => <div key={term} className="flex gap-3 rounded-xl bg-slate-50 px-3 py-2"><code className="w-32 shrink-0 font-mono text-xs font-semibold text-blue-700">{term}</code><span className="text-xs text-slate-600">{explanation}</span></div>)}</div></section>
-                      <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4"><h3 className="font-semibold text-amber-950">Avoid these mistakes</h3><ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-amber-900"><li>Do not use commas in the price: write <code>3000</code>, not <code>3,000</code>.</li><li>Do not add the ₦ sign to the price.</li><li>Do not change the spelling of the field names.</li><li>Do not use <code>Test</code> or <code>Testing</code> in a real plan name; those groups are filtered out automatically.</li><li>Use a different name for different products, such as 20GB and 40GB.</li></ul></section>
-                      <p className="text-xs leading-5 text-slate-500">After creating or updating voucher groups in Omada, press <strong>Sync now</strong> for that controller. Plans with complete metadata can be made available automatically; existing codes are matched and never duplicated.</p>
-                    </div>
-                  </aside>
+                  {syncFilterScope === "controller" && <select value={syncFilterController} onChange={(e) => { setSyncFilterController(e.target.value); fetchSyncFilters(e.target.value); }} className="glass-input mt-3"><option value="">Select controller</option>{controllers.map((controller) => <option key={controller.id} value={controller.id}>{controller.name}</option>)}</select>}
+                  <div className="mt-3 flex flex-wrap items-center gap-2"><input value={syncFilterPatterns.join(", ")} onChange={(e) => setSyncFilterPatterns(e.target.value.split(",").map((item) => item.trim()).filter(Boolean))} className="glass-input sm:w-auto sm:min-w-[14rem] sm:flex-1" placeholder="test, testing, staging" /><label className="flex min-h-[44px] items-center gap-2 rounded-2xl border border-white/80 bg-white/70 px-3 py-2 text-xs text-slate-600">Low-stock alert / refill at <input type="number" min="1" value={syncLowStockThreshold} onChange={(e) => setSyncLowStockThreshold(Number(e.target.value))} className="w-16 border-0 bg-transparent p-0 text-sm font-semibold outline-none" /></label><button type="button" onClick={saveSyncFilters} disabled={savingSyncFilters || (syncFilterScope === "controller" && !syncFilterController)} className="glass-primary">{savingSyncFilters ? "Saving…" : "Save policy"}</button></div>
                 </div>
               )}
 
               {loadingSync ? (
                 <div className="text-center py-8">
                   <div className="inline-block w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="mt-2 text-sm text-apple-gray-500">
+                  <p className="mt-2 text-sm text-slate-500">
                     Loading sync status...
                   </p>
                 </div>
               ) : syncStatus.length === 0 ? (
                 <div className="text-center py-8">
-                  <Server className="w-12 h-12 text-apple-gray-300 mx-auto mb-3" />
-                  <p className="text-sm text-apple-gray-500">
+                  <Server className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-sm text-slate-500">
                     No controllers configured yet.
                   </p>
                 </div>
@@ -1704,22 +1667,22 @@ export default function AdminDataCodesPage() {
                     return (
                       <div
                         key={ctrl.id}
-                        className="border border-apple-gray-200 rounded-xl p-5"
+                        className="border border-slate-200/70 rounded-xl p-5"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                           <div className="flex items-center gap-2">
                             <Server className="w-4 h-4 text-blue-500" />
-                            <h3 className="text-base font-semibold text-apple-gray-900">
+                            <h3 className="text-base font-semibold text-slate-900">
                               {ctrl.name}
                             </h3>
-                            <span className="text-xs text-apple-gray-500">
+                            <span className="text-xs text-slate-500">
                               · {ctrl.memberHostels.length} hostel
                               {ctrl.memberHostels.length !== 1 ? "s" : ""}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
                               {!never && (
-                                <span className="text-xs text-apple-gray-500">
+                                <span className="text-xs text-slate-500">
                                   Last sync:{" "}
                                   {new Date(last!.ranAt!).toLocaleString()}
                                 </span>
@@ -1727,7 +1690,7 @@ export default function AdminDataCodesPage() {
                               <span
                                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                                   never
-                                    ? "bg-apple-gray-100 text-apple-gray-600"
+                                    ? "bg-slate-100 text-slate-600"
                                     : statusText === "In sync"
                                       ? "bg-green-100 text-green-700"
                                       : "bg-amber-100 text-amber-700"
@@ -1758,9 +1721,9 @@ export default function AdminDataCodesPage() {
 
                         {!never && (
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                            <div className="rounded-lg bg-apple-gray-50 px-3 py-2">
-                              <p className="text-xs text-apple-gray-500">Groups</p>
-                              <p className="text-lg font-bold text-apple-gray-900">
+                            <div className="rounded-lg bg-white/60 px-3 py-2">
+                              <p className="text-xs text-slate-500">Groups</p>
+                              <p className="text-lg font-bold text-slate-900">
                                 {last.groups}
                               </p>
                             </div>
@@ -1770,15 +1733,15 @@ export default function AdminDataCodesPage() {
                                 {last.added}
                               </p>
                             </div>
-                            <div className="rounded-lg bg-apple-gray-50 px-3 py-2">
-                              <p className="text-xs text-apple-gray-500">Skipped (dup)</p>
-                              <p className="text-lg font-bold text-apple-gray-900">
+                            <div className="rounded-lg bg-white/60 px-3 py-2">
+                              <p className="text-xs text-slate-500">Skipped (dup)</p>
+                              <p className="text-lg font-bold text-slate-900">
                                 {last.skipped}
                               </p>
                             </div>
-                            <div className="rounded-lg bg-apple-gray-50 px-3 py-2">
-                              <p className="text-xs text-apple-gray-500">Used / expired</p>
-                              <p className="text-lg font-bold text-apple-gray-900">
+                            <div className="rounded-lg bg-white/60 px-3 py-2">
+                              <p className="text-xs text-slate-500">Used / expired</p>
+                              <p className="text-lg font-bold text-slate-900">
                                 {last.filteredOut}
                               </p>
                             </div>
@@ -1806,10 +1769,10 @@ export default function AdminDataCodesPage() {
                                 >
                                   <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
-                                      <p className="font-semibold text-apple-gray-900 text-sm">
+                                      <p className="font-semibold text-slate-900 text-sm">
                                         {pool.poolKey.split("|")[0]}
                                       </p>
-                                      <p className="text-xs text-apple-gray-500 mt-0.5">
+                                      <p className="text-xs text-slate-500 mt-0.5">
                                         {pool.count} code
                                         {pool.count !== 1 ? "s" : ""}
                                         {pool.sourceGroupName
@@ -1831,7 +1794,7 @@ export default function AdminDataCodesPage() {
                                             [pool.poolKey]: e.target.value,
                                           }))
                                         }
-                                        className="w-28 px-3 py-2 border border-apple-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-28 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                       />
                                       <select
                                         aria-label="Apply this price to"
@@ -1842,7 +1805,7 @@ export default function AdminDataCodesPage() {
                                             [pool.poolKey]: e.target.value,
                                           }))
                                         }
-                                        className="max-w-[190px] rounded-lg border border-apple-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="max-w-[190px] rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                                       >
                                         <option value="">All hostels on this controller</option>
                                         {ctrl.memberHostels.map((hostel) => (
@@ -1889,25 +1852,44 @@ export default function AdminDataCodesPage() {
             </section>
           )}
 
+              {showNamingGuide && (
+                <div className="fixed inset-0 z-50 !mt-0 flex justify-end bg-slate-950/25 backdrop-blur-sm" onClick={() => setShowNamingGuide(false)}>
+                  <aside className="glass-drawer h-full w-full !rounded-none p-4 sm:max-w-xl sm:!rounded-l-[32px] sm:p-8" onClick={(event) => event.stopPropagation()}>
+                    <div className="flex items-start justify-between gap-3 border-b border-white/80 pb-4 sm:pb-5">
+                      <div className="min-w-0"><div className="eyebrow flex items-center gap-2"><BookOpen className="h-4 w-4" /> OMADA PLAN GUIDE</div><h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">How to name a plan</h2><p className="mt-2 text-sm leading-6 text-slate-500">Use one clear name for each plan. The sync reads the name and automatically understands the plan type, data size, devices, duration and price.</p></div>
+                      <button type="button" onClick={() => setShowNamingGuide(false)} aria-label="Close naming guide" className="glass-icon shrink-0 text-slate-500"><X className="h-5 w-5" /></button>
+                    </div>
+                    <div className="mt-5 space-y-5 text-sm text-slate-700 sm:mt-6 sm:space-y-6">
+                      <section><h3 className="font-semibold text-slate-950">The short pattern</h3><p className="mt-2 leading-6">Put five items in this order and separate them with the vertical line <code className="rounded bg-slate-100 px-1 font-mono">|</code>:</p><code className="mt-3 block break-all rounded-xl bg-slate-950 p-3 text-xs leading-6 text-blue-100">PLAN NAME | DATA | TYPE | DURATION | PRICE</code></section>
+                      <section className="rounded-2xl border border-blue-100 bg-blue-50/70 p-3 sm:p-4"><h3 className="font-semibold text-slate-950">Device plan — copy this</h3><code className="mt-3 block break-all rounded-xl bg-slate-950 p-3 text-xs leading-6 text-blue-100">ONLINE|20GB|5|7|2000</code><p className="mt-3 text-xs leading-5 text-slate-600">This means: ONLINE, 20GB, usable on 5 devices, valid for 7 days, sold for ₦2,000. You can also write <code>3k</code> instead of <code>3000</code>.</p></section>
+                      <section className="rounded-2xl border border-purple-100 bg-purple-50/70 p-3 sm:p-4"><h3 className="font-semibold text-slate-950">Unlimited plan — copy this</h3><code className="mt-3 block break-all rounded-xl bg-slate-950 p-3 text-xs leading-6 text-purple-100">ONLINE Weekly Unlimited||WU||5000</code><p className="mt-3 text-xs leading-5 text-slate-600">Use <code>DU</code> for daily, <code>WU</code> for weekly, <code>MU</code> for monthly, or <code>YU</code> for yearly. Leave data and duration empty because the system knows the period and duration automatically.</p></section>
+                      <section><h3 className="font-semibold text-slate-950">Type shortcuts</h3><div className="mt-3 space-y-2">{[["3 or 5", "Device plan for 3 or 5 devices."], ["DU / WU / MU / YU", "Daily, weekly, monthly or yearly unlimited."], ["DTV / WTV / MTV / YTV", "Daily, weekly, monthly or yearly TV plan."]].map(([term, explanation]) => <div key={term} className="flex flex-col gap-1 rounded-xl bg-white/70 px-3 py-2 sm:flex-row sm:gap-3"><code className="shrink-0 font-mono text-xs font-semibold text-blue-700 sm:w-32">{term}</code><span className="text-xs text-slate-600">{explanation}</span></div>)}</div></section>
+                      <section className="rounded-2xl border border-amber-200 bg-amber-50/90 p-3 sm:p-4"><h3 className="font-semibold text-amber-950">Avoid these mistakes</h3><ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-amber-900"><li>Do not use commas in the price: write <code>3000</code>, not <code>3,000</code>.</li><li>Do not add the ₦ sign to the price.</li><li>Do not change the spelling of the field names.</li><li>Do not use <code>Test</code> or <code>Testing</code> in a real plan name; those groups are filtered out automatically.</li><li>Use a different name for different products, such as 20GB and 40GB.</li></ul></section>
+                      <p className="text-xs leading-5 text-slate-500">After creating or updating voucher groups in Omada, press <strong>Sync now</strong> for that controller. Plans with complete metadata can be made available automatically; existing codes are matched and never duplicated.</p>
+                    </div>
+                  </aside>
+                </div>
+              )}
+
           {/* Controller pool management drawer */}
           {syncDetailControllerId && (
-            <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/25 backdrop-blur-sm" onClick={() => setSyncDetailControllerId(null)}>
-              <aside id="controller-pool-drawer" className="h-full w-full max-w-2xl overflow-y-auto border-l border-white/70 bg-white/90 p-5 shadow-2xl backdrop-blur-2xl sm:p-7" onClick={(e) => e.stopPropagation()}>
+            <div className="fixed inset-0 z-50 !mt-0 flex justify-end bg-slate-950/25 backdrop-blur-sm" onClick={() => setSyncDetailControllerId(null)}>
+              <aside id="controller-pool-drawer" className="glass-drawer h-full w-full !rounded-none p-4 sm:max-w-2xl sm:!rounded-l-[32px] sm:p-7" onClick={(e) => e.stopPropagation()}>
                 {(() => {
                   const ctrl = controllers.find((c) => c.id === syncDetailControllerId);
                   return (
                     <>
-                      <div className="flex items-start justify-between gap-4 border-b border-slate-200/80 pb-5">
-                        <div><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-blue-600"><Server className="h-4 w-4" /> Controller catalogue</div><h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">{ctrl?.name || "Controller pools"}</h2><p className="mt-1 text-sm text-slate-500">General terms apply to every member hostel unless a hostel override is set.</p></div>
-                        <button type="button" onClick={() => setSyncDetailControllerId(null)} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"><X className="h-5 w-5" /></button>
+                      <div className="flex items-start justify-between gap-3 border-b border-white/80 pb-4 sm:pb-5">
+                        <div className="min-w-0"><div className="eyebrow flex items-center gap-2"><Server className="h-4 w-4" /> CONTROLLER CATALOGUE</div><h2 className="mt-1 break-words text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">{ctrl?.name || "Controller pools"}</h2><p className="mt-1 text-sm text-slate-500">General terms apply to every member hostel unless a hostel override is set.</p></div>
+                        <button type="button" onClick={() => setSyncDetailControllerId(null)} aria-label="Close controller pools" className="glass-icon shrink-0 text-slate-500"><X className="h-5 w-5" /></button>
                       </div>
-                      {!syncDetailLoading && syncDetailBuckets.length > 0 && <div className="mt-5 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-semibold text-slate-800">Pool visibility</p><button type="button" onClick={() => setShowAllSyncPools((value) => !value)} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-blue-700 shadow-sm">{showAllSyncPools ? "Showing all pools" : "Needs action only"}</button></div>
+                      {!syncDetailLoading && syncDetailBuckets.length > 0 && <div className="mt-4 rounded-2xl border border-white/80 bg-white/60 p-3 sm:mt-5">
+                        <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-semibold text-slate-800">Pool visibility</p><button type="button" onClick={() => setShowAllSyncPools((value) => !value)} className="glass-button text-xs font-semibold text-blue-700">{showAllSyncPools ? "Showing all pools" : "Needs action only"}</button></div>
                         <div className="mt-2 flex flex-wrap gap-1.5">
-                          {([["all", "All"], ["approved", "Approved for sale"], ["enabled", "Enabled"], ["disabled", "Disabled"], ["metadata", "Needs metadata"]] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setSyncPoolFilter(value)} className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${syncPoolFilter === value ? "bg-slate-950 text-white" : "bg-white text-slate-600 hover:bg-blue-50"}`}>{label}</button>)}
+                          {([["all", "All"], ["approved", "Approved for sale"], ["enabled", "Enabled"], ["disabled", "Disabled"], ["metadata", "Needs metadata"]] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setSyncPoolFilter(value)} className={`min-h-[40px] rounded-full px-3 py-2 text-xs font-semibold transition ${syncPoolFilter === value ? "bg-slate-900 text-white shadow-sm" : "bg-white/80 text-slate-600 hover:bg-white"}`}>{label}</button>)}
                         </div>
                       </div>}
-                      {syncDetailLoading ? <div className="flex items-center justify-center py-16 text-sm text-slate-500"><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Loading pools…</div> : syncDetailBuckets.length === 0 ? <div className="py-16 text-center text-sm text-slate-500">No synced pools found for this controller.</div> : <div className="mt-4 space-y-4">
+                      {syncDetailLoading ? <div className="flex items-center justify-center py-16 text-sm text-slate-500"><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Loading pools…</div> : syncDetailBuckets.length === 0 ? <div className="py-16 text-center text-sm text-slate-500">No synced pools found for this controller.</div> : <div className="mt-4 space-y-3 sm:space-y-4">
                         {syncDetailBuckets.filter((bucket) => {
                           const saleReady = bucket.approved === true && bucket.enabled !== false && !bucket.needsPriceResolve && bucket.price != null;
                           const matches = syncPoolFilter === "all" || (syncPoolFilter === "approved" && saleReady) || (syncPoolFilter === "enabled" && bucket.enabled !== false) || (syncPoolFilter === "disabled" && bucket.enabled === false) || (syncPoolFilter === "metadata" && bucket.needsMetadataResolve === true);
@@ -1916,12 +1898,12 @@ export default function AdminDataCodesPage() {
                           const key = `${syncDetailControllerId}:${bucket.poolKey}`;
                           const draft = syncPoolDrafts[key] ?? bucket;
                           const saleReady = bucket.approved === true && bucket.enabled !== false && !bucket.needsPriceResolve && bucket.price != null;
-                          return <details key={bucket.poolKey} className="group rounded-2xl border border-slate-200/80 bg-white/80 shadow-sm" open={bucket.needsPriceResolve || (showControllerWalkthrough && walkthroughStep >= 4 && walkthroughStep <= 5)}>
-                            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="truncate text-sm font-semibold text-slate-900">{bucket.planName}</span><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${saleReady ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{saleReady ? "Approved for sale" : bucket.enabled === false && bucket.needsPriceResolve ? "Disabled · needs metadata" : bucket.enabled === false ? "Disabled" : bucket.needsPriceResolve ? "Needs metadata" : "Needs review"}</span><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${bucket.enabled === false ? "bg-slate-100 text-slate-500" : "bg-blue-100 text-blue-700"}`}>{bucket.enabled === false ? "Disabled" : "Enabled"}</span></div><p className="mt-1 text-xs text-slate-500">{bucket.availableCount} available · {bucket.codeCount} total · {bucket.poolKey}</p></div><ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" /></summary>
-                            <div className="space-y-4 border-t border-slate-100 p-4">
-                              <div id="controller-pool-general" className="grid grid-cols-2 gap-3 sm:grid-cols-4"><label className="col-span-2 text-xs font-medium text-slate-600">Plan name<input value={draft.planName} onChange={(e) => setSyncPoolDrafts((p) => ({ ...p, [key]: { ...draft, planName: e.target.value } }))} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" /></label><label className="text-xs font-medium text-slate-600">Price (₦)<input type="number" min="0" value={draft.price ?? ""} onChange={(e) => setSyncPoolDrafts((p) => ({ ...p, [key]: { ...draft, price: e.target.value === "" ? null : Number(e.target.value) } }))} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" /></label><label className="text-xs font-medium text-slate-600">Duration<input type="number" min="1" value={draft.duration ?? ""} onChange={(e) => setSyncPoolDrafts((p) => ({ ...p, [key]: { ...draft, duration: e.target.value === "" ? undefined : Number(e.target.value) } }))} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" /></label></div>
-                              <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600"><label className="inline-flex items-center gap-2"><input type="checkbox" checked={draft.approved === true} onChange={(e) => setSyncPoolDrafts((p) => ({ ...p, [key]: { ...draft, approved: e.target.checked } }))} /> Approved for sale</label><label className="inline-flex items-center gap-2"><input type="checkbox" checked={draft.enabled !== false} onChange={(e) => setSyncPoolDrafts((p) => ({ ...p, [key]: { ...draft, enabled: e.target.checked } }))} /> Enabled</label><button type="button" onClick={() => saveSyncPool(syncDetailControllerId, bucket.poolKey)} disabled={syncSavingKey === key} className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Save className="h-3.5 w-3.5" /> {syncSavingKey === key ? "Saving…" : "Save general terms"}</button></div>
-                              {ctrl?.memberHostels?.length ? <div id="controller-hostel-overrides" className="rounded-2xl bg-slate-50/90 p-3"><div className="mb-3 flex items-center justify-between"><div><p className="text-xs font-semibold text-slate-800">Per-hostel overrides</p><p className="text-[11px] text-slate-500">Override price or availability without changing the controller default.</p></div><span className="text-[10px] font-medium text-slate-400">{ctrl.memberHostels.length} hostels</span></div><div className="space-y-2">{ctrl.memberHostels.map((hostel) => { const override = bucket.hostelOverrides?.[hostel] ?? {}; const effectiveEnabled = override.enabled ?? bucket.enabled !== false; return <div key={hostel} className="flex flex-wrap items-center gap-2 rounded-xl bg-white px-3 py-2"><span className="min-w-[9rem] flex-1 text-xs font-medium text-slate-700">{hostel}<span className="ml-1 text-[10px] text-slate-400">{override.price != null ? "custom price" : "default price"}</span></span><input type="number" min="0" defaultValue={override.price ?? ""} placeholder={`₦${bucket.price ?? "default"}`} className="w-28 rounded-lg border border-slate-200 px-2 py-1.5 text-xs" onBlur={(e) => { if (e.target.value !== "") saveHostelOverride(syncDetailControllerId, hostel, bucket.poolKey, "price", Number(e.target.value)); }} /><button type="button" onClick={() => saveHostelOverride(syncDetailControllerId, hostel, bucket.poolKey, "enabled", !effectiveEnabled)} disabled={syncSavingKey === `${syncDetailControllerId}:${hostel}:${bucket.poolKey}`} className={`rounded-lg px-2.5 py-1.5 text-[11px] font-semibold ${effectiveEnabled ? "bg-slate-100 text-slate-600" : "bg-emerald-100 text-emerald-700"}`}>{effectiveEnabled ? "Disable" : "Enable"}</button></div>; })}</div></div> : null}
+                          return <details key={bucket.poolKey} className="group rounded-2xl border border-white/85 bg-white/70 shadow-[0_8px_22px_rgba(15,23,42,.05)] backdrop-blur-xl" open={bucket.needsPriceResolve || (showControllerWalkthrough && walkthroughStep >= 4 && walkthroughStep <= 5)}>
+                            <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between gap-3 p-3 sm:p-4"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="min-w-0 break-words text-sm font-semibold text-slate-900">{bucket.planName}</span><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${saleReady ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{saleReady ? "Approved for sale" : bucket.enabled === false && bucket.needsPriceResolve ? "Disabled · needs metadata" : bucket.enabled === false ? "Disabled" : bucket.needsPriceResolve ? "Needs metadata" : "Needs review"}</span><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${bucket.enabled === false ? "bg-slate-100 text-slate-500" : "bg-blue-100 text-blue-700"}`}>{bucket.enabled === false ? "Disabled" : "Enabled"}</span></div><p className="mt-1 break-all text-xs text-slate-500">{bucket.availableCount} available · {bucket.codeCount} total · {bucket.poolKey}</p></div><ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" /></summary>
+                            <div className="space-y-4 border-t border-white/80 p-3 sm:p-4">
+                              <div id="controller-pool-general" className="grid grid-cols-2 gap-3 sm:grid-cols-4"><label className="col-span-2 min-w-0 text-xs font-medium text-slate-600">Plan name<input value={draft.planName} onChange={(e) => setSyncPoolDrafts((p) => ({ ...p, [key]: { ...draft, planName: e.target.value } }))} className="glass-input mt-1" /></label><label className="min-w-0 text-xs font-medium text-slate-600">Price (₦)<input type="number" min="0" value={draft.price ?? ""} onChange={(e) => setSyncPoolDrafts((p) => ({ ...p, [key]: { ...draft, price: e.target.value === "" ? null : Number(e.target.value) } }))} className="glass-input mt-1" /></label><label className="min-w-0 text-xs font-medium text-slate-600">Duration<input type="number" min="1" value={draft.duration ?? ""} onChange={(e) => setSyncPoolDrafts((p) => ({ ...p, [key]: { ...draft, duration: e.target.value === "" ? undefined : Number(e.target.value) } }))} className="glass-input mt-1" /></label></div>
+                              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-600"><label className="inline-flex min-h-[40px] items-center gap-2"><input type="checkbox" checked={draft.approved === true} onChange={(e) => setSyncPoolDrafts((p) => ({ ...p, [key]: { ...draft, approved: e.target.checked } }))} className="h-4 w-4" /> Approved for sale</label><label className="inline-flex min-h-[40px] items-center gap-2"><input type="checkbox" checked={draft.enabled !== false} onChange={(e) => setSyncPoolDrafts((p) => ({ ...p, [key]: { ...draft, enabled: e.target.checked } }))} className="h-4 w-4" /> Enabled</label><button type="button" onClick={() => saveSyncPool(syncDetailControllerId, bucket.poolKey)} disabled={syncSavingKey === key} className="glass-primary ml-auto"><Save className="h-3.5 w-3.5" /> {syncSavingKey === key ? "Saving…" : "Save general terms"}</button></div>
+                              {ctrl?.memberHostels?.length ? <div id="controller-hostel-overrides" className="rounded-2xl bg-white/60 p-3"><div className="mb-3 flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="text-xs font-semibold text-slate-800">Per-hostel overrides</p><p className="text-[11px] text-slate-500">Override price or availability without changing the controller default.</p></div><span className="text-[10px] font-medium text-slate-400">{ctrl.memberHostels.length} hostels</span></div><div className="space-y-2">{ctrl.memberHostels.map((hostel) => { const override = bucket.hostelOverrides?.[hostel] ?? {}; const effectiveEnabled = override.enabled ?? bucket.enabled !== false; return <div key={hostel} className="flex flex-wrap items-center gap-2 rounded-xl bg-white/80 px-3 py-2"><span className="w-full min-w-0 break-words text-xs font-medium text-slate-700 sm:w-auto sm:min-w-[9rem] sm:flex-1">{hostel}<span className="ml-1 text-[10px] text-slate-400">{override.price != null ? "custom price" : "default price"}</span></span><input type="number" min="0" defaultValue={override.price ?? ""} placeholder={`₦${bucket.price ?? "default"}`} className="glass-input !min-h-[40px] min-w-0 flex-1 !py-1.5 text-xs sm:w-28 sm:flex-none" onBlur={(e) => { if (e.target.value !== "") saveHostelOverride(syncDetailControllerId, hostel, bucket.poolKey, "price", Number(e.target.value)); }} /><button type="button" onClick={() => saveHostelOverride(syncDetailControllerId, hostel, bucket.poolKey, "enabled", !effectiveEnabled)} disabled={syncSavingKey === `${syncDetailControllerId}:${hostel}:${bucket.poolKey}`} className={`min-h-[40px] shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${effectiveEnabled ? "bg-slate-100 text-slate-600" : "bg-emerald-100 text-emerald-700"}`}>{effectiveEnabled ? "Disable" : "Enable"}</button></div>; })}</div></div> : null}
                             </div>
                           </details>;
                         })}
@@ -1934,30 +1916,30 @@ export default function AdminDataCodesPage() {
           )}
 
           {/* Data Codes Management */}
-          <div className="grid gap-8 lg:grid-cols-[1fr_1fr]">
+          <div className="grid gap-5 lg:grid-cols-2">
             {/* LEFT: Plan Configuration */}
-            <section id="plan-setup-section" className="relative overflow-hidden rounded-[2rem] border border-white/90 bg-white/75 p-6 shadow-[0_20px_70px_rgba(15,23,42,0.08)] backdrop-blur-xl flex flex-col gap-5">
-              <div className="flex items-center gap-2">
-                <LayoutGrid className="w-5 h-5 text-blue-500" />
-                <div>
-                  <h2 className="text-lg font-semibold text-apple-gray-800">
+            <section id="plan-setup-section" className="glass-panel flex min-w-0 flex-col gap-5">
+              <div className="flex min-w-0 items-center gap-2">
+                <LayoutGrid className="h-5 w-5 shrink-0 text-blue-500" />
+                <div className="min-w-0">
+                  <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">
                     Plan Setup
                   </h2>
-                  <p className="text-sm text-apple-gray-500">
+                  <p className="text-sm text-slate-500">
                     Configure plans per hostel
                   </p>
                 </div>
               </div>
 
               {/* Controllers / Standalone toggle */}
-              <div className="flex rounded-lg border border-apple-gray-200 overflow-hidden">
+              <div className="flex gap-1 rounded-full border border-white/80 bg-white/70 p-1 backdrop-blur-xl">
                 <button
                   type="button"
                   onClick={() => setMode("controllers")}
-                  className={`flex-1 py-2.5 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+                  className={`flex min-h-[40px] flex-1 items-center justify-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition sm:px-4 ${
                     mode === "controllers"
-                      ? "bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white"
-                      : "text-apple-gray-600 hover:bg-apple-gray-50"
+                      ? "bg-slate-900 text-white shadow-sm"
+                      : "text-slate-600 hover:bg-white"
                   }`}
                 >
                   <Server className="w-4 h-4" />
@@ -1966,10 +1948,10 @@ export default function AdminDataCodesPage() {
                 <button
                   type="button"
                   onClick={() => setMode("standalone")}
-                  className={`flex-1 py-2.5 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+                  className={`flex min-h-[40px] flex-1 items-center justify-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition sm:px-4 ${
                     mode === "standalone"
-                      ? "bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white"
-                      : "text-apple-gray-600 hover:bg-apple-gray-50"
+                      ? "bg-slate-900 text-white shadow-sm"
+                      : "text-slate-600 hover:bg-white"
                   }`}
                 >
                   <Globe className="w-4 h-4" />
@@ -1978,7 +1960,7 @@ export default function AdminDataCodesPage() {
               </div>
 
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                <div className="glass-alert break-words border-rose-200 bg-rose-50/90 text-rose-700">
                   {error}
                 </div>
               )}
@@ -1986,7 +1968,7 @@ export default function AdminDataCodesPage() {
               {/* Plans about to sell out. Sorted emptiest-first by the API, so
                   the most urgent is always the one read first. */}
               {lowStock.length > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                <div className="rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3">
                   <div className="flex items-start gap-3">
                     <span className="text-lg leading-none mt-0.5">⚠️</span>
                     <div className="flex-1 min-w-0">
@@ -2004,12 +1986,12 @@ export default function AdminDataCodesPage() {
                             key={`${plan.id}-${plan.hostel}`}
                             className="flex items-center justify-between gap-3 text-sm"
                           >
-                            <span className="text-amber-900 truncate">
+                            <span className="min-w-0 truncate text-amber-900">
                               {plan.name}
                               <span className="text-amber-700"> · {plan.hostel}</span>
                             </span>
                             <span
-                              className={`font-semibold whitespace-nowrap ${
+                              className={`shrink-0 font-semibold whitespace-nowrap ${
                                 plan.remaining === 0
                                   ? "text-red-700"
                                   : "text-amber-900"
@@ -2031,7 +2013,7 @@ export default function AdminDataCodesPage() {
                 <>
               {/* Step 1: Hostel */}
               <div>
-                <label className="block text-sm font-medium text-apple-gray-700 mb-2">
+                <label className="mb-2 block text-sm font-medium text-slate-700">
                   1. Select Hostel
                 </label>
                 <select
@@ -2062,7 +2044,7 @@ export default function AdminDataCodesPage() {
                       );
                     }
                   }}
-                  className="w-full px-4 py-3 border border-apple-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="glass-input"
                 >
                   <option value="">Select a hostel...</option>
                   {standaloneHostels.map((h) => (
@@ -2074,7 +2056,7 @@ export default function AdminDataCodesPage() {
                 {selectedAdminHostel && (
                   <>
                   {selectedHostelController && (
-                    <div className="flex items-center gap-2 mt-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-blue-100 bg-blue-50/80 px-3 py-2 text-xs text-blue-700">
                       <Server className="w-3.5 h-3.5" />
                       <span className="font-medium">
                         Shared pool via {selectedHostelController.name} Controller
@@ -2085,7 +2067,7 @@ export default function AdminDataCodesPage() {
                     </div>
                   )}
                   {!selectedHostelController && (
-                    <div className="flex items-center gap-2 mt-2 px-3 py-1.5 bg-apple-gray-50 border border-apple-gray-200 rounded-lg text-xs text-apple-gray-500">
+                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-white/80 bg-white/60 px-3 py-2 text-xs text-slate-500">
                       <Globe className="w-3.5 h-3.5" />
                       <span>Standalone &mdash; codes are private to this hostel</span>
                     </div>
@@ -2117,12 +2099,12 @@ export default function AdminDataCodesPage() {
               {/* Step 2: Plan */}
               {selectedAdminHostel && (
                 <div>
-                  <p className="block text-sm font-medium text-apple-gray-700 mb-3">
+                  <p className="mb-3 block text-sm font-medium text-slate-700">
                     2. Plan
                   </p>
 
                   {/* Mode Toggle */}
-                  <div className="flex rounded-lg border border-apple-gray-200 overflow-hidden mb-5">
+                  <div className="flex gap-1 rounded-full border border-white/80 bg-white/70 p-1 backdrop-blur-xl mb-5">
                     {canEdit && (
                       <button
                         type="button"
@@ -2138,10 +2120,10 @@ export default function AdminDataCodesPage() {
                           setPlanId(null);
                           setCodes([]);
                         }}
-                        className={`flex-1 py-2.5 px-4 text-sm font-medium transition-colors ${
+                        className={`min-h-[40px] flex-1 rounded-full px-3 py-2 text-sm font-semibold transition sm:px-4 ${
                           isNewPlan
-                            ? "bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white"
-                            : "text-apple-gray-600 hover:bg-apple-gray-50"
+                            ? "bg-slate-900 text-white shadow-sm"
+                            : "text-slate-600 hover:bg-white"
                         }`}
                       >
                         + New Plan
@@ -2155,10 +2137,10 @@ export default function AdminDataCodesPage() {
                         setPlanId(null);
                         setCodes([]);
                       }}
-                      className={`flex-1 py-2.5 px-4 text-sm font-medium transition-colors ${
+                      className={`min-h-[40px] flex-1 rounded-full px-3 py-2 text-sm font-semibold transition sm:px-4 ${
                         !isNewPlan
-                          ? "bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white"
-                          : "text-apple-gray-600 hover:bg-apple-gray-50"
+                          ? "bg-slate-900 text-white shadow-sm"
+                          : "text-slate-600 hover:bg-white"
                       }`}
                     >
                       Existing (
@@ -2175,7 +2157,7 @@ export default function AdminDataCodesPage() {
                   {isNewPlan && canEdit && (
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-apple-gray-700 mb-2">
+                        <label className="mb-2 block text-sm font-medium text-slate-700">
                           Plan Type
                         </label>
                         <div className="flex flex-wrap gap-3">
@@ -2191,10 +2173,10 @@ export default function AdminDataCodesPage() {
                                   setIsNewPlan(true);
                                 }
                               }}
-                              className={`flex-1 px-4 py-3 rounded-lg border font-semibold transition-all ${
+                              className={`min-h-[44px] flex-1 rounded-2xl border px-4 py-2.5 font-semibold backdrop-blur-xl transition ${
                                 planType === "device"
-                                  ? "border-transparent bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white"
-                                  : "border-apple-gray-200 text-apple-gray-700 hover:bg-apple-gray-50"
+                                  ? "border-transparent bg-slate-900 text-white shadow-sm"
+                                  : "border-white/80 bg-white/70 text-slate-700 hover:bg-white"
                               }`}
                             >
                               Device
@@ -2212,10 +2194,10 @@ export default function AdminDataCodesPage() {
                                   setIsNewPlan(true);
                                 }
                               }}
-                              className={`flex-1 px-4 py-3 rounded-lg border font-semibold transition-all ${
+                              className={`min-h-[44px] flex-1 rounded-2xl border px-4 py-2.5 font-semibold backdrop-blur-xl transition ${
                                 planType === "unlimited"
-                                  ? "border-transparent bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white"
-                                  : "border-apple-gray-200 text-apple-gray-700 hover:bg-apple-gray-50"
+                                  ? "border-transparent bg-slate-900 text-white shadow-sm"
+                                  : "border-white/80 bg-white/70 text-slate-700 hover:bg-white"
                               }`}
                             >
                               Unlimited
@@ -2233,10 +2215,10 @@ export default function AdminDataCodesPage() {
                                   setIsNewPlan(true);
                                 }
                               }}
-                              className={`flex-1 px-4 py-3 rounded-lg border font-semibold transition-all ${
+                              className={`min-h-[44px] flex-1 rounded-2xl border px-4 py-2.5 font-semibold backdrop-blur-xl transition ${
                                 planType === "tv"
-                                  ? "border-transparent bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white"
-                                  : "border-apple-gray-200 text-apple-gray-700 hover:bg-apple-gray-50"
+                                  ? "border-transparent bg-slate-900 text-white shadow-sm"
+                                  : "border-white/80 bg-white/70 text-slate-700 hover:bg-white"
                               }`}
                             >
                               TV Unlimited
@@ -2247,7 +2229,7 @@ export default function AdminDataCodesPage() {
 
                       {planType === "unlimited" && (
                         <div>
-                          <label className="block text-sm font-medium text-apple-gray-700 mb-2">
+                          <label className="mb-2 block text-sm font-medium text-slate-700">
                             Number of Devices
                           </label>
                           <input
@@ -2258,7 +2240,7 @@ export default function AdminDataCodesPage() {
                               setPlanId(null);
                               setCodes([]);
                             }}
-                            className="w-full px-4 py-3 border border-apple-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="glass-input"
                             placeholder="e.g. 1, 2, 3"
                             min={1}
                             max={10}
@@ -2268,7 +2250,7 @@ export default function AdminDataCodesPage() {
 
                       {planType === "unlimited" && (
                         <div>
-                          <label className="block text-sm font-medium text-apple-gray-700 mb-2">
+                          <label className="mb-2 block text-sm font-medium text-slate-700">
                             Unlimited Period
                           </label>
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -2282,10 +2264,10 @@ export default function AdminDataCodesPage() {
                                     setPlanId(null);
                                     setCodes([]);
                                   }}
-                                  className={`px-3 py-2 rounded-lg border font-medium text-sm capitalize transition-all ${
+                                  className={`min-h-[40px] rounded-2xl border px-3 py-2 text-sm font-medium capitalize backdrop-blur-xl transition ${
                                     unlimitedPeriod === period
-                                      ? "border-transparent bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white"
-                                      : "border-apple-gray-200 text-apple-gray-700 hover:bg-apple-gray-50"
+                                      ? "border-transparent bg-slate-900 text-white shadow-sm"
+                                      : "border-white/80 bg-white/70 text-slate-700 hover:bg-white"
                                   }`}
                                 >
                                   {period}
@@ -2298,7 +2280,7 @@ export default function AdminDataCodesPage() {
                               type="text"
                               value={customPeriodName}
                               onChange={(e) => setCustomPeriodName(e.target.value)}
-                              className="w-full mt-2 px-4 py-3 border border-apple-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              className="glass-input mt-2"
                               placeholder="e.g. 3-Day, Bi-Weekly, Semester"
                             />
                           )}
@@ -2307,7 +2289,7 @@ export default function AdminDataCodesPage() {
 
                       {planType === "unlimited" && (
                         <div>
-                          <label className="block text-sm font-medium text-apple-gray-700 mb-2">
+                          <label className="mb-2 block text-sm font-medium text-slate-700">
                             Number of Devices
                           </label>
                           <input
@@ -2318,19 +2300,19 @@ export default function AdminDataCodesPage() {
                               setPlanId(null);
                               setCodes([]);
                             }}
-                            className="w-full px-4 py-3 border border-apple-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="glass-input"
                             placeholder="e.g. 3"
                             min={1}
                             max={10}
                           />
-                          <p className="mt-1 text-sm text-apple-gray-500">
+                          <p className="mt-1 text-sm text-slate-500">
                             How many devices can use this plan simultaneously
                           </p>
                         </div>
                       )}
 
                       <div>
-                        <label className="block text-sm font-medium text-apple-gray-700 mb-2">
+                        <label className="mb-2 block text-sm font-medium text-slate-700">
                           Plan Name
                         </label>
                         <input
@@ -2341,7 +2323,7 @@ export default function AdminDataCodesPage() {
                             setPlanId(null);
                             setCodes([]);
                           }}
-                          className="w-full px-4 py-3 border border-apple-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="glass-input"
                           placeholder={
                             planType === "device"
                               ? "e.g. Lodge Internet 10GB"
@@ -2354,7 +2336,7 @@ export default function AdminDataCodesPage() {
 
                       {planType === "device" && (
                         <div>
-                          <label className="block text-sm font-medium text-apple-gray-700 mb-2">
+                          <label className="mb-2 block text-sm font-medium text-slate-700">
                             Number of Users
                           </label>
                           <div className="grid grid-cols-2 gap-3">
@@ -2367,10 +2349,10 @@ export default function AdminDataCodesPage() {
                                   setPlanId(null);
                                   setCodes([]);
                                 }}
-                                className={`px-4 py-3 rounded-lg border font-semibold transition-all ${
+                                className={`min-h-[44px] rounded-2xl border px-4 py-2.5 font-semibold backdrop-blur-xl transition ${
                                   usersCount === count
-                                    ? "border-transparent bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white"
-                                    : "border-apple-gray-200 text-apple-gray-700 hover:bg-apple-gray-50"
+                                    ? "border-transparent bg-slate-900 text-white shadow-sm"
+                                    : "border-white/80 bg-white/70 text-slate-700 hover:bg-white"
                                 }`}
                               >
                                 {count} Users
@@ -2382,7 +2364,7 @@ export default function AdminDataCodesPage() {
 
                       {planType === "tv" && (
                         <div>
-                          <label className="block text-sm font-medium text-apple-gray-700 mb-2">
+                          <label className="mb-2 block text-sm font-medium text-slate-700">
                             Duration (Days)
                           </label>
                           <input
@@ -2393,11 +2375,11 @@ export default function AdminDataCodesPage() {
                               setPlanId(null);
                               setCodes([]);
                             }}
-                            className="w-full px-4 py-3 border border-apple-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="glass-input"
                             placeholder="e.g. 7 for weekly, 30 for monthly"
                             min={1}
                           />
-                          <p className="mt-1 text-sm text-apple-gray-500">
+                          <p className="mt-1 text-sm text-slate-500">
                             e.g., 7 days (weekly), 21 days, 30 days (monthly),
                             etc.
                           </p>
@@ -2405,7 +2387,7 @@ export default function AdminDataCodesPage() {
                       )}
 
                       <div>
-                        <label className="block text-sm font-medium text-apple-gray-700 mb-2">
+                        <label className="mb-2 block text-sm font-medium text-slate-700">
                           Price (₦)
                         </label>
                         <input
@@ -2416,14 +2398,14 @@ export default function AdminDataCodesPage() {
                             setPlanId(null);
                             setCodes([]);
                           }}
-                          className="w-full px-4 py-3 border border-apple-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="glass-input"
                           placeholder="e.g. 3500"
                           min={0}
                         />
                       </div>
 
                       {planType === "tv" && (
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="rounded-2xl border border-blue-100 bg-blue-50/80 p-4">
                           <p className="text-sm text-blue-800">
                             <strong>Note:</strong> TV Unlimited plans don&apos;t
                             require access codes. Users will purchase
@@ -2433,7 +2415,7 @@ export default function AdminDataCodesPage() {
                           <button
                             onClick={handleAddCode}
                             disabled={adding}
-                            className="mt-4 w-full bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+                            className="glass-primary mt-4 w-full"
                           >
                             {adding ? "Creating Plan..." : "Create TV Plan"}
                           </button>
@@ -2452,10 +2434,10 @@ export default function AdminDataCodesPage() {
                               key={type}
                               type="button"
                               onClick={() => setPlanType(type)}
-                              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                              className={`min-h-[40px] rounded-full px-4 py-2 text-xs font-semibold transition ${
                                 planType === type
                                   ? "bg-blue-100 text-blue-700"
-                                  : "bg-apple-gray-100 text-apple-gray-600 hover:bg-apple-gray-200"
+                                  : "bg-white/70 text-slate-600 hover:bg-white"
                               }`}
                             >
                               {type === "device"
@@ -2485,14 +2467,14 @@ export default function AdminDataCodesPage() {
                                 <button
                                   type="button"
                                   onClick={() => handlePlanChange(plan.id)}
-                                  className={`w-full text-left border rounded-xl p-4 transition-all ${
+                                  className={`w-full rounded-2xl border p-4 text-left backdrop-blur-xl transition ${
                                     selectedPlanId === plan.id
-                                      ? "border-blue-400 bg-blue-50 ring-2 ring-blue-400 ring-offset-1"
-                                      : "border-apple-gray-200 hover:border-blue-200 hover:bg-apple-gray-50"
+                                      ? "border-blue-300 bg-blue-50/80 ring-2 ring-blue-300"
+                                      : "border-white/80 bg-white/70 hover:bg-white"
                                   }`}
                                 >
-                                  <div className="pr-7">
-                                    <p className="font-semibold text-apple-gray-900 text-sm">
+                                  <div className={canEdit ? "pr-24" : ""}>
+                                    <p className="break-words text-sm font-semibold text-slate-900">
                                       {plan.name}
                                     </p>
                                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -2502,29 +2484,30 @@ export default function AdminDataCodesPage() {
                                       {plan.source === "controller" && <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${plan.approvedForSale ? "bg-emerald-100 text-emerald-700" : plan.enabled === false || plan.isActive === false ? "bg-slate-100 text-slate-500" : "bg-amber-100 text-amber-700"}`}>{plan.approvedForSale ? "Approved for sale" : plan.enabled === false || plan.isActive === false ? "Disabled" : plan.needsMetadataResolve ? "Needs metadata" : "Needs approval"}</span>}
                                       {plan.source === "controller" && plan.priceResolved === false && <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700"><AlertTriangle className="h-3 w-3" /> Needs price</span>}
                                     </div>
-                                    <p className="text-xs text-apple-gray-500 mt-0.5">
+                                    <p className="mt-0.5 text-xs text-slate-500">
                                       {plan.planType === "device"
                                         ? `${plan.usersCount} Users`
                                         : plan.planType === "unlimited"
                                           ? `${(plan.unlimitedPeriod || "Unlimited").charAt(0).toUpperCase() + (plan.unlimitedPeriod || "unlimited").slice(1)}${plan.usersCount ? ` · ${plan.usersCount} Device${plan.usersCount !== 1 ? "s" : ""}` : ""}`
                                           : `${plan.duration} Days`}
                                     </p>
-                                    <p className="text-base font-bold text-blue-600 mt-1">
+                                    <p className="mt-1 text-base font-bold text-blue-600">
                                       ₦{plan.price.toLocaleString()}
                                     </p>
                                   </div>
                                 </button>
                                 {canEdit && (
-                                  <>
+                                  <div className="absolute right-2 top-2 flex gap-1.5">
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         openEditModal(plan);
                                       }}
-                                      className="absolute top-3 right-10 flex items-center justify-center w-7 h-7 rounded-lg text-blue-500 hover:bg-blue-50 transition-colors"
+                                      className="glass-icon text-blue-600 hover:bg-blue-50"
                                       title="Edit plan"
+                                      aria-label="Edit plan"
                                     >
-                                      <Pencil className="w-3.5 h-3.5" />
+                                      <Pencil className="h-4 w-4" />
                                     </button>
                                     <button
                                       onClick={(e) => {
@@ -2532,22 +2515,23 @@ export default function AdminDataCodesPage() {
                                         handleDeletePlan(plan);
                                       }}
                                       disabled={deletingPlan === plan.id}
-                                      className="absolute top-3 right-3 flex items-center justify-center w-7 h-7 rounded-lg text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                                      className="glass-icon text-rose-600 hover:bg-rose-50 disabled:opacity-50"
                                       title="Delete plan"
+                                      aria-label="Delete plan"
                                     >
                                       {deletingPlan === plan.id ? (
-                                        <div className="w-3.5 h-3.5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-500 border-t-transparent" />
                                       ) : (
-                                        <Trash2 className="w-3.5 h-3.5" />
+                                        <Trash2 className="h-4 w-4" />
                                       )}
                                     </button>
-                                  </>
+                                  </div>
                                 )}
                               </div>
                             ))}
                         </div>
                       ) : (
-                        <div className="text-center py-6 text-sm text-apple-gray-500">
+                        <div className="text-center py-6 text-sm text-slate-500">
                           No{" "}
                           {planType === "device"
                             ? "device"
@@ -2567,13 +2551,13 @@ export default function AdminDataCodesPage() {
               {mode === "controllers" && (
                 <div className="space-y-5">
                   <div>
-                    <label className="block text-sm font-medium text-apple-gray-700 mb-2">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
                       1. Select Controller
                     </label>
                     <select
                       value={selectedControllerId}
                       onChange={(e) => handleControllerSelect(e.target.value)}
-                      className="w-full px-4 py-3 border border-apple-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="glass-input"
                     >
                       <option value="">Select a controller...</option>
                       {activeControllers.map((c) => (
@@ -2583,7 +2567,7 @@ export default function AdminDataCodesPage() {
                       ))}
                     </select>
                     {selectedControllerId && (
-                      <div className="flex items-center gap-2 mt-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+                      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-blue-100 bg-blue-50/80 px-3 py-2 text-xs text-blue-700">
                         <Server className="w-3.5 h-3.5" />
                         <span className="font-medium">
                           Shared pool — codes added here are drawable by every
@@ -2594,7 +2578,7 @@ export default function AdminDataCodesPage() {
                   </div>
 
                   {selectedCtrlBucket && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700">
+                    <div className="break-words rounded-2xl border border-blue-100 bg-blue-50/80 px-3 py-2 text-xs text-blue-700">
                       Adding to existing bucket{" "}
                       <span className="font-semibold">
                         {ctrlPlanName}
@@ -2606,17 +2590,17 @@ export default function AdminDataCodesPage() {
                   )}
 
                   <div>
-                    <label className="block text-sm font-medium text-apple-gray-700 mb-2">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
                       2. Plan Type
                     </label>
                     <div className="flex flex-wrap gap-3">
                       <button
                         type="button"
                         onClick={() => setCtrlPlanType("device")}
-                        className={`flex-1 px-4 py-3 rounded-lg border font-semibold transition-all ${
+                        className={`min-h-[44px] flex-1 rounded-2xl border px-4 py-2.5 font-semibold backdrop-blur-xl transition ${
                           ctrlPlanType === "device"
-                            ? "border-transparent bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white"
-                            : "border-apple-gray-200 text-apple-gray-700 hover:bg-apple-gray-50"
+                            ? "border-transparent bg-slate-900 text-white shadow-sm"
+                            : "border-white/80 bg-white/70 text-slate-700 hover:bg-white"
                         }`}
                       >
                         Device
@@ -2624,10 +2608,10 @@ export default function AdminDataCodesPage() {
                       <button
                         type="button"
                         onClick={() => setCtrlPlanType("unlimited")}
-                        className={`flex-1 px-4 py-3 rounded-lg border font-semibold transition-all ${
+                        className={`min-h-[44px] flex-1 rounded-2xl border px-4 py-2.5 font-semibold backdrop-blur-xl transition ${
                           ctrlPlanType === "unlimited"
-                            ? "border-transparent bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white"
-                            : "border-apple-gray-200 text-apple-gray-700 hover:bg-apple-gray-50"
+                            ? "border-transparent bg-slate-900 text-white shadow-sm"
+                            : "border-white/80 bg-white/70 text-slate-700 hover:bg-white"
                         }`}
                       >
                         Unlimited
@@ -2636,21 +2620,21 @@ export default function AdminDataCodesPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-apple-gray-700 mb-2">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
                       Plan Name
                     </label>
                     <input
                       type="text"
                       value={ctrlPlanName}
                       onChange={(e) => setCtrlPlanName(e.target.value)}
-                      className="w-full px-4 py-3 border border-apple-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="glass-input"
                       placeholder={
                         ctrlPlanType === "device"
                           ? "e.g. Lodge Internet 10GB"
                           : "e.g. Daily Unlimited"
                       }
                     />
-                    <p className="mt-1 text-sm text-apple-gray-500">
+                    <p className="mt-1 text-sm text-slate-500">
                       The pool bucket is keyed by this name
                       {ctrlPlanType === "device"
                         ? " and the device count below"
@@ -2661,7 +2645,7 @@ export default function AdminDataCodesPage() {
 
                   {ctrlPlanType === "device" && (
                     <div>
-                      <label className="block text-sm font-medium text-apple-gray-700 mb-2">
+                      <label className="mb-2 block text-sm font-medium text-slate-700">
                         Number of Devices
                       </label>
                       <div className="grid grid-cols-2 gap-3">
@@ -2670,10 +2654,10 @@ export default function AdminDataCodesPage() {
                             key={count}
                             type="button"
                             onClick={() => setCtrlUsersCount(count)}
-                            className={`px-4 py-3 rounded-lg border font-semibold transition-all ${
+                            className={`min-h-[44px] rounded-2xl border px-4 py-2.5 font-semibold backdrop-blur-xl transition ${
                               ctrlUsersCount === count
-                                ? "border-transparent bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white"
-                                : "border-apple-gray-200 text-apple-gray-700 hover:bg-apple-gray-50"
+                                ? "border-transparent bg-slate-900 text-white shadow-sm"
+                                : "border-white/80 bg-white/70 text-slate-700 hover:bg-white"
                             }`}
                           >
                             {count} Devices
@@ -2684,9 +2668,9 @@ export default function AdminDataCodesPage() {
                   )}
 
                   <div>
-                    <label className="block text-sm font-medium text-apple-gray-700 mb-2">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
                       Price (₦)
-                      <span className="text-apple-gray-400 font-normal">
+                      <span className="text-slate-400 font-normal">
                         {" "}
                         — for reference only
                       </span>
@@ -2695,21 +2679,21 @@ export default function AdminDataCodesPage() {
                       type="number"
                       value={ctrlPrice}
                       onChange={(e) => setCtrlPrice(Number(e.target.value))}
-                      className="w-full px-4 py-3 border border-apple-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="glass-input"
                       placeholder="e.g. 3500"
                       min={0}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-apple-gray-700 mb-2">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
                       Access Code
                     </label>
                     <input
                       type="text"
                       value={ctrlCode}
                       onChange={(e) => setCtrlCode(e.target.value)}
-                      className="w-full px-4 py-3 border border-apple-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="glass-input"
                       placeholder={
                         ctrlPlanType === "device"
                           ? "e.g. WIFI-10GB-3D-8F2A"
@@ -2721,7 +2705,7 @@ export default function AdminDataCodesPage() {
                   <button
                     onClick={handleAddControllerCode}
                     disabled={ctrlAdding}
-                    className="w-full bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+                    className="glass-primary w-full"
                   >
                     {ctrlAdding
                       ? "Adding to Controller Pool..."
@@ -2732,15 +2716,15 @@ export default function AdminDataCodesPage() {
             </section>
 
             {/* RIGHT: Code Inventory */}
-            <section id="code-inventory-section" className="relative overflow-hidden rounded-[2rem] border border-white/90 bg-white/75 p-6 shadow-[0_20px_70px_rgba(15,23,42,0.08)] backdrop-blur-xl flex flex-col gap-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <KeyRound className="w-5 h-5 text-blue-500" />
-                  <div>
-                    <h2 className="text-lg font-semibold text-apple-gray-800">
+            <section id="code-inventory-section" className="glass-panel flex min-w-0 flex-col gap-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <KeyRound className="h-5 w-5 shrink-0 text-blue-500" />
+                  <div className="min-w-0">
+                    <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">
                       Code Inventory
                     </h2>
-                    <p className="text-sm text-apple-gray-500">
+                    <p className="break-words text-sm text-slate-500">
                       {planId && selectedAdminHostel
                         ? `${codes.length} code${codes.length !== 1 ? "s" : ""} · ${selectedAdminHostel}`
                         : "Select a hostel and plan"}
@@ -2748,7 +2732,7 @@ export default function AdminDataCodesPage() {
                   </div>
                 </div>
                 {selectedPlan && (
-                  <span className="text-xs font-medium text-apple-gray-600 bg-apple-gray-100 px-3 py-1 rounded-full">
+                  <span className="slate-chip max-w-full break-words text-xs">
                     ₦{selectedPlan.price.toLocaleString()} ·{" "}
                     {selectedPlan.planType === "device"
                       ? `${selectedPlan.usersCount} Users`
@@ -2762,14 +2746,14 @@ export default function AdminDataCodesPage() {
               {/* Code Inventory display switch: added (manual per-plan codes)
                   vs controller (shared pool buckets synced from Omada). For a
                   standalone hostel this is purely a display switch. */}
-              <div className="flex rounded-lg border border-apple-gray-200 overflow-hidden">
+              <div className="flex gap-1 rounded-full border border-white/80 bg-white/70 p-1 backdrop-blur-xl">
                 <button
                   type="button"
                   onClick={() => setInvTab("added")}
-                  className={`flex-1 py-2.5 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+                  className={`flex min-h-[40px] flex-1 items-center justify-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition sm:px-4 ${
                     invTab === "added"
-                      ? "bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white"
-                      : "text-apple-gray-600 hover:bg-apple-gray-50"
+                      ? "bg-slate-900 text-white shadow-sm"
+                      : "text-slate-600 hover:bg-white"
                   }`}
                 >
                   <KeyRound className="w-4 h-4" />
@@ -2778,10 +2762,10 @@ export default function AdminDataCodesPage() {
                 <button
                   type="button"
                   onClick={() => setInvTab("controller")}
-                  className={`flex-1 py-2.5 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+                  className={`flex min-h-[40px] flex-1 items-center justify-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition sm:px-4 ${
                     invTab === "controller"
-                      ? "bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white"
-                      : "text-apple-gray-600 hover:bg-apple-gray-50"
+                      ? "bg-slate-900 text-white shadow-sm"
+                      : "text-slate-600 hover:bg-white"
                   }`}
                 >
                   <Server className="w-4 h-4" />
@@ -2796,8 +2780,8 @@ export default function AdminDataCodesPage() {
                 canEdit &&
                 ((isNewPlan && (planType === "device" || planType === "unlimited")) ||
                   (!isNewPlan && (selectedPlan?.planType === "device" || selectedPlan?.planType === "unlimited"))) && (
-                  <div className="border border-apple-gray-200 rounded-xl p-4 bg-apple-gray-50">
-                    <label className="block text-sm font-medium text-apple-gray-700 mb-2">
+                  <div className="rounded-2xl border border-white/80 bg-white/60 p-3 sm:p-4">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
                       Add Access Code
                     </label>
                     <div className="flex gap-2">
@@ -2808,13 +2792,13 @@ export default function AdminDataCodesPage() {
                         onKeyDown={(e) => {
                           if (e.key === "Enter") handleAddCode();
                         }}
-                        className="flex-1 px-4 py-3 border border-apple-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                        className="glass-input min-w-0 flex-1"
                         placeholder="Enter access code"
                       />
                       <button
                         onClick={handleAddCode}
                         disabled={adding}
-                        className="flex-shrink-0 bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white font-semibold py-3 px-5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+                        className="glass-primary shrink-0"
                       >
                         {adding ? "..." : "Add"}
                       </button>
@@ -2823,9 +2807,9 @@ export default function AdminDataCodesPage() {
                       <button
                         onClick={handleLoadCodes}
                         type="button"
-                        className="mt-2 flex items-center gap-1.5 text-sm text-apple-gray-500 hover:text-apple-gray-800 transition-colors"
+                        className="mt-2 inline-flex min-h-[40px] items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-slate-800"
                       >
-                        <RefreshCw className="w-3.5 h-3.5" />
+                        <RefreshCw className="h-3.5 w-3.5" />
                         Reload codes
                       </button>
                     )}
@@ -2834,36 +2818,36 @@ export default function AdminDataCodesPage() {
 
               {/* States */}
               {!selectedAdminHostel ? (
-                <div className="flex-1 flex flex-col items-center justify-center py-12 text-center">
-                  <KeyRound className="w-12 h-12 text-apple-gray-300 mb-3" />
-                  <p className="text-sm text-apple-gray-500">
+                <div className="flex flex-1 flex-col items-center justify-center px-2 py-8 text-center sm:py-12">
+                  <KeyRound className="w-12 h-12 text-slate-300 mb-3" />
+                  <p className="text-sm text-slate-500">
                     Select a hostel and plan to manage codes
                   </p>
                 </div>
               ) : (isNewPlan && planType === "tv") ||
                 (!isNewPlan && selectedPlan?.planType === "tv") ? (
-                <div className="flex-1 flex flex-col items-center justify-center py-12 text-center">
-                  <Tv className="w-10 h-10 text-apple-gray-300 mb-2" />
-                  <p className="text-sm text-apple-gray-500">
+                <div className="flex flex-1 flex-col items-center justify-center px-2 py-8 text-center sm:py-12">
+                  <Tv className="w-10 h-10 text-slate-300 mb-2" />
+                  <p className="text-sm text-slate-500">
                     TV plans don&apos;t use access codes.
                   </p>
-                  <p className="text-xs text-apple-gray-400 mt-1">
+                  <p className="text-xs text-slate-400 mt-1">
                     Manage subscriptions from the TV Users page.
                   </p>
                 </div>
               ) : !planId && !isNewPlan ? (
-                <div className="flex-1 flex flex-col items-center justify-center py-12 text-center">
-                  <p className="text-sm text-apple-gray-500">
+                <div className="flex flex-1 flex-col items-center justify-center px-2 py-8 text-center sm:py-12">
+                  <p className="text-sm text-slate-500">
                     Select a plan on the left to view its codes.
                   </p>
                 </div>
               ) : loadingCodes ? (
-                <div className="flex items-center gap-2 text-sm text-apple-gray-500">
+                <div className="flex items-center gap-2 text-sm text-slate-500">
                   <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                   Loading codes...
                 </div>
               ) : planId && codes.length === 0 ? (
-                <div className="text-sm text-apple-gray-500">
+                <div className="text-sm text-slate-500">
                   No codes for {selectedAdminHostel} under this plan yet.
                 </div>
               ) : null}
@@ -2874,13 +2858,13 @@ export default function AdminDataCodesPage() {
                   {codes.map((code) => (
                     <li
                       key={code.id}
-                      className="flex items-center justify-between gap-3 px-4 py-3 border border-apple-gray-200 rounded-lg hover:border-apple-gray-300 transition-colors"
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-white/80 bg-white/70 px-4 py-2.5 backdrop-blur-xl"
                     >
-                      <div className="flex flex-col flex-1 min-w-0">
-                        <span className="font-mono text-sm text-apple-gray-700">
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <span className="break-all font-mono text-sm text-slate-700">
                           {code.codeMask}
                         </span>
-                        <span className="text-xs text-apple-gray-500">
+                        <span className="text-xs text-slate-500">
                           {code.createdAt
                             ? new Date(code.createdAt).toLocaleString()
                             : "Just now"}
@@ -2892,13 +2876,14 @@ export default function AdminDataCodesPage() {
                             handleDeleteCode(code.id, code.codeMask)
                           }
                           disabled={deleting === code.id}
-                          className="flex items-center justify-center w-8 h-8 rounded-lg text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="glass-icon shrink-0 text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
                           title="Delete code"
+                          aria-label="Delete code"
                         >
                           {deleting === code.id ? (
-                            <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
                           ) : (
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="h-4 w-4" />
                           )}
                         </button>
                       )}
@@ -2915,8 +2900,8 @@ export default function AdminDataCodesPage() {
                   top it up (pre-fills name/type/device count). */}
               {mode === "controllers" && selectedControllerId && (
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-apple-gray-700">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <label className="block min-w-0 text-sm font-medium text-slate-700">
                       Existing Codes, Plans &amp; Devices
                     </label>
                     <button
@@ -2924,9 +2909,9 @@ export default function AdminDataCodesPage() {
                       onClick={() =>
                         fetchControllerBuckets(selectedControllerId)
                       }
-                      className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700"
+                      className="glass-button text-blue-700"
                     >
-                      <RefreshCw className="w-3.5 h-3.5" />
+                      <RefreshCw className="h-3.5 w-3.5" />
                       Refresh
                     </button>
                   </div>
@@ -2936,7 +2921,7 @@ export default function AdminDataCodesPage() {
                       <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
                     </div>
                   ) : ctrlBuckets.length === 0 ? (
-                    <div className="border border-dashed border-apple-gray-300 rounded-xl px-4 py-6 text-center text-sm text-apple-gray-500">
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-white/40 px-4 py-6 text-center text-sm text-slate-500">
                       No codes yet on this controller. Add one on the left to
                       create a new bucket.
                     </div>
@@ -2947,15 +2932,15 @@ export default function AdminDataCodesPage() {
                           key={bucket.poolKey}
                           type="button"
                           onClick={() => handleCtrlBucketSelect(bucket)}
-                          className={`w-full text-left border rounded-xl p-4 transition-all ${
+                          className={`w-full rounded-2xl border p-4 text-left backdrop-blur-xl transition ${
                             selectedCtrlBucket === bucket.poolKey
-                              ? "border-blue-400 bg-blue-50 ring-2 ring-blue-400 ring-offset-1"
-                              : "border-apple-gray-200 hover:border-blue-200 hover:bg-apple-gray-50"
+                              ? "border-blue-300 bg-blue-50/80 ring-2 ring-blue-300"
+                              : "border-white/80 bg-white/70 hover:bg-white"
                           }`}
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="font-semibold text-apple-gray-900 text-sm">
+                              <p className="break-words text-sm font-semibold text-slate-900">
                                 {bucket.planName}
                               </p>
                               <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -2963,7 +2948,7 @@ export default function AdminDataCodesPage() {
                                 <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${bucket.enabled === false ? "bg-slate-100 text-slate-500" : "bg-blue-100 text-blue-700"}`}>{bucket.enabled === false ? "Disabled" : "Enabled"}</span>
                                 {bucket.needsMetadataResolve && <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-700"><AlertTriangle className="h-3 w-3" /> Metadata needed</span>}
                               </div>
-                              <p className="text-xs text-apple-gray-500 mt-0.5">
+                              <p className="text-xs text-slate-500 mt-0.5">
                                 {bucket.planType === "unlimited"
                                   ? "Unlimited"
                                   : `${bucket.usersCount ?? "?"} Device${bucket.usersCount !== 1 ? "s" : ""}`}
@@ -2972,10 +2957,10 @@ export default function AdminDataCodesPage() {
                                   : ` · ${bucket.planType}`}
                               </p>
                             </div>
-                            <div className="text-right shrink-0">
+                            <div className="max-w-[45%] shrink-0 text-right">
                               <p className="text-sm font-bold text-blue-600">
                                 {bucket.availableCount}
-                                <span className="text-apple-gray-400 font-normal">
+                                <span className="text-slate-400 font-normal">
                                   {" "}
                                   / {bucket.codeCount} available
                                 </span>
@@ -2984,7 +2969,7 @@ export default function AdminDataCodesPage() {
                           </div>
                         </button>
                       ))}
-                      <p className="text-xs text-apple-gray-400 mt-1">
+                      <p className="text-xs text-slate-400 mt-1">
                         Click a bucket to add another code to it.
                       </p>
                     </div>
@@ -2993,12 +2978,12 @@ export default function AdminDataCodesPage() {
               )}
 
               {mode !== "controllers" && (
-                <div className="flex-1 flex flex-col items-center justify-center py-12 text-center">
-                  <Server className="w-10 h-10 text-apple-gray-300 mb-2" />
-                  <p className="text-sm text-apple-gray-500">
+                <div className="flex flex-1 flex-col items-center justify-center px-2 py-8 text-center sm:py-12">
+                  <Server className="w-10 h-10 text-slate-300 mb-2" />
+                  <p className="text-sm text-slate-500">
                     No controller selected.
                   </p>
-                  <p className="text-xs text-apple-gray-400 mt-1">
+                  <p className="text-xs text-slate-400 mt-1">
                     Switch to Controller mode and pick a controller to see its
                     shared pool buckets.
                   </p>
@@ -3009,65 +2994,109 @@ export default function AdminDataCodesPage() {
               {mode === "controllers" && selectedCtrlBucket && (
                 <>
                   {loadingCtrlCodes ? (
-                    <div className="flex items-center gap-2 text-sm text-apple-gray-500">
+                    <div className="flex items-center gap-2 text-sm text-slate-500">
                       <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                       Loading codes...
                     </div>
                   ) : ctrlCodes.length === 0 ? (
-                    <div className="text-sm text-apple-gray-500">
+                    <div className="text-sm text-slate-500">
                       No codes in this bucket yet.
                     </div>
                   ) : (
-                    <div className="border border-apple-gray-200 rounded-xl overflow-hidden bg-white">
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead className="bg-apple-gray-50">
-                            <tr>
-                              <th className="px-3 py-2 text-left font-medium text-apple-gray-600">Code</th>
-                              <th className="px-3 py-2 text-left font-medium text-apple-gray-600">Status</th>
-                              <th className="px-3 py-2 text-left font-medium text-apple-gray-600">Reserved By</th>
-                              <th className="px-3 py-2 text-left font-medium text-apple-gray-600">Reserved Until</th>
-                              <th className="px-3 py-2 text-left font-medium text-apple-gray-600">Created</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-apple-gray-100">
-                            {ctrlCodes.map((code) => (
-                              <tr key={code.id} className="hover:bg-apple-gray-50">
-                                <td className="px-3 py-2 font-mono text-xs text-apple-gray-900">
+                    <div>
+                      <div className="overflow-hidden rounded-2xl border border-white/80 bg-white/60">
+                        <ResponsiveTable
+                          rows={ctrlCodes}
+                          rowKey={(code) => code.id}
+                          columns={[
+                            {
+                              key: "code",
+                              header: "Code",
+                              className: "font-mono text-xs text-slate-900",
+                              cell: (code) => code.codeMask,
+                            },
+                            {
+                              key: "status",
+                              header: "Status",
+                              cell: (code) =>
+                                code.reservedBy ? (
+                                  <span className="warning-chip text-xs">Reserved</span>
+                                ) : (
+                                  <span className="status-chip text-xs">Available</span>
+                                ),
+                            },
+                            {
+                              key: "reservedBy",
+                              header: "Reserved By",
+                              className: "font-mono text-xs text-slate-600",
+                              cell: (code) => code.reservedBy || "—",
+                            },
+                            {
+                              key: "reservedUntil",
+                              header: "Reserved Until",
+                              className: "text-xs text-slate-600",
+                              cell: (code) =>
+                                code.reservedUntil
+                                  ? new Date(code.reservedUntil).toLocaleString()
+                                  : "—",
+                            },
+                            {
+                              key: "created",
+                              header: "Created",
+                              className: "text-xs text-slate-600",
+                              cell: (code) =>
+                                code.createdAt
+                                  ? new Date(code.createdAt).toLocaleString()
+                                  : "—",
+                            },
+                          ]}
+                          renderCard={(code) => (
+                            <MobileCard
+                              title={
+                                <span className="break-all font-mono text-sm">
                                   {code.codeMask}
-                                </td>
-                                <td className="px-3 py-2">
-                                  {code.reservedBy ? (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
-                                      Reserved
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                                      Available
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-3 py-2 text-apple-gray-600 font-mono text-xs">
-                                  {code.reservedBy || "—"}
-                                </td>
-                                <td className="px-3 py-2 text-apple-gray-600 text-xs">
-                                  {code.reservedUntil
-                                    ? new Date(code.reservedUntil).toLocaleString()
-                                    : "—"}
-                                </td>
-                                <td className="px-3 py-2 text-apple-gray-600 text-xs">
-                                  {code.createdAt
+                                </span>
+                              }
+                              badges={
+                                code.reservedBy ? (
+                                  <span className="warning-chip">Reserved</span>
+                                ) : (
+                                  <span className="status-chip">Available</span>
+                                )
+                              }
+                              lines={[
+                                ...(code.reservedBy
+                                  ? [
+                                      {
+                                        label: "Reserved by",
+                                        value: (
+                                          <span className="break-all font-mono text-xs">
+                                            {code.reservedBy}
+                                          </span>
+                                        ),
+                                      },
+                                      {
+                                        label: "Reserved until",
+                                        value: code.reservedUntil
+                                          ? new Date(code.reservedUntil).toLocaleString()
+                                          : "—",
+                                      },
+                                    ]
+                                  : []),
+                                {
+                                  label: "Created",
+                                  value: code.createdAt
                                     ? new Date(code.createdAt).toLocaleString()
-                                    : "—"}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                                    : "—",
+                                },
+                              ]}
+                            />
+                          )}
+                        />
                       </div>
-                      <div className="px-3 py-2 bg-apple-gray-50 border-t border-apple-gray-100 text-xs text-apple-gray-500 text-center">
+                      <p className="mt-2 text-center text-xs text-slate-500">
                         {ctrlCodes.length} code{ctrlCodes.length !== 1 ? "s" : ""} total
-                      </div>
+                      </p>
                     </div>
                   )}
                 </>
@@ -3075,7 +3104,7 @@ export default function AdminDataCodesPage() {
                 </>
               )}
 
-              <p className="text-xs text-apple-gray-500 mt-auto">
+              <p className="text-xs text-slate-500 mt-auto">
                 Codes are encrypted and hashed before storage. Only masked
                 values are shown here.
               </p>
@@ -3084,31 +3113,31 @@ export default function AdminDataCodesPage() {
 
           {/* Feedback Section */}
           {showFeedback && (
-            <section className="bg-white rounded-2xl shadow-sm p-6 mt-8">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5 text-purple-500" />
-                  <h2 className="text-lg font-semibold text-apple-gray-800">
+            <section className="glass-panel">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <MessageSquare className="h-5 w-5 shrink-0 text-purple-500" />
+                  <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">
                     Customer Feedback
                   </h2>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={() => setFeedbackFilter("all")}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    className={`min-h-[40px] rounded-full px-4 py-2 text-sm font-semibold transition ${
                       feedbackFilter === "all"
                         ? "bg-purple-100 text-purple-700"
-                        : "bg-apple-gray-100 text-apple-gray-600 hover:bg-apple-gray-200"
+                        : "bg-white/70 text-slate-600 hover:bg-white"
                     }`}
                   >
                     All ({feedback.length})
                   </button>
                   <button
                     onClick={() => setFeedbackFilter("review")}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    className={`min-h-[40px] rounded-full px-4 py-2 text-sm font-semibold transition ${
                       feedbackFilter === "review"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-apple-gray-100 text-apple-gray-600 hover:bg-apple-gray-200"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-white/70 text-slate-600 hover:bg-white"
                     }`}
                   >
                     Reviews (
@@ -3116,10 +3145,10 @@ export default function AdminDataCodesPage() {
                   </button>
                   <button
                     onClick={() => setFeedbackFilter("complaint")}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    className={`min-h-[40px] rounded-full px-4 py-2 text-sm font-semibold transition ${
                       feedbackFilter === "complaint"
-                        ? "bg-red-100 text-red-700"
-                        : "bg-apple-gray-100 text-apple-gray-600 hover:bg-apple-gray-200"
+                        ? "bg-rose-100 text-rose-700"
+                        : "bg-white/70 text-slate-600 hover:bg-white"
                     }`}
                   >
                     Complaints (
@@ -3127,34 +3156,34 @@ export default function AdminDataCodesPage() {
                   </button>
                   <button
                     onClick={() => fetchFeedback(selectedAdminHostel || undefined)}
-                    className="flex items-center gap-1 text-purple-600 hover:text-purple-700 font-medium text-sm"
+                    className="glass-button text-purple-700"
                   >
-                    <RefreshCw className="w-4 h-4" />
+                    <RefreshCw className="h-4 w-4" />
                     Refresh
                   </button>
                 </div>
               </div>
 
               {loadingFeedback ? (
-                <div className="text-center py-8">
-                  <div className="inline-block w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="mt-2 text-sm text-apple-gray-500">
+                <div className="py-8 text-center">
+                  <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-purple-600 border-t-transparent"></div>
+                  <p className="mt-2 text-sm text-slate-500">
                     Loading feedback...
                   </p>
                 </div>
               ) : feedback.filter(
                   (f) => feedbackFilter === "all" || f.type === feedbackFilter,
                 ).length === 0 ? (
-                <div className="text-center py-8">
-                  <MessageSquare className="w-12 h-12 text-apple-gray-300 mx-auto mb-3" />
-                  <p className="text-sm text-apple-gray-500">
-                    {feedbackFilter === "all"
+                <EmptyState
+                  icon={<MessageSquare className="h-12 w-12 text-slate-300" />}
+                  title={
+                    feedbackFilter === "all"
                       ? "No feedback yet"
-                      : `No ${feedbackFilter}s yet`}
-                  </p>
-                </div>
+                      : `No ${feedbackFilter}s yet`
+                  }
+                />
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {feedback
                     .filter(
                       (f) =>
@@ -3163,28 +3192,28 @@ export default function AdminDataCodesPage() {
                     .map((item) => (
                       <div
                         key={item.id}
-                        className={`border-2 rounded-xl p-5 transition-all ${
+                        className={`rounded-[20px] border p-4 backdrop-blur-xl sm:p-5 ${
                           item.type === "review"
-                            ? "border-green-200 bg-green-50/50 hover:border-green-300"
-                            : "border-red-200 bg-red-50/50 hover:border-red-300"
+                            ? "border-emerald-200/80 bg-emerald-50/60"
+                            : "border-rose-200/80 bg-rose-50/60"
                         }`}
                       >
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
+                        <div className="mb-3 flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-1 flex flex-wrap items-center gap-2">
                               <span
-                                className={`text-2xl ${item.type === "review" ? "text-green-600" : "text-red-600"}`}
+                                className={`text-xl sm:text-2xl ${item.type === "review" ? "text-green-600" : "text-red-600"}`}
                               >
                                 {item.type === "review" ? "⭐" : "⚠️"}
                               </span>
-                              <h3 className="font-semibold text-apple-gray-900">
+                              <h3 className="min-w-0 break-words font-semibold text-slate-900">
                                 {item.name}
                               </h3>
                               <span
-                                className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                                   item.type === "review"
-                                    ? "bg-green-100 text-green-700"
-                                    : "bg-red-100 text-red-700"
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : "bg-rose-100 text-rose-700"
                                 }`}
                               >
                                 {item.type === "review"
@@ -3192,44 +3221,40 @@ export default function AdminDataCodesPage() {
                                   : "Complaint"}
                               </span>
                             </div>
-                            <p className="text-sm text-apple-gray-600">
+                            <p className="break-words text-sm text-slate-600">
                               {item.email} • {item.planName}
                             </p>
                           </div>
-                          <div className="text-right">
-                            <p className="text-xs text-apple-gray-500">
+                          <div className="shrink-0 text-right">
+                            <p className="text-xs text-slate-500">
                               {new Date(item.createdAt).toLocaleDateString()}
                             </p>
-                            <p className="text-xs text-apple-gray-400">
+                            <p className="text-xs text-slate-400">
                               {new Date(item.createdAt).toLocaleTimeString()}
                             </p>
                           </div>
                         </div>
 
                         {item.type === "review" && item.rating && (
-                          <div className="flex items-center gap-1 mb-3">
+                          <div className="mb-3 flex flex-wrap items-center gap-1">
                             {[1, 2, 3, 4, 5].map((star) => (
                               <Star
                                 key={star}
-                                className={`w-5 h-5 ${
+                                className={`h-5 w-5 ${
                                   star <= item.rating!
                                     ? "fill-yellow-400 text-yellow-400"
-                                    : "text-apple-gray-300"
+                                    : "text-slate-300"
                                 }`}
                               />
                             ))}
-                            <span className="ml-2 text-sm font-medium text-apple-gray-700">
+                            <span className="ml-2 text-sm font-medium text-slate-700">
                               {item.rating}/5
                             </span>
                           </div>
                         )}
 
-                        <div
-                          className={`p-4 rounded-lg ${
-                            item.type === "review" ? "bg-white" : "bg-white"
-                          }`}
-                        >
-                          <p className="text-apple-gray-800 whitespace-pre-wrap">
+                        <div className="rounded-2xl bg-white/80 p-3 sm:p-4">
+                          <p className="whitespace-pre-wrap break-words text-slate-800">
                             {item.message}
                           </p>
                         </div>
@@ -3239,268 +3264,249 @@ export default function AdminDataCodesPage() {
               )}
             </section>
           )}
-        </div>
-      </div>
+      </AdminPage>
 
       {/* Duplicate Plans Modal */}
-      {showDuplicateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 animate-in fade-in slide-in-from-bottom-4 duration-200">
-            <div className="p-6">
-              <div className="flex items-start justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl">
-                    <Copy className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-apple-gray-900">
-                      Duplicate Plans & Codes
-                    </h3>
-                    <p className="text-sm text-apple-gray-500">
-                      Copy all plans and codes between hostels
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowDuplicateModal(false)}
-                  className="p-1.5 text-apple-gray-400 hover:text-apple-gray-600 hover:bg-apple-gray-100 rounded-lg transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-apple-gray-700 mb-2">
-                    From Hostel
-                  </label>
-                  <select
-                    value={dupFrom}
-                    onChange={(e) => setDupFrom(e.target.value)}
-                    className="w-full px-4 py-3 border border-apple-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Select source hostel...</option>
-                    {allowedHostels.map((h) => (
-                      <option key={h.id} value={h.name}>
-                        {h.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex items-center justify-center">
-                  <div className="p-2 bg-apple-gray-100 rounded-full">
-                    <ArrowRight className="w-4 h-4 text-apple-gray-500" />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-apple-gray-700 mb-2">
-                    To Hostel
-                  </label>
-                  <select
-                    value={dupTo}
-                    onChange={(e) => setDupTo(e.target.value)}
-                    className="w-full px-4 py-3 border border-apple-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Select destination hostel...</option>
-                    {allowedHostels
-                      .filter((h) => h.name !== dupFrom)
-                      .map((h) => (
-                        <option key={h.id} value={h.name}>
-                          {h.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-
-                {dupFrom && dupTo && dupFrom !== dupTo && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                    <p className="text-sm text-blue-800">
-                      All plans and codes from <strong>{dupFrom}</strong> will be
-                      copied to <strong>{dupTo}</strong>. Existing plans in{" "}
-                      <strong>{dupTo}</strong> won&apos;t be duplicated.
-                    </p>
-                  </div>
-                )}
-
-                {dupResult && (
-                  <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                    <p className="text-sm text-green-800 font-medium">
-                      {dupResult}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="px-6 py-4 bg-apple-gray-50 rounded-b-2xl flex items-center gap-3 justify-end">
+      <Modal
+        open={showDuplicateModal}
+        onClose={() => setShowDuplicateModal(false)}
+        icon={
+          <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-cyan-500 p-2.5">
+            <Copy className="h-5 w-5 text-white" />
+          </div>
+        }
+        title={
+          <div className="min-w-0">
+            <h3 className="break-words text-lg font-semibold text-slate-900">
+              Duplicate Plans & Codes
+            </h3>
+            <p className="text-sm font-normal text-slate-500">
+              Copy all plans and codes between hostels
+            </p>
+          </div>
+        }
+        footer={
+          <>
+            <button
+              onClick={() => setShowDuplicateModal(false)}
+              className="glass-button"
+            >
+              {dupResult ? "Done" : "Cancel"}
+            </button>
+            {!dupResult && (
               <button
-                onClick={() => setShowDuplicateModal(false)}
-                className="px-4 py-2.5 text-apple-gray-700 bg-white border border-apple-gray-300 rounded-xl hover:bg-apple-gray-50 transition-colors font-medium"
+                onClick={handleDuplicate}
+                disabled={
+                  duplicating || !dupFrom || !dupTo || dupFrom === dupTo
+                }
+                className="glass-primary"
               >
-                {dupResult ? "Done" : "Cancel"}
+                {duplicating ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Duplicating...
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" />
+                    Duplicate
+                  </>
+                )}
               </button>
-              {!dupResult && (
-                <button
-                  onClick={handleDuplicate}
-                  disabled={
-                    duplicating || !dupFrom || !dupTo || dupFrom === dupTo
-                  }
-                  className="px-5 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {duplicating ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Duplicating...
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-4 h-4" />
-                      Duplicate
-                    </>
-                  )}
-                </button>
-              )}
+            )}
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              From Hostel
+            </label>
+            <select
+              value={dupFrom}
+              onChange={(e) => setDupFrom(e.target.value)}
+              className="glass-input"
+            >
+              <option value="">Select source hostel...</option>
+              {allowedHostels.map((h) => (
+                <option key={h.id} value={h.name}>
+                  {h.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center justify-center">
+            <div className="rounded-full bg-white/70 p-2">
+              <ArrowRight className="h-4 w-4 text-slate-500" />
             </div>
           </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              To Hostel
+            </label>
+            <select
+              value={dupTo}
+              onChange={(e) => setDupTo(e.target.value)}
+              className="glass-input"
+            >
+              <option value="">Select destination hostel...</option>
+              {allowedHostels
+                .filter((h) => h.name !== dupFrom)
+                .map((h) => (
+                  <option key={h.id} value={h.name}>
+                    {h.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          {dupFrom && dupTo && dupFrom !== dupTo && (
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/80 p-4">
+              <p className="break-words text-sm text-blue-800">
+                All plans and codes from <strong>{dupFrom}</strong> will be
+                copied to <strong>{dupTo}</strong>. Existing plans in{" "}
+                <strong>{dupTo}</strong> won&apos;t be duplicated.
+              </p>
+            </div>
+          )}
+
+          {dupResult && (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/90 p-4">
+              <p className="break-words text-sm font-medium text-emerald-800">
+                {dupResult}
+              </p>
+            </div>
+          )}
         </div>
-      )}
+      </Modal>
 
       {/* Edit Plan Modal */}
-      {editingPlan && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 animate-in fade-in slide-in-from-bottom-4 duration-200">
-            <div className="p-6">
-              <div className="flex items-start justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl">
-                    <Pencil className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-apple-gray-900">
-                      Edit Plan
-                    </h3>
-                    <p className="text-sm text-apple-gray-500">
-                      Update plan details
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => { setEditingPlan(null); setError(""); }}
-                  className="p-1.5 text-apple-gray-400 hover:text-apple-gray-600 hover:bg-apple-gray-100 rounded-lg transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-apple-gray-700 mb-2">
-                    Plan Name
-                  </label>
-                  <input
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full px-4 py-3 border border-apple-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Plan name"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-apple-gray-700 mb-2">
-                    Price (₦)
-                  </label>
-                  <input
-                    type="number"
-                    value={editPrice}
-                    onChange={(e) => setEditPrice(Number(e.target.value))}
-                    className="w-full px-4 py-3 border border-apple-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="0"
-                    min={0}
-                  />
-                </div>
-
-                {(editingPlan.planType === "device" ||
-                  editingPlan.planType === "unlimited") && (
-                  <div>
-                    <label className="block text-sm font-medium text-apple-gray-700 mb-2">
-                      Users Count
-                    </label>
-                    <input
-                      type="number"
-                      value={editUsersCount}
-                      onChange={(e) => setEditUsersCount(Number(e.target.value))}
-                      className="w-full px-4 py-3 border border-apple-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="0"
-                      min={1}
-                    />
-                  </div>
-                )}
-
-                {(editingPlan.planType === "tv" ||
-                  editingPlan.planType === "unlimited") && (
-                  <div>
-                    <label className="block text-sm font-medium text-apple-gray-700 mb-2">
-                      Duration (days)
-                    </label>
-                    <input
-                      type="number"
-                      value={editDuration}
-                      onChange={(e) => setEditDuration(Number(e.target.value))}
-                      className="w-full px-4 py-3 border border-apple-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="0"
-                      min={1}
-                    />
-                  </div>
-                )}
-
-                {editingPlan.planType === "unlimited" && (
-                  <div>
-                    <label className="block text-sm font-medium text-apple-gray-700 mb-2">
-                      Period
-                    </label>
-                    <select
-                      value={editUnlimitedPeriod}
-                      onChange={(e) => setEditUnlimitedPeriod(e.target.value)}
-                      className="w-full px-4 py-3 border border-apple-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="yearly">Yearly</option>
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => { setEditingPlan(null); setError(""); }}
-                  className="flex-1 px-4 py-3 border border-apple-gray-300 text-apple-gray-700 rounded-xl font-semibold hover:bg-apple-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveEdit}
-                  disabled={savingEdit}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-400 via-blue-500 to-purple-400 text-white rounded-xl font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
-                >
-                  {savingEdit ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Saving...
-                    </span>
-                  ) : (
-                    "Save Changes"
-                  )}
-                </button>
-              </div>
-            </div>
+      <Modal
+        open={!!editingPlan}
+        onClose={() => { setEditingPlan(null); setError(""); }}
+        icon={
+          <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-cyan-500 p-2.5">
+            <Pencil className="h-5 w-5 text-white" />
           </div>
-        </div>
-      )}
+        }
+        title={
+          <div className="min-w-0">
+            <h3 className="text-lg font-semibold text-slate-900">Edit Plan</h3>
+            <p className="text-sm font-normal text-slate-500">
+              Update plan details
+            </p>
+          </div>
+        }
+        footer={
+          <>
+            <button
+              onClick={() => { setEditingPlan(null); setError(""); }}
+              className="glass-button sm:min-w-[120px]"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveEdit}
+              disabled={savingEdit}
+              className="glass-primary sm:min-w-[140px]"
+            >
+              {savingEdit ? (
+                <span className="flex items-center justify-center gap-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Saving...
+                </span>
+              ) : (
+                "Save Changes"
+              )}
+            </button>
+          </>
+        }
+      >
+        {editingPlan && (
+          <div className="space-y-4">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Plan Name
+              </label>
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="glass-input"
+                placeholder="Plan name"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Price (₦)
+              </label>
+              <input
+                type="number"
+                value={editPrice}
+                onChange={(e) => setEditPrice(Number(e.target.value))}
+                className="glass-input"
+                placeholder="0"
+                min={0}
+              />
+            </div>
+
+            {(editingPlan.planType === "device" ||
+              editingPlan.planType === "unlimited") && (
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Users Count
+                </label>
+                <input
+                  type="number"
+                  value={editUsersCount}
+                  onChange={(e) => setEditUsersCount(Number(e.target.value))}
+                  className="glass-input"
+                  placeholder="0"
+                  min={1}
+                />
+              </div>
+            )}
+
+            {(editingPlan.planType === "tv" ||
+              editingPlan.planType === "unlimited") && (
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Duration (days)
+                </label>
+                <input
+                  type="number"
+                  value={editDuration}
+                  onChange={(e) => setEditDuration(Number(e.target.value))}
+                  className="glass-input"
+                  placeholder="0"
+                  min={1}
+                />
+              </div>
+            )}
+
+            {editingPlan.planType === "unlimited" && (
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Period
+                </label>
+                <select
+                  value={editUnlimitedPeriod}
+                  onChange={(e) => setEditUnlimitedPeriod(e.target.value)}
+                  className="glass-input"
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
 
       {showControllerWalkthrough && false && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-md" onClick={closeControllerWalkthrough}>
@@ -3515,17 +3521,36 @@ export default function AdminDataCodesPage() {
           </div>
         </div>
       )}
-      {showControllerWalkthrough && walkthroughRect && (
+      {showControllerWalkthrough && walkthroughRect && (() => {
+        // The popover is min(25rem, 100vw - 2rem) wide; place it with that real
+        // width so it stays on screen on a phone, and keep it inside the
+        // viewport vertically (above the target when there's no room below).
+        const popoverWidth = Math.min(400, window.innerWidth - 32);
+        const popoverHeight = 300;
+        const popoverLeft = Math.min(
+          Math.max(16, walkthroughRect.left),
+          Math.max(16, window.innerWidth - popoverWidth - 16),
+        );
+        const below = walkthroughRect.bottom + 18;
+        const above = walkthroughRect.top - 18 - popoverHeight;
+        const popoverTop =
+          below + popoverHeight <= window.innerHeight - 16
+            ? below
+            : above >= 16
+              ? above
+              : Math.max(16, Math.min(below, window.innerHeight - popoverHeight - 16));
+        return (
           <div className="fixed inset-0 z-[60] pointer-events-none">
           <div className="pointer-events-auto absolute inset-0 bg-slate-950/30" onClick={closeControllerWalkthrough} />
           <div className="absolute rounded-2xl border-2 border-blue-400 bg-white/5 shadow-[0_0_0_9999px_rgba(15,23,42,0.48),0_0_35px_rgba(59,130,246,0.45)] transition-all duration-300" style={{ left: walkthroughRect.left - 6, top: walkthroughRect.top - 6, width: walkthroughRect.width + 12, height: walkthroughRect.height + 12 }} />
-          <div className="pointer-events-auto absolute w-[min(25rem,calc(100vw-2rem))] rounded-[1.5rem] border border-white/80 bg-white/95 p-5 shadow-[0_20px_70px_rgba(15,23,42,0.25)] backdrop-blur-2xl" style={{ left: Math.min(Math.max(16, walkthroughRect.left), window.innerWidth - 416), top: Math.min(window.innerHeight - 280, Math.max(16, walkthroughRect.bottom + 18)) }} onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-blue-600">Step {walkthroughStep + 1} of {walkthroughSteps.length}</p><button type="button" onClick={closeControllerWalkthrough} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>
-            <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">{walkthroughSteps[walkthroughStep].title}</h2><p className="mt-2 text-sm leading-6 text-slate-600">{walkthroughSteps[walkthroughStep].body}</p><p className="mt-3 rounded-xl bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700">{walkthroughSteps[walkthroughStep].note}</p>
-            <div className="mt-4 flex items-center justify-between"><div className="flex gap-1">{walkthroughSteps.map((_, index) => <span key={index} className={`h-1.5 rounded-full ${index === walkthroughStep ? "w-5 bg-blue-600" : "w-1.5 bg-slate-200"}`} />)}</div><div className="flex gap-2">{walkthroughStep > 0 && <button type="button" onClick={() => setWalkthroughStep((step) => step - 1)} className="rounded-xl px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100">Back</button>}{walkthroughStep < walkthroughSteps.length - 1 ? <button type="button" onClick={() => setWalkthroughStep((step) => step + 1)} className="rounded-xl bg-slate-950 px-4 py-2 text-xs font-semibold text-white">Next</button> : <button type="button" onClick={closeControllerWalkthrough} className="rounded-xl bg-gradient-to-r from-blue-600 to-purple-500 px-4 py-2 text-xs font-semibold text-white">Finish</button>}</div></div>
+          <div className="glass-drawer pointer-events-auto absolute max-h-[calc(100dvh-2rem)] w-[min(25rem,calc(100vw-2rem))] !rounded-[24px] p-4 sm:p-5" style={{ left: popoverLeft, top: popoverTop }} onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between gap-3"><p className="eyebrow">STEP {walkthroughStep + 1} OF {walkthroughSteps.length}</p><button type="button" onClick={closeControllerWalkthrough} aria-label="Close walkthrough" className="glass-icon shrink-0 text-slate-500"><X className="h-4 w-4" /></button></div>
+            <h2 className="mt-2 break-words text-lg font-semibold tracking-tight text-slate-950 sm:text-xl">{walkthroughSteps[walkthroughStep].title}</h2><p className="mt-2 text-sm leading-6 text-slate-600">{walkthroughSteps[walkthroughStep].body}</p><p className="mt-3 rounded-xl bg-blue-50/90 px-3 py-2 text-xs font-medium text-blue-700">{walkthroughSteps[walkthroughStep].note}</p>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3"><div className="flex gap-1">{walkthroughSteps.map((_, index) => <span key={index} className={`h-1.5 rounded-full ${index === walkthroughStep ? "w-5 bg-blue-600" : "w-1.5 bg-slate-200"}`} />)}</div><div className="flex gap-2">{walkthroughStep > 0 && <button type="button" onClick={() => setWalkthroughStep((step) => step - 1)} className="glass-button">Back</button>}{walkthroughStep < walkthroughSteps.length - 1 ? <button type="button" onClick={() => setWalkthroughStep((step) => step + 1)} className="glass-primary">Next</button> : <button type="button" onClick={closeControllerWalkthrough} className="glass-primary">Finish</button>}</div></div>
           </div>
         </div>
-      )}
+        );
+      })()}
       <ConfirmationModal
         isOpen={!!cleanSyncTarget}
         title={`Clean and resync ${cleanSyncTarget?.name ?? "controller"}?`}
@@ -3536,16 +3561,16 @@ export default function AdminDataCodesPage() {
         onConfirm={handleCleanSyncController}
         onClose={() => setCleanSyncTarget(null)}
       >
-        <label className="flex items-start gap-3 rounded-xl border border-apple-gray-200 bg-apple-gray-50 p-3 text-left">
+        <label className="flex items-start gap-3 rounded-2xl border border-white/80 bg-white/60 p-3 text-left">
           <input
             type="checkbox"
             checked={cleanSyncKeepPrices}
             onChange={(e) => setCleanSyncKeepPrices(e.target.checked)}
-            className="mt-0.5 h-4 w-4 rounded border-apple-gray-300 text-blue-600 focus:ring-blue-500"
+            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
           />
-          <span className="text-sm text-gray-700">
+          <span className="text-sm text-slate-700">
             <b>Keep the prices I have set.</b>
-            <span className="mt-1 block text-xs text-gray-500">
+            <span className="mt-1 block text-xs text-slate-500">
               A rebuild reads prices from the Omada group names, which usually
               carry none. Unchecking this clears every price on this controller
               and its pools stop selling until you set them again. Per-hostel

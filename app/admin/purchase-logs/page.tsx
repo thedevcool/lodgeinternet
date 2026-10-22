@@ -3,11 +3,20 @@ import { adminFetch } from "@/lib/apiClient";
 
 import { useEffect, useMemo, useState } from "react";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
-import Logo from "@/components/Logo";
 import { useAuthStore } from "@/store/authStore";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft, Receipt, Download, Search, LogOut, RefreshCw } from "lucide-react";
+import { Receipt, Download, Search, RefreshCw } from "lucide-react";
+import {
+  AdminPage,
+  Panel,
+  Kpi,
+  GLASS_INPUT,
+  GLASS_INPUT_ICON,
+  IconButton,
+  ResponsiveTable,
+  MobileCard,
+  EmptyState,
+  type Column,
+} from "@/components/admin/ui";
 import type { Hostel } from "@/types";
 
 interface DataPurchase {
@@ -23,8 +32,7 @@ interface DataPurchase {
 }
 
 export default function PurchaseLogsPage() {
-  const { logout, adminProfile } = useAuthStore();
-  const router = useRouter();
+  const { adminProfile } = useAuthStore();
   const [purchases, setPurchases] = useState<DataPurchase[]>([]);
   const [hostels, setHostels] = useState<Hostel[]>([]);
   const allowedHostels = useMemo(
@@ -166,230 +174,160 @@ export default function PurchaseLogsPage() {
     window.URL.revokeObjectURL(url);
   };
 
+  const columns: Column<DataPurchase>[] = [
+    {
+      key: "date",
+      header: "Date",
+      className: "whitespace-nowrap",
+      cell: (purchase) => (
+        <>
+          <span className="text-slate-900">{purchase.purchasedAt.toLocaleDateString()}</span>
+          <br />
+          <span className="text-xs text-slate-400">{purchase.purchasedAt.toLocaleTimeString()}</span>
+        </>
+      ),
+    },
+    {
+      key: "hostel",
+      header: "Hostel",
+      className: "whitespace-nowrap",
+      cell: (purchase) => purchase.hostel || <span className="text-slate-400">—</span>,
+    },
+    {
+      key: "plan",
+      header: "Plan",
+      className: "whitespace-nowrap",
+      cell: (purchase) => <span className="font-medium text-slate-900">{purchase.planName}</span>,
+    },
+    { key: "users", header: "Users", className: "whitespace-nowrap", cell: (purchase) => purchase.usersCount },
+    {
+      key: "price",
+      header: "Price",
+      className: "whitespace-nowrap",
+      cell: (purchase) => <span className="font-medium text-emerald-600">₦{purchase.price.toFixed(2)}</span>,
+    },
+    {
+      key: "customer",
+      header: "Customer",
+      className: "max-w-[220px] truncate",
+      cell: (purchase) => purchase.customerEmail || "N/A",
+    },
+  ];
+
   return (
     <ProtectedRoute module="transactions">
-      <div className="min-h-screen bg-apple-gray-50">
-        <header className="bg-white shadow-sm border-b border-apple-gray-200 sticky top-0 z-10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <Logo variant="dark" />
-                <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-400 via-blue-500 to-black-400 bg-clip-text text-transparent">
-                  Purchase Logs
-                </h1>
-              </div>
-              <div className="flex items-center gap-3">
-                <Link
-                  href="/admin/dashboard"
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-apple-gray-700 hover:bg-apple-gray-100 rounded-lg transition-colors"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span className="hidden sm:inline">Dashboard</span>
-                </Link>
-                <button
-                  onClick={() => { setPurchases([]); setLoading(true); fetchPurchases(); }}
-                  disabled={loading}
-                  title="Refresh purchases"
-                  className="p-2 text-apple-gray-500 hover:text-apple-gray-700 hover:bg-apple-gray-100 rounded-lg transition-colors disabled:opacity-40"
-                >
-                  <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-                </button>
-                <button
-                  onClick={() => {
-                    logout();
-                    router.push("/admin/login");
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-apple-gray-700 hover:bg-apple-gray-100 rounded-lg transition-colors"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span className="hidden sm:inline">Logout</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8">
-            <div className="bg-white rounded-xl p-6 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-blue-100 rounded-lg">
-                  <Receipt className="w-6 h-6 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-apple-gray-600">Total Purchases</p>
-                  <p className="text-2xl font-bold text-apple-gray-900">
-                    {visiblePurchases.length}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl p-6 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-green-100 rounded-lg">
-                  <Receipt className="w-6 h-6 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-apple-gray-600">Total Revenue</p>
-                  <p className="text-2xl font-bold text-apple-gray-900">
-                    ₦{totalRevenue.toFixed(2)}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl p-6 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-purple-100 rounded-lg">
-                  <Receipt className="w-6 h-6 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-apple-gray-600">Unique Plans</p>
-                  <p className="text-2xl font-bold text-apple-gray-900">
-                    {uniquePlans.length}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Filters */}
-          <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <div className="flex-1 w-full sm:w-auto">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-apple-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search by plan or email..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-apple-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-3 w-full sm:w-auto flex-wrap">
-                <select
-                  value={filterHostel}
-                  onChange={(e) => setFilterHostel(e.target.value)}
-                  className="px-4 py-2 border border-apple-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="all">All Hostels</option>
-                  {allHostelNames.map((h) => (
-                    <option key={h} value={h}>
-                      {h}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={filterPlan}
-                  onChange={(e) => setFilterPlan(e.target.value)}
-                  className="px-4 py-2 border border-apple-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="all">All Plans</option>
-                  {uniquePlans.map((plan) => (
-                    <option key={plan} value={plan}>
-                      {plan}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={exportToCSV}
-                  disabled={filteredPurchases.length === 0}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-400 via-blue-500 to-black-400 text-white font-semibold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Download className="w-4 h-4" />
-                  Export CSV
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Purchases Table */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              {loading ? (
-                <div className="p-8 text-center text-apple-gray-500">
-                  Loading purchases...
-                </div>
-              ) : filteredPurchases.length === 0 ? (
-                <div className="p-8 text-center text-apple-gray-500">
-                  {searchTerm || filterPlan !== "all"
-                    ? "No purchases match your filters"
-                    : "No purchases yet"}
-                </div>
-              ) : (
-                <table className="w-full">
-                  <thead className="bg-apple-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-apple-gray-500 uppercase tracking-wider whitespace-nowrap">
-                        Date
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-apple-gray-500 uppercase tracking-wider whitespace-nowrap">
-                        Hostel
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-apple-gray-500 uppercase tracking-wider whitespace-nowrap">
-                        Plan
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-apple-gray-500 uppercase tracking-wider whitespace-nowrap">
-                        Users
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-apple-gray-500 uppercase tracking-wider whitespace-nowrap">
-                        Price
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-apple-gray-500 uppercase tracking-wider whitespace-nowrap">
-                        Customer
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-apple-gray-200">
-                    {filteredPurchases.map((purchase) => (
-                      <tr key={purchase.id} className="hover:bg-apple-gray-50">
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-apple-gray-900">
-                          {purchase.purchasedAt.toLocaleDateString()}
-                          <br />
-                          <span className="text-xs text-apple-gray-400">
-                            {purchase.purchasedAt.toLocaleTimeString()}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-apple-gray-600">
-                          {purchase.hostel || (
-                            <span className="text-apple-gray-400">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="text-sm font-medium text-apple-gray-900">
-                            {purchase.planName}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-apple-gray-900">
-                          {purchase.usersCount}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-green-600">
-                          ₦{purchase.price.toFixed(2)}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-apple-gray-900 max-w-[160px] truncate">
-                          {purchase.customerEmail || "N/A"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-
-          {/* Summary */}
-          {filteredPurchases.length > 0 && (
-            <div className="mt-4 text-sm text-apple-gray-600 text-right">
-              Showing {filteredPurchases.length} of {visiblePurchases.length} purchases
-              {hasMore && ` — latest ${PAGE_SIZE}; pick a hostel to narrow the search`}
-            </div>
-          )}
+      <AdminPage
+        eyebrow="TRANSACTIONS"
+        title="Purchase Logs"
+        actions={
+          <IconButton
+            label="Refresh purchases"
+            onClick={() => { setPurchases([]); setLoading(true); fetchPurchases(); }}
+            disabled={loading}
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          </IconButton>
+        }
+      >
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <Kpi label="Total Purchases" value={visiblePurchases.length} tone="blue" icon={<Receipt className="w-4 h-4" />} />
+          <Kpi label="Total Revenue" value={`₦${totalRevenue.toFixed(2)}`} tone="green" icon={<Receipt className="w-4 h-4" />} />
+          <Kpi label="Unique Plans" value={uniquePlans.length} tone="purple" icon={<Receipt className="w-4 h-4" />} />
         </div>
-      </div>
+
+        {/* Filters */}
+        <Panel>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="relative min-w-0 flex-1">
+              <Search className={GLASS_INPUT_ICON} />
+              <input
+                type="text"
+                placeholder="Search by plan or email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className={`${GLASS_INPUT} pl-11`}
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-center">
+              <select
+                value={filterHostel}
+                onChange={(e) => setFilterHostel(e.target.value)}
+                className={`${GLASS_INPUT} sm:w-48`}
+              >
+                <option value="all">All Hostels</option>
+                {allHostelNames.map((h) => (
+                  <option key={h} value={h}>
+                    {h}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={filterPlan}
+                onChange={(e) => setFilterPlan(e.target.value)}
+                className={`${GLASS_INPUT} sm:w-48`}
+              >
+                <option value="all">All Plans</option>
+                {uniquePlans.map((plan) => (
+                  <option key={plan} value={plan}>
+                    {plan}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={exportToCSV}
+                disabled={filteredPurchases.length === 0}
+                className="glass-primary w-full sm:w-auto"
+              >
+                <Download className="w-4 h-4" />
+                Export CSV
+              </button>
+            </div>
+          </div>
+        </Panel>
+
+        {/* Purchases Table */}
+        <Panel flush>
+          {loading ? (
+            <EmptyState title="Loading purchases..." />
+          ) : filteredPurchases.length === 0 ? (
+            <EmptyState
+              title={
+                searchTerm || filterPlan !== "all"
+                  ? "No purchases match your filters"
+                  : "No purchases yet"
+              }
+            />
+          ) : (
+            <ResponsiveTable
+              rows={filteredPurchases}
+              columns={columns}
+              rowKey={(purchase) => purchase.id}
+              renderCard={(purchase) => (
+                <MobileCard
+                  title={purchase.planName}
+                  aside={<span className="text-emerald-600">₦{purchase.price.toFixed(2)}</span>}
+                  subtitle={`${purchase.hostel || "—"} · ${purchase.usersCount} users`}
+                  lines={[
+                    <span key="email" className="block truncate">{purchase.customerEmail || "N/A"}</span>,
+                    <span key="date" className="text-xs text-slate-500">
+                      {purchase.purchasedAt.toLocaleDateString()} {purchase.purchasedAt.toLocaleTimeString()}
+                    </span>,
+                  ]}
+                />
+              )}
+            />
+          )}
+        </Panel>
+
+        {/* Summary */}
+        {filteredPurchases.length > 0 && (
+          <p className="text-sm text-slate-500 sm:text-right">
+            Showing {filteredPurchases.length} of {visiblePurchases.length} purchases
+            {hasMore && ` — latest ${PAGE_SIZE}; pick a hostel to narrow the search`}
+          </p>
+        )}
+      </AdminPage>
     </ProtectedRoute>
   );
 }

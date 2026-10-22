@@ -6,14 +6,13 @@ import { useAuthStore } from "@/store/authStore";
 import { adminHome } from "@/lib/adminHome";
 import { takeSessionEndReason } from "@/lib/adminSession";
 import { BrandGlyph } from "@/components/ui/BrandMark";
-import Button from "@/components/ui/Button";
-import TextField from "@/components/ui/TextField";
-import InlineAlert from "@/components/ui/InlineAlert";
+import Spinner from "@/components/ui/Spinner";
+import { AlertTriangle, Eye, EyeOff, Info } from "lucide-react";
 
 /**
- * Admin sign-in, in the client design language. `.client-root` opts this one
- * admin page into the client tokens, Inter and light/dark; the rest of admin
- * is unchanged. Login logic is unchanged.
+ * Admin sign-in, in the admin's glass look. It renders outside the admin
+ * shell, so it carries the `analytics-shell` background itself. Login logic
+ * is unchanged.
  */
 export default function AdminLoginPage() {
   return (
@@ -39,6 +38,7 @@ function AdminLogin() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [revealPassword, setRevealPassword] = useState(false);
 
   const { login } = useAuthStore();
   const router = useRouter();
@@ -74,45 +74,81 @@ function AdminLogin() {
   };
 
   return (
-    <div className="client-root flex min-h-dvh items-center justify-center px-4 py-12">
+    <div className="analytics-shell flex min-h-dvh items-center justify-center px-4 py-12">
       <div className="ui-page-in w-full max-w-[400px]">
-        <div className="rounded-sheet bg-surface p-7 shadow-card sm:p-9">
+        <div className="glass-panel">
           <div className="flex justify-center">
             <BrandGlyph className="h-14 w-14" />
           </div>
-          <p className="ui-eyebrow mt-6 text-center text-accent-ink">Lodge Internet Admin</p>
-          <h1 className="ui-title-1 mt-1 text-center text-ink">Sign in</h1>
-          <p className="ui-subhead mt-1.5 text-center text-ink-2">Manage hostels, plans and customers.</p>
+          <p className="eyebrow mt-6 text-center uppercase">Lodge Internet Admin</p>
+          <h1 className="mt-1 text-center text-2xl font-semibold tracking-tight text-slate-900">Sign in</h1>
+          <p className="mt-1.5 text-center text-sm text-slate-500">Manage hostels, plans and customers.</p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-            <TextField
-              label="Username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter username"
-              autoComplete="username"
-              autoCapitalize="none"
-              required
-            />
-            <TextField
-              label="Password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter password"
-              autoComplete="current-password"
-              required
-            />
+            <div>
+              <label htmlFor="admin-username" className="mb-1.5 block px-1 text-sm font-medium text-slate-600">
+                Username
+              </label>
+              <input
+                id="admin-username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter username"
+                autoComplete="username"
+                autoCapitalize="none"
+                required
+                className="glass-input"
+              />
+            </div>
+            <div>
+              <label htmlFor="admin-password" className="mb-1.5 block px-1 text-sm font-medium text-slate-600">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  id="admin-password"
+                  type={revealPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter password"
+                  autoComplete="current-password"
+                  required
+                  className="glass-input pr-12"
+                />
+                <button
+                  type="button"
+                  onClick={() => setRevealPassword((r) => !r)}
+                  aria-label={revealPassword ? "Hide password" : "Show password"}
+                  className="absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 transition hover:text-slate-600"
+                >
+                  {revealPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
             {!error && ENDED_MESSAGE[endedReason] && (
-              <InlineAlert tone="info">{ENDED_MESSAGE[endedReason]}</InlineAlert>
+              <div role="status" className="flex gap-3 rounded-2xl border border-blue-200 bg-blue-50/90 px-4 py-3 text-sm text-blue-800">
+                <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                <span className="min-w-0">{ENDED_MESSAGE[endedReason]}</span>
+              </div>
             )}
-            {error && <InlineAlert>{error}</InlineAlert>}
-            <Button type="submit" full loading={loading} className="!mt-6">
+            {error && (
+              <div role="alert" className="flex gap-3 rounded-2xl border border-rose-200 bg-rose-50/90 px-4 py-3 text-sm text-rose-700">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span className="min-w-0">{error}</span>
+              </div>
+            )}
+            <button
+              type="submit"
+              disabled={loading}
+              aria-busy={loading || undefined}
+              className="glass-primary !mt-6 min-h-[48px] w-full"
+            >
+              {loading && <Spinner className="h-[18px] w-[18px]" />}
               {loading ? "Signing in..." : "Sign In"}
-            </Button>
+            </button>
           </form>
         </div>
-        <p className="ui-footnote mt-6 text-center text-ink-3">Authorised staff only</p>
+        <p className="mt-6 text-center text-xs text-slate-500">Authorised staff only</p>
       </div>
     </div>
   );

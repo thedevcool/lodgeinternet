@@ -1,13 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, HandCoins, LogOut } from "lucide-react";
 import { adminFetch } from "@/lib/apiClient";
 import { clearAttentionCache } from "@/lib/adminNav";
-import { useAuthStore } from "@/store/authStore";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
-import Logo from "@/components/Logo";
+import { AdminPage, Panel, EmptyState, GLASS_INPUT } from "@/components/admin/ui";
 
 /**
  * /admin/owed-orders — paid for but not delivered (backend:
@@ -38,7 +35,6 @@ function describe(order: Order): string {
 }
 
 export default function OwedOrdersPage() {
-  const { logout } = useAuthStore();
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [error, setError] = useState("");
 
@@ -56,56 +52,38 @@ export default function OwedOrdersPage() {
 
   return (
     <ProtectedRoute requireSuperAdmin>
-      <div className="min-h-screen bg-apple-gray-50">
-        <header className="bg-white shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Logo variant="dark" />
-              <div>
-                <h1 className="text-2xl font-bold text-apple-gray-900">Owed orders</h1>
-                <p className="text-sm text-apple-gray-500">Paid for but not delivered</p>
-              </div>
+      <AdminPage eyebrow="MONEY" title="Owed orders" subtitle="Paid for but not delivered" width="narrow">
+        {error ? (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-sm text-rose-700 break-words">{error}</div>
+        ) : !orders ? (
+          <Panel>
+            <EmptyState title="Loading owed orders…" />
+          </Panel>
+        ) : orders.length === 0 ? (
+          <Panel>
+            <EmptyState title="Nothing owed: every paid order was delivered." />
+          </Panel>
+        ) : (
+          <>
+            <p className="glass-alert">
+              {orders.length} paid order{orders.length === 1 ? "" : "s"} still owed. Sort each one out with the customer (a voucher
+              from Omada, or a refund), then record it here.
+            </p>
+            <div className="space-y-4">
+              {orders.map((order) => (
+                <OwedOrder
+                  key={`${order.kind}:${order.id}`}
+                  order={order}
+                  onSettled={() => {
+                    clearAttentionCache();
+                    load();
+                  }}
+                />
+              ))}
             </div>
-            <button onClick={() => { logout(); window.location.href = "/admin/login"; }} className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg hover:bg-apple-gray-100">
-              <LogOut className="w-4 h-4" /> Logout
-            </button>
-          </div>
-        </header>
-        <main className="max-w-4xl mx-auto px-4 py-8">
-          <div className="flex items-center justify-between mb-6">
-            <Link href="/admin/dashboard" className="flex items-center gap-2 text-sm text-apple-gray-600 hover:text-apple-gray-900">
-              <ArrowLeft className="w-4 h-4" /> Back to dashboard
-            </Link>
-            <HandCoins className="w-6 h-6 text-amber-600" />
-          </div>
-          {error ? (
-            <div className="bg-red-50 text-red-700 rounded-2xl p-5">{error}</div>
-          ) : !orders ? (
-            <div className="bg-white rounded-2xl p-8 text-center text-apple-gray-500">Loading owed orders…</div>
-          ) : orders.length === 0 ? (
-            <div className="bg-white rounded-2xl p-8 text-center text-apple-gray-500">Nothing owed: every paid order was delivered.</div>
-          ) : (
-            <>
-              <p className="mb-4 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">
-                {orders.length} paid order{orders.length === 1 ? "" : "s"} still owed. Sort each one out with the customer (a voucher
-                from Omada, or a refund), then record it here.
-              </p>
-              <div className="space-y-4">
-                {orders.map((order) => (
-                  <OwedOrder
-                    key={`${order.kind}:${order.id}`}
-                    order={order}
-                    onSettled={() => {
-                      clearAttentionCache();
-                      load();
-                    }}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-        </main>
-      </div>
+          </>
+        )}
+      </AdminPage>
     </ProtectedRoute>
   );
 }
@@ -141,41 +119,41 @@ function OwedOrder({ order, onSettled }: { order: Order; onSettled: () => void }
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <Panel>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <p className="font-semibold text-apple-gray-900">
+          <p className="break-words font-semibold text-slate-900">
             {order.planName || "Plan"} · {order.hostel || "Unknown hostel"}
           </p>
-          <p className="text-sm text-apple-gray-600">{order.customerEmail || "No email"}</p>
+          <p className="break-all text-sm text-slate-600">{order.customerEmail || "No email"}</p>
           <p className="text-sm text-amber-700 mt-1">{describe(order)}</p>
         </div>
-        <div className="text-right">
-          <p className="font-semibold text-apple-gray-900">₦{order.amountPaid.toLocaleString()} paid</p>
-          <p className="text-xs text-apple-gray-500">{order.paymentRef || "No reference"}</p>
-          <p className="text-xs text-apple-gray-500">{order.at ? new Date(order.at).toLocaleString() : ""}</p>
+        <div className="min-w-0 sm:max-w-[45%] sm:text-right">
+          <p className="font-semibold text-slate-900">₦{order.amountPaid.toLocaleString()} paid</p>
+          <p className="break-all font-mono text-xs text-slate-500">{order.paymentRef || "No reference"}</p>
+          <p className="text-xs text-slate-500">{order.at ? new Date(order.at).toLocaleString() : ""}</p>
         </div>
       </div>
       <form onSubmit={settle} className="mt-4 flex flex-col gap-2 sm:flex-row">
         <input
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="How was it settled? (e.g. voucher from Omada by WhatsApp)"
-          className="flex-1 rounded-lg border border-apple-gray-200 px-3 py-2 text-sm"
+          placeholder="How was it settled? (e.g. Omada voucher)"
+          className={`${GLASS_INPUT} min-w-0 sm:flex-1`}
         />
         {order.kind === "purchase" && (
           <input
             value={code}
             onChange={(e) => setCode(e.target.value)}
             placeholder="Code handed over (optional)"
-            className="rounded-lg border border-apple-gray-200 px-3 py-2 text-sm sm:w-56"
+            className={`${GLASS_INPUT} sm:w-56`}
           />
         )}
-        <button type="submit" disabled={saving} className="rounded-lg bg-apple-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+        <button type="submit" disabled={saving} className="glass-primary shrink-0">
           {saving ? "Saving…" : "Settled offline"}
         </button>
       </form>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-    </div>
+      {error && <p className="mt-2 text-sm text-rose-600">{error}</p>}
+    </Panel>
   );
 }

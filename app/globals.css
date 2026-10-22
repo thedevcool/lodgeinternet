@@ -21,7 +21,7 @@
   /* Wraps rather than overflowing: these headers carry a title plus a row of
      actions, which together are wider than a phone. */
   .glass-header { @apply sticky top-0 z-30 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-white/80 px-4 py-3 shadow-[0_8px_30px_rgba(15,23,42,.06)] backdrop-blur-2xl sm:px-8; background: rgba(255,255,255,.55); }
-  .glass-hero, .glass-panel { @apply rounded-[30px] border border-white/85 bg-white/60 p-5 shadow-[0_18px_60px_rgba(31,41,55,0.09)] backdrop-blur-2xl sm:p-7; position: relative; overflow: hidden; }
+  .glass-hero, .glass-panel { @apply rounded-[24px] border border-white/85 bg-white/60 p-4 shadow-[0_18px_60px_rgba(31,41,55,0.09)] backdrop-blur-2xl sm:rounded-[30px] sm:p-7; position: relative; overflow: hidden; }
   .glass-hero::before, .glass-panel::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(120deg,rgba(255,255,255,.52),transparent 34%,rgba(255,255,255,.16) 70%,rgba(255,255,255,.42)); opacity: .78; }
   .glass-hero > *, .glass-panel > * { position: relative; z-index: 1; }
   .glass-hero { @apply flex flex-col justify-between gap-6 sm:flex-row; background: linear-gradient(120deg,rgba(255,255,255,.78),rgba(232,241,255,.62),rgba(250,245,255,.72)); }
@@ -34,8 +34,10 @@
   .kpi-card:hover { @apply -translate-y-0.5 bg-white/90 shadow-[0_14px_38px_rgba(31,41,55,0.10)]; }
   .kpi-rail { @apply absolute inset-y-0 left-0 w-1; }
   .kpi-label { @apply text-[11px] font-semibold uppercase tracking-[0.13em] text-slate-500; }
-  .kpi-value { @apply mt-2 text-[26px] font-semibold leading-none tracking-tight text-slate-900 sm:text-[30px]; }
-  .kpi-value-sm { @apply mt-2 text-[20px] font-semibold leading-none tracking-tight text-slate-900; }
+  /* Scales with the phone: two tiles abreast at 360px leave ~120px for a
+     figure, and "₦12,345,678" at 26px didn't fit — it was cut off unseen. */
+  .kpi-value { @apply mt-2 text-[20px] font-semibold leading-tight tracking-tight text-slate-900 min-[400px]:text-[24px] sm:text-[30px] sm:leading-none; overflow-wrap: anywhere; }
+  .kpi-value-sm { @apply mt-2 text-[17px] font-semibold leading-tight tracking-tight text-slate-900 sm:text-[20px] sm:leading-none; overflow-wrap: anywhere; }
   .kpi-note { @apply mt-2 text-xs text-slate-500; }
   .kpi-grid { @apply grid gap-3 grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8; }
 
@@ -69,7 +71,7 @@
 
   /* ── Segmented control (analytics ⇄ tiles) ────────────────────────────── */
   .segmented { @apply inline-flex items-center gap-1 rounded-full border border-white/80 bg-white/70 p-1 shadow-sm backdrop-blur-xl; }
-  .segmented-item { @apply inline-flex h-8 w-9 items-center justify-center rounded-full text-slate-500 transition; }
+  .segmented-item { @apply inline-flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition; }
   .segmented-item[aria-pressed="true"] { @apply bg-slate-900 text-white shadow-sm; }
 
   /* Thin proportion bar used under inventory / catalogue headlines. */
@@ -99,15 +101,26 @@
   @media (max-width: 1023px) {
     .admin-main header { position: relative; top: auto; }
     .admin-main > header.admin-topbar { position: sticky; top: 0; }
+    /* The pinned sidebar is also a `.glass-drawer`, which is declared later
+       and sets `display:flex` — that beat `.admin-sidebar`'s `hidden`, so on
+       a phone the whole desktop sidebar rendered above every page. */
+    .admin-sidebar.glass-drawer { display: none; }
   }
   .drawer-footer { @apply mt-4 flex items-center justify-between gap-3 border-t border-white/80 pt-4; }
   .drawer-signout { @apply inline-flex shrink-0 items-center gap-2 rounded-full border border-white/90 px-3 py-2 text-sm font-medium text-slate-700 shadow-[0_6px_18px_rgba(15,23,42,.07)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white hover:text-red-600; background: rgba(255,255,255,.65); }
-  .glass-button { @apply inline-flex items-center gap-2 rounded-full border border-white/90 px-4 py-2 text-sm font-medium shadow-[0_6px_18px_rgba(15,23,42,.07)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white; background: rgba(255,255,255,.65); }
+  .glass-button { @apply inline-flex min-h-[40px] items-center justify-center gap-2 rounded-full border border-white/90 px-4 py-2 text-sm font-medium shadow-[0_6px_18px_rgba(15,23,42,.07)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0; background: rgba(255,255,255,.65); }
+  /* The page's main action, and a destructive one. Same shape as glass-button. */
+  .glass-primary { @apply inline-flex min-h-[40px] items-center justify-center gap-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 px-5 py-2 text-sm font-semibold text-white shadow-[0_8px_22px_rgba(79,70,229,.25)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(79,70,229,.32)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0; }
+  .glass-danger { @apply inline-flex min-h-[40px] items-center justify-center gap-2 rounded-full bg-rose-600 px-5 py-2 text-sm font-semibold text-white shadow-[0_8px_22px_rgba(225,29,72,.22)] transition hover:-translate-y-0.5 hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0; }
+  /* Glass form field. min-h keeps it a comfortable tap target. */
+  .glass-input { @apply min-h-[44px] w-full rounded-2xl border border-white/80 bg-white/70 px-4 py-2.5 text-sm text-slate-700 backdrop-blur-xl placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60; }
+  /* A row shown as a card on a phone (see ResponsiveTable / MobileCard). */
+  .glass-card { @apply rounded-[20px] border border-white/85 bg-white/70 p-4 shadow-[0_8px_22px_rgba(15,23,42,.05)] backdrop-blur-xl; }
   .live-pill { @apply inline-flex items-center gap-2 rounded-full bg-emerald-100/80 px-3 py-2 text-xs font-semibold text-emerald-700; }
   .live-dot { @apply h-2 w-2 rounded-full bg-emerald-500; }
   .eyebrow { @apply text-[10px] font-bold tracking-[0.22em] text-blue-600; }
-  .panel-heading { @apply mb-5 flex items-center justify-between gap-3; } .panel-heading h3 { @apply mt-1 text-xl font-semibold; }
-  .glass-alert { @apply flex items-center gap-3 rounded-2xl border border-orange-200 bg-orange-50/90 p-4 text-sm text-orange-800; }
+  .panel-heading { @apply mb-4 flex flex-wrap items-center justify-between gap-3 sm:mb-5; } .panel-heading h3 { @apply mt-1 text-xl font-semibold; }
+  .glass-alert { @apply flex flex-wrap items-center gap-3 rounded-2xl border border-orange-200 bg-orange-50/90 p-4 text-sm text-orange-800; }
   .glass-link { @apply inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800; }
   .glass-controller { @apply rounded-[22px] border border-white/90 p-4 shadow-[0_8px_22px_rgba(15,23,42,.06)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/90; background: rgba(255,255,255,.58); }
   .controller-icon { @apply flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100 text-blue-600; }

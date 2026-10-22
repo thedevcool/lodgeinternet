@@ -24,11 +24,11 @@ import {
   RefreshCw,
 } from "lucide-react";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
-import Logo from "@/components/Logo";
 import { adminFetch } from "@/lib/apiClient";
 import { adminHome } from "@/lib/adminHome";
 import { ADMIN_NAV, badgeFor, primeAttention } from "@/lib/adminNav";
 import { useAuthStore } from "@/store/authStore";
+import { AdminPage, Kpi, Panel } from "@/components/admin/ui";
 
 type CountMap = Record<string, number>;
 
@@ -124,72 +124,21 @@ const FRESHNESS_LABEL: Record<string, string> = {
   stale: "Stale",
 };
 
-/**
- * Tone → class name, written out in full on purpose.
- *
- * Tailwind finds classes by scanning source text, so a name built at runtime
- * (`kpi-${tone}`) is never seen and the rule is purged from the stylesheet —
- * which is exactly why these tints did not render. Spelling each one out here
- * is what keeps them in the build.
- */
-const TONE_BG: Record<string, string> = {
-  blue: "kpi-blue",
-  green: "kpi-green",
-  orange: "kpi-orange",
-  red: "kpi-red",
-  violet: "kpi-violet",
-  purple: "kpi-purple",
-  slate: "kpi-slate",
-  teal: "kpi-teal",
-};
-
-/** Rail colours, paired with the grounds above. */
-const TONE_RAIL: Record<string, string> = {
-  teal: "bg-teal-500",
-  blue: "bg-blue-500",
-  green: "bg-emerald-500",
-  orange: "bg-amber-500",
-  red: "bg-rose-500",
-  violet: "bg-violet-500",
-  purple: "bg-purple-500",
-  slate: "bg-slate-400",
-};
-
 const money = (value: number | undefined) => `₦${Math.round(value || 0).toLocaleString()}`;
 const fmt = (value: number | undefined) => (value || 0).toLocaleString();
 const pct = (part: number | undefined, whole: number | undefined) =>
   whole ? Math.round(((part || 0) / whole) * 100) : 0;
 
-function Kpi({
-  label,
-  value,
-  note,
-  tone = "blue",
-}: {
-  label: string;
-  value: string | number;
-  note?: string;
-  tone?: string;
-}) {
-  return (
-    <div className={`kpi-card ${TONE_BG[tone] || TONE_BG.blue}`}>
-      <span className={`kpi-rail ${TONE_RAIL[tone] || TONE_RAIL.blue}`} />
-      <p className="kpi-label">{label}</p>
-      <p className="kpi-value">{value}</p>
-      {note && <p className="kpi-note">{note}</p>}
-    </div>
-  );
-}
-
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="stat">
       <p className="stat-label">{label}</p>
-      <p className="stat-value">{value}</p>
+      <p className="stat-value [overflow-wrap:anywhere]">{value}</p>
     </div>
   );
 }
 
+/** A dashboard section: a kit Panel with a "Manage" link to the full page. */
 function Section({
   eyebrow,
   title,
@@ -202,18 +151,18 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="glass-panel">
-      <div className="panel-heading">
-        <div>
-          <p className="eyebrow">{eyebrow}</p>
-          <h3>{title}</h3>
-        </div>
-        <Link href={href} className="glass-link">
+    <Panel
+      eyebrow={eyebrow}
+      title={title}
+      className="min-w-0"
+      actions={
+        <Link href={href} className="glass-link min-h-[40px]">
           Manage <ChevronRight size={16} />
         </Link>
-      </div>
+      }
+    >
       {children}
-    </section>
+    </Panel>
   );
 }
 
@@ -331,19 +280,11 @@ export default function AdminDashboardPage() {
 
   return (
     <ProtectedRoute requireSuperAdmin>
-      <div className="min-h-screen analytics-shell">
-        <header className="glass-header">
-          <div className="flex min-w-0 items-center gap-3">
-            <Logo variant="dark" />
-            <div>
-              <p className="eyebrow">SUPERADMIN CONTROL CENTRE</p>
-              <h1 className="text-xl font-semibold sm:text-2xl">
-                {view === "analytics" ? "Analytics overview" : "All sections"}
-              </h1>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
+      <AdminPage
+        eyebrow="SUPERADMIN CONTROL CENTRE"
+        title={view === "analytics" ? "Analytics overview" : "All sections"}
+        actions={
+          <>
             <span
               className={freshness === "live" ? "live-pill" : "live-pill bg-amber-100/80 text-amber-700"}
               title={data ? `Snapshot age ${data.ageSeconds ?? 0}s` : undefined}
@@ -354,18 +295,24 @@ export default function AdminDashboardPage() {
 
             {view === "analytics" && (
               <>
-                <button onClick={() => void load()} disabled={loading} className="glass-button hidden sm:inline-flex">
+                <button
+                  onClick={() => void load()}
+                  disabled={loading}
+                  className="glass-button"
+                  aria-label="Refresh"
+                >
                   <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-                  Refresh
+                  <span className="hidden min-[400px]:inline">Refresh</span>
                 </button>
                 <button
                   onClick={() => void load("rebuild")}
                   disabled={rebuilding}
-                  className="glass-button hidden md:inline-flex"
+                  className="glass-button"
+                  aria-label="Rebuild"
                   title="Rescan Firestore and rewrite the snapshot"
                 >
                   <Database size={16} />
-                  {rebuilding ? "Rebuilding…" : "Rebuild"}
+                  <span className="hidden min-[400px]:inline">{rebuilding ? "Rebuilding…" : "Rebuild"}</span>
                 </button>
               </>
             )}
@@ -391,38 +338,38 @@ export default function AdminDashboardPage() {
                 <LayoutGrid size={17} />
               </button>
             </div>
-
-          </div>
-        </header>
-
-        <main className="mx-auto max-w-[1900px] space-y-5 px-4 py-6 sm:px-8 lg:px-12">
+          </>
+        }
+      >
           {error && (
             <div className="glass-alert">
-              <AlertTriangle size={18} />
-              <span>
+              <AlertTriangle size={18} className="shrink-0" />
+              <span className="min-w-0 flex-1 break-words">
                 {error}
                 {data && ` · showing the snapshot from ${new Date(data.generatedAt).toLocaleTimeString()}`}
               </span>
-              <button onClick={() => void load()} className="ml-auto underline">
-                Retry
-              </button>
-              <button onClick={() => void load("rebuild")} className="underline">
-                Rebuild
-              </button>
+              <div className="ml-auto flex flex-wrap gap-2">
+                <button onClick={() => void load()} className="glass-button">
+                  Retry
+                </button>
+                <button onClick={() => void load("rebuild")} className="glass-button">
+                  Rebuild
+                </button>
+              </div>
             </div>
           )}
 
           {view === "tiles" ? (
             <>
               <section className="glass-hero">
-                <div>
+                <div className="min-w-0">
                   <p className="eyebrow">LODGE INTERNET · CONTROL CENTRE</p>
                   <h2 className="text-3xl font-semibold sm:text-4xl">Where do you want to go?</h2>
                   <p className="mt-3 max-w-2xl opacity-70">
                     Every section you can reach, with anything waiting for you marked.
                   </p>
                 </div>
-                <div className="text-right text-sm opacity-60">
+                <div className="shrink-0 text-left text-sm opacity-60 sm:text-right">
                   {fmt(attention.total)} items need attention
                   <br />
                   {adminProfile?.username}
@@ -451,7 +398,7 @@ export default function AdminDashboardPage() {
           ) : (
             <>
               <section className="glass-hero">
-                <div>
+                <div className="min-w-0">
                   <p className="eyebrow">LODGE INTERNET · LIVE OPERATIONS</p>
                   <h2 className="text-3xl font-semibold sm:text-5xl">
                     Everything important,
@@ -463,8 +410,15 @@ export default function AdminDashboardPage() {
                     communications and maintenance.
                   </p>
                 </div>
-                <div className="text-right text-sm opacity-60">
+                <div className="shrink-0 text-left text-sm opacity-60 sm:text-right">
                   {data ? `Updated ${new Date(data.generatedAt).toLocaleString()}` : "Preparing metrics"}
+                  {/* Shown as text too: the pill's tooltip never appears on a phone. */}
+                  {data && (
+                    <>
+                      <br />
+                      Snapshot age {data.ageSeconds ?? 0}s
+                    </>
+                  )}
                   <br />
                   {adminProfile?.username}
                 </div>
@@ -472,12 +426,12 @@ export default function AdminDashboardPage() {
 
               {!error && freshness === "stale" && data && (
                 <div className="glass-alert">
-                  <AlertTriangle size={18} />
-                  <span>
+                  <AlertTriangle size={18} className="shrink-0" />
+                  <span className="min-w-0 flex-1 break-words">
                     These figures are {Math.round((data.ageSeconds ?? 0) / 60)} minutes old. A refresh
                     is running in the background.
                   </span>
-                  <button onClick={() => void load("rebuild")} className="ml-auto underline">
+                  <button onClick={() => void load("rebuild")} className="glass-button ml-auto">
                     Rebuild now
                   </button>
                 </div>
@@ -596,8 +550,8 @@ export default function AdminDashboardPage() {
                 <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
                   {(data?.controllers || []).map((controller) => (
                     <Link href="/admin/controllers" key={controller.id} className="glass-controller">
-                      <div className="flex items-center justify-between gap-2">
-                        <b>{controller.name}</b>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <b className="min-w-0 break-words">{controller.name}</b>
                         <span className={controller.lastSync?.status === "error" ? "warning-chip" : "status-chip"}>
                           {controller.lastSync?.status || "No sync"}
                         </span>
@@ -672,8 +626,8 @@ export default function AdminDashboardPage() {
                   <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
                     {salesByController.map((row) => (
                       <div key={row.controllerId} className="glass-controller">
-                        <div className="flex items-center justify-between gap-2">
-                          <b>{row.controllerName}</b>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <b className="min-w-0 break-words">{row.controllerName}</b>
                           <span className="status-chip">{money(row.revenue)}</span>
                         </div>
                         <p className="mt-1 text-sm opacity-60">
@@ -730,16 +684,28 @@ export default function AdminDashboardPage() {
                 {data?.recent?.length ? (
                   <ul className="space-y-2 text-sm">
                     {data.recent.map((event) => (
+                      // On a phone the date sits under the plan, in a short form,
+                      // so the plan text keeps the row's width.
                       <li
                         key={`${event.at}-${event.plan}-${event.amount}`}
                         className="flex items-center justify-between gap-3 rounded-2xl bg-white/60 px-3 py-2"
                       >
-                        <span className="truncate">
-                          {event.plan}
-                          {event.hostel && <span className="opacity-60"> · {event.hostel}</span>}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate">
+                            {event.plan}
+                            {event.hostel && <span className="opacity-60"> · {event.hostel}</span>}
+                          </span>
+                          <span className="block text-xs opacity-50 sm:hidden">
+                            {new Date(event.at).toLocaleString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                              hour: "numeric",
+                              minute: "2-digit",
+                            })}
+                          </span>
                         </span>
                         <span className="shrink-0 font-semibold">{money(event.amount)}</span>
-                        <span className="shrink-0 text-xs opacity-50">
+                        <span className="hidden shrink-0 text-xs opacity-50 sm:inline">
                           {new Date(event.at).toLocaleString()}
                         </span>
                       </li>
@@ -751,9 +717,7 @@ export default function AdminDashboardPage() {
               </Section>
             </>
           )}
-        </main>
-
-      </div>
+      </AdminPage>
     </ProtectedRoute>
   );
 }

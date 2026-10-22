@@ -1,12 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, LogOut, MessageCircle, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { adminFetch } from "@/lib/apiClient";
 import { useAuthStore } from "@/store/authStore";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
-import Logo from "@/components/Logo";
+import {
+  AdminPage,
+  Panel,
+  Kpi,
+  GLASS_INPUT,
+  IconButton,
+  ResponsiveTable,
+  MobileCard,
+  EmptyState,
+  type Column,
+} from "@/components/admin/ui";
 
 /**
  * WhatsApp bot usage, for the super admin: who messages the bot and how much,
@@ -51,21 +60,10 @@ function query(preset: Preset, from: string, to: string): string {
 const formatWhen = (value: string | null) =>
   value ? new Date(value).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
 
-function Card({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
-  return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm">
-      <p className="text-sm text-apple-gray-500">{label}</p>
-      <p className="text-3xl font-bold text-apple-gray-900 mt-2">{value}</p>
-      {hint && <p className="text-xs text-apple-gray-400 mt-1">{hint}</p>}
-    </div>
-  );
-}
-
 function SpreadRow({ title, spread, unit }: { title: string; spread: Spread; unit: string }) {
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm">
-      <p className="text-sm font-semibold text-apple-gray-900 mb-3">{title}</p>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <Panel title={title}>
+      <div className="stat-row">
         {(
           [
             ["Highest", spread.highest],
@@ -74,20 +72,35 @@ function SpreadRow({ title, spread, unit }: { title: string; spread: Spread; uni
             ["Lowest", spread.lowest],
           ] as const
         ).map(([label, value]) => (
-          <div key={label} className="rounded-xl bg-apple-gray-50 p-3">
-            <p className="text-xs text-apple-gray-500">{label}</p>
-            <p className="text-xl font-semibold text-apple-gray-900">
-              {value} <span className="text-xs font-normal text-apple-gray-400">{unit}</span>
+          <div key={label} className="stat min-w-0">
+            <p className="stat-label">{label}</p>
+            <p className="stat-value break-words">
+              {value} <span className="text-xs font-normal text-slate-400">{unit}</span>
             </p>
           </div>
         ))}
       </div>
-    </div>
+    </Panel>
   );
 }
 
+type TopUser = Report["messages"]["topUsers"][number];
+
+const TOP_USER_COLUMNS: Column<TopUser>[] = [
+  { key: "user", header: "User", cell: (u) => <span className="font-mono text-xs break-all">{u.user}</span> },
+  { key: "messages", header: "Messages", align: "right", cell: (u) => u.messages },
+  { key: "days", header: "Days", align: "right", cell: (u) => u.activeDays },
+  {
+    key: "last",
+    header: "Last message",
+    align: "right",
+    className: "whitespace-nowrap text-slate-500",
+    cell: (u) => formatWhen(u.lastAt),
+  },
+];
+
 export default function BotUsagePage() {
-  const { adminProfile, logout } = useAuthStore();
+  const { adminProfile } = useAuthStore();
   const isSuperAdmin = adminProfile?.isSuperAdmin ?? false;
   const [preset, setPreset] = useState<Preset>("30");
   const [from, setFrom] = useState(daysAgo(29));
@@ -122,39 +135,27 @@ export default function BotUsagePage() {
 
   return (
     <ProtectedRoute requireSuperAdmin>
-      <div className="min-h-screen bg-apple-gray-50">
-        <header className="bg-white shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Logo variant="dark" />
-              <div>
-                <h1 className="text-2xl font-bold text-apple-gray-900">Bot Usage</h1>
-                <p className="text-sm text-apple-gray-500">Who messages the WhatsApp bot, and how much</p>
-              </div>
-            </div>
-            <button
-              onClick={() => { logout(); window.location.href = "/admin/login"; }}
-              className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg hover:bg-apple-gray-100"
-            >
-              <LogOut className="w-4 h-4" /> Logout
-            </button>
-          </div>
-        </header>
-
-        <main className="max-w-7xl mx-auto px-4 py-8 space-y-6">
-          <div className="flex items-center justify-between">
-            <Link href="/admin/dashboard" className="flex items-center gap-2 text-sm text-apple-gray-600 hover:text-apple-gray-900">
-              <ArrowLeft className="w-4 h-4" /> Back to dashboard
-            </Link>
-            <MessageCircle className="w-6 h-6 text-green-600" />
-          </div>
-
-          {!isSuperAdmin ? (
-            <div className="bg-white rounded-2xl p-8 text-center text-apple-gray-500">This section is available to the super admin only.</div>
-          ) : (
-            <>
-              {/* Filters */}
-              <div className="bg-white rounded-2xl p-4 shadow-sm flex flex-wrap items-end gap-3">
+      <AdminPage
+        eyebrow="WHATSAPP BOT"
+        title="Bot Usage"
+        subtitle="Who messages the WhatsApp bot, and how much"
+        actions={
+          isSuperAdmin && (
+            <IconButton label="Refresh" onClick={load} disabled={loading}>
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            </IconButton>
+          )
+        }
+      >
+        {!isSuperAdmin ? (
+          <Panel>
+            <EmptyState title="This section is available to the super admin only." />
+          </Panel>
+        ) : (
+          <>
+            {/* Filters */}
+            <Panel>
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
                 <div className="flex flex-wrap gap-2">
                   {(
                     [
@@ -168,126 +169,125 @@ export default function BotUsagePage() {
                     <button
                       key={value}
                       onClick={() => setPreset(value)}
-                      className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-                        preset === value ? "bg-green-600 text-white" : "bg-apple-gray-100 text-apple-gray-700 hover:bg-apple-gray-200"
-                      }`}
+                      aria-pressed={preset === value}
+                      className={
+                        preset === value
+                          ? "inline-flex min-h-[40px] items-center rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm"
+                          : "glass-button"
+                      }
                     >
                       {label}
                     </button>
                   ))}
                 </div>
                 {preset === "custom" && (
-                  <div className="flex flex-wrap items-end gap-2">
-                    <label className="text-xs text-apple-gray-500">
+                  <div className="grid grid-cols-2 items-end gap-2 sm:flex sm:flex-wrap">
+                    <label className="min-w-0 text-xs text-slate-500">
                       From
                       <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)}
-                        className="block mt-1 rounded-lg border border-apple-gray-200 px-2 py-2 text-sm" />
+                        className={`${GLASS_INPUT} mt-1 block sm:w-44`} />
                     </label>
-                    <label className="text-xs text-apple-gray-500">
+                    <label className="min-w-0 text-xs text-slate-500">
                       To
                       <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)}
-                        className="block mt-1 rounded-lg border border-apple-gray-200 px-2 py-2 text-sm" />
+                        className={`${GLASS_INPUT} mt-1 block sm:w-44`} />
                     </label>
-                    <button onClick={load} className="px-4 py-2 rounded-xl bg-green-600 text-white text-sm font-medium hover:bg-green-700">
+                    <button onClick={load} className="glass-primary col-span-2 sm:col-span-1">
                       Apply
                     </button>
                   </div>
                 )}
-                <button onClick={load} disabled={loading} className="ml-auto p-2 rounded-xl bg-apple-gray-100 hover:bg-apple-gray-200 disabled:opacity-50" title="Refresh">
-                  <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-                </button>
               </div>
+            </Panel>
 
-              {error && <div className="bg-red-50 text-red-700 rounded-2xl p-5">{error}</div>}
-              {!report && !error && <div className="bg-white rounded-2xl p-8 text-center text-apple-gray-500">Loading…</div>}
+            {error && <div className="rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-sm text-rose-700 break-words">{error}</div>}
+            {!report && !error && (
+              <Panel>
+                <EmptyState title="Loading…" />
+              </Panel>
+            )}
 
-              {report && m && c && (
-                <>
-                  <p className="text-xs text-apple-gray-500">
-                    {rangeLabel} (UTC).{" "}
-                    {m.recordingSince
-                      ? `Message counts are recorded from ${m.recordingSince}; earlier days show none.`
-                      : "Message counts haven't started yet: they begin once the updated bot is deployed."}
-                  </p>
+            {report && m && c && (
+              <>
+                <p className="text-xs text-slate-500">
+                  {rangeLabel} (UTC).{" "}
+                  {m.recordingSince
+                    ? `Message counts are recorded from ${m.recordingSince}; earlier days show none.`
+                    : "Message counts haven't started yet: they begin once the updated bot is deployed."}
+                </p>
 
-                  {/* Messages */}
-                  <h2 className="text-lg font-semibold text-apple-gray-900">Messages</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <Card label="Active users" value={m.activeUsers} hint="Sent at least one message" />
-                    <Card label="Messages" value={m.messages} />
-                    <Card label="Average users per day" value={m.averageUsersPerDay} hint="Quiet days count as zero" />
-                  </div>
-                  <SpreadRow title="Messages per user" spread={m.perUser} unit="msgs" />
+                {/* Messages */}
+                <h2 className="text-lg font-semibold text-slate-900">Messages</h2>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <Kpi label="Active users" value={m.activeUsers} note="Sent at least one message" tone="green" />
+                  <Kpi label="Messages" value={m.messages} tone="blue" />
+                  <Kpi label="Average users per day" value={m.averageUsersPerDay} note="Quiet days count as zero" tone="teal" />
+                </div>
+                <SpreadRow title="Messages per user" spread={m.perUser} unit="msgs" />
 
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div className="bg-white rounded-2xl p-5 shadow-sm">
-                      <p className="text-sm font-semibold text-apple-gray-900 mb-3">By day</p>
-                      {m.daily.length === 0 ? (
-                        <p className="text-sm text-apple-gray-400">No messages in this range.</p>
-                      ) : (
-                        <div className="space-y-1.5 max-h-96 overflow-y-auto">
-                          {m.daily.map((d) => (
-                            <div key={d.day} className="flex items-center gap-3 text-xs">
-                              <span className="w-20 shrink-0 text-apple-gray-500">{d.day}</span>
-                              <div className="flex-1 h-4 rounded bg-apple-gray-50">
-                                <div className="h-4 rounded bg-green-500" style={{ width: `${(d.messages / busiestDay) * 100}%` }} />
-                              </div>
-                              <span className="w-28 shrink-0 text-right text-apple-gray-700">
-                                {d.users} users · {d.messages} msgs
-                              </span>
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                  <Panel title="By day">
+                    {m.daily.length === 0 ? (
+                      <p className="text-sm text-slate-400">No messages in this range.</p>
+                    ) : (
+                      <div className="space-y-1.5 max-h-96 overflow-y-auto">
+                        {m.daily.map((d) => (
+                          <div key={d.day} className="flex items-center gap-2 text-xs sm:gap-3">
+                            <span className="w-[4.5rem] shrink-0 text-slate-500 sm:w-20">{d.day}</span>
+                            <div className="h-4 min-w-0 flex-1 rounded bg-white/70">
+                              <div className="h-4 rounded bg-emerald-500" style={{ width: `${(d.messages / busiestDay) * 100}%` }} />
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                            <span className="shrink-0 whitespace-nowrap text-right text-slate-700 sm:w-28">
+                              {d.users} users · {d.messages} msgs
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </Panel>
 
-                    <div className="bg-white rounded-2xl p-5 shadow-sm overflow-x-auto">
-                      <p className="text-sm font-semibold text-apple-gray-900 mb-3">Most active users</p>
-                      {m.topUsers.length === 0 ? (
-                        <p className="text-sm text-apple-gray-400">No messages in this range.</p>
-                      ) : (
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="text-left text-xs text-apple-gray-500">
-                              <th className="pb-2">User</th>
-                              <th className="pb-2 text-right">Messages</th>
-                              <th className="pb-2 text-right">Days</th>
-                              <th className="pb-2 text-right">Last message</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-apple-gray-100">
-                            {m.topUsers.map((u) => (
-                              <tr key={`${u.user}-${u.firstAt}`}>
-                                <td className="py-2 font-mono text-xs">{u.user}</td>
-                                <td className="py-2 text-right">{u.messages}</td>
-                                <td className="py-2 text-right">{u.activeDays}</td>
-                                <td className="py-2 text-right text-apple-gray-500">{formatWhen(u.lastAt)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                    </div>
-                  </div>
+                  <Panel title="Most active users" flush>
+                    {m.topUsers.length === 0 ? (
+                      <p className="px-4 pb-6 text-sm text-slate-400 sm:px-7">No messages in this range.</p>
+                    ) : (
+                      <ResponsiveTable
+                        rows={m.topUsers}
+                        columns={TOP_USER_COLUMNS}
+                        rowKey={(u) => `${u.user}-${u.firstAt}`}
+                        renderCard={(u) => (
+                          <MobileCard
+                            title={<span className="font-mono text-xs break-all">{u.user}</span>}
+                            lines={[
+                              { label: "Messages", value: u.messages },
+                              { label: "Days", value: u.activeDays },
+                              { label: "Last message", value: formatWhen(u.lastAt) },
+                            ]}
+                          />
+                        )}
+                      />
+                    )}
+                  </Panel>
+                </div>
 
-                  {/* Checkouts */}
-                  <h2 className="text-lg font-semibold text-apple-gray-900 pt-2">Bot checkouts</h2>
-                  <p className="text-xs text-apple-gray-500 -mt-4">
+                {/* Checkouts */}
+                <div>
+                  <h2 className="pt-2 text-lg font-semibold text-slate-900">Bot checkouts</h2>
+                  <p className="mt-1 text-xs text-slate-500">
                     Purchases started in the bot. These go back to the bot&apos;s launch, so use them for older periods.
                   </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <Card label="Users who started a checkout" value={c.users} />
-                    <Card label="Checkouts" value={c.checkouts} />
-                    <Card label="Completed" value={c.completed}
-                      hint={c.checkouts ? `${Math.round((c.completed / c.checkouts) * 100)}% of checkouts` : undefined} />
-                  </div>
-                  <SpreadRow title="Checkouts per user" spread={c.perUser} unit="checkouts" />
-                </>
-              )}
-            </>
-          )}
-        </main>
-      </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <Kpi label="Users who started a checkout" value={c.users} tone="violet" />
+                  <Kpi label="Checkouts" value={c.checkouts} tone="blue" />
+                  <Kpi label="Completed" value={c.completed} tone="green"
+                    note={c.checkouts ? `${Math.round((c.completed / c.checkouts) * 100)}% of checkouts` : undefined} />
+                </div>
+                <SpreadRow title="Checkouts per user" spread={c.perUser} unit="checkouts" />
+              </>
+            )}
+          </>
+        )}
+      </AdminPage>
     </ProtectedRoute>
   );
 }
