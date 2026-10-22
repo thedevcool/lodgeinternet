@@ -12,6 +12,7 @@ import {
   IconButton,
   Kpi,
   MobileCard,
+  Modal,
   Panel,
   ResponsiveTable,
   SegToggle,
@@ -405,6 +406,13 @@ export default function AdminTransactionsPage() {
   const [resolveError, setResolveError] = useState("");
   const [manualName, setManualName] = useState(false);
   const [subaccountPin, setSubaccountPin] = useState("");
+  // "Forgot PIN?": a new PIN, confirmed with the superadmin's sign-in password.
+  const [pinResetOpen, setPinResetOpen] = useState(false);
+  const [pinResetPassword, setPinResetPassword] = useState("");
+  const [pinResetPin, setPinResetPin] = useState("");
+  const [pinResetError, setPinResetError] = useState("");
+  const [pinResetSaving, setPinResetSaving] = useState(false);
+  const [pinResetDone, setPinResetDone] = useState(false);
   const [reserveActionLoading, setReserveActionLoading] = useState(false);
 
   // ── Partner Payouts view (admin-only) ──────────────────────────────────────
@@ -682,6 +690,32 @@ export default function AdminTransactionsPage() {
       setReserveError(err instanceof Error ? err.message : "Could not create the reserve subaccount");
     } finally {
       setReserveActionLoading(false);
+    }
+  };
+
+  const closePinReset = () => {
+    setPinResetOpen(false);
+    setPinResetPassword("");
+    setPinResetPin("");
+    setPinResetError("");
+  };
+
+  // Replaces a forgotten reserve PIN. The sign-in password stands in for the
+  // old PIN, so an open admin session alone still can't change it.
+  const resetReservePin = async () => {
+    setPinResetSaving(true);
+    setPinResetError("");
+    try {
+      const res = await adminFetch("/api/admin/reserve/pin/reset", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: pinResetPassword, pin: pinResetPin }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not reset the PIN");
+      closePinReset();
+      setPinResetDone(true);
+      await fetchReserve();
+    } catch (err) {
+      setPinResetError(err instanceof Error ? err.message : "Could not reset the PIN");
+    } finally {
+      setPinResetSaving(false);
     }
   };
 
@@ -2677,8 +2711,39 @@ export default function AdminTransactionsPage() {
                         {!reserveState.bank && <p className="text-xs text-amber-700">Save bank details first.</p>}
                       </div>
                     )}
+                    {reserveState.pinConfigured && (
+                      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <button type="button" onClick={() => { setPinResetDone(false); setPinResetOpen(true); }} className="inline-flex min-h-[40px] items-center text-sm font-semibold text-blue-600 hover:text-blue-800">
+                          Forgot PIN?
+                        </button>
+                        {pinResetDone && <span className="text-sm text-emerald-700">New PIN saved.</span>}
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                <Modal
+                  open={pinResetOpen}
+                  onClose={closePinReset}
+                  dismissible={!pinResetSaving}
+                  size="sm"
+                  title="Reset reserve PIN"
+                  footer={
+                    <>
+                      <button type="button" onClick={closePinReset} disabled={pinResetSaving} className="glass-button">Cancel</button>
+                      <button type="button" onClick={resetReservePin} disabled={pinResetSaving || !pinResetPassword || !pinResetPin} className="glass-primary">
+                        {pinResetSaving ? "Saving…" : "Save new PIN"}
+                      </button>
+                    </>
+                  }
+                >
+                  <div className="space-y-3">
+                    <p className="text-sm text-slate-600">Confirm it&apos;s you with the password you sign in with, then choose a new 4–6 digit PIN.</p>
+                    <input className={GLASS_INPUT} type="password" autoComplete="current-password" placeholder="Sign-in password" value={pinResetPassword} onChange={(e) => setPinResetPassword(e.target.value)} />
+                    <input className={GLASS_INPUT} type="password" inputMode="numeric" autoComplete="new-password" placeholder="New 4–6 digit PIN" value={pinResetPin} onChange={(e) => setPinResetPin(e.target.value.replace(/\D/g, "").slice(0, 6))} />
+                    {pinResetError && <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{pinResetError}</p>}
+                  </div>
+                </Modal>
 
                 <Panel flush eyebrow="AUDIT TRAIL" title="Reserve allocations">
                   <ResponsiveTable
