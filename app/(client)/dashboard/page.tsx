@@ -390,7 +390,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Wallet (renders nothing when the wallet is switched off) ────── */}
-      <WalletSection profileHasPhone={profile?.hasPhone} />
+      <WalletSection />
 
       {/* ── Hostel ──────────────────────────────────────────────────────── */}
       <GroupedList header="Your hostel" className="mt-8">

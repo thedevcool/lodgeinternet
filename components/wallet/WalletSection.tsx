@@ -33,7 +33,7 @@ import {
  * they add it. Only if the bank still can't open it does the card top-up
  * appear, with a retry.
  */
-export default function WalletSection({ profileHasPhone }: { profileHasPhone?: boolean }) {
+export default function WalletSection() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [opening, setOpening] = useState(false);
   const [error, setError] = useState("");
@@ -103,7 +103,7 @@ export default function WalletSection({ profileHasPhone }: { profileHasPhone?: b
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const reference = params.get("reference") || params.get("trxref");
-    if (params.get("topup") !== "card" || !reference) return;
+    if (!params.get("topup")?.startsWith("card") || !reference) return;
     window.history.replaceState(null, "", window.location.pathname);
     confirmCardTopup(reference)
       .then((balanceKobo) => {
@@ -116,7 +116,9 @@ export default function WalletSection({ profileHasPhone }: { profileHasPhone?: b
 
   // Either source saying "no phone" is enough to ask (the wallet one also
   // checks that the saved number is a valid Nigerian mobile).
-  const hasPhone = !!wallet && wallet.available && wallet.hasPhone && profileHasPhone !== false;
+  // The wallet's own flag: it is the stricter check (a valid Nigerian mobile)
+  // and, unlike the dashboard profile, it updates the moment a phone is saved.
+  const hasPhone = !!wallet && wallet.available && wallet.hasPhone;
 
   // We have their phone but no account number yet (and no recorded failure):
   // open it now, once, without making them press anything.
@@ -170,6 +172,10 @@ export default function WalletSection({ profileHasPhone }: { profileHasPhone?: b
                 </Button>
                 <CardTopUp />
               </>
+            ) : error ? (
+              <Button variant="tinted" full size="md" onClick={openAccount}>
+                Try again
+              </Button>
             ) : !hasPhone ? (
               <p className="ui-subhead text-ink-2">Add your phone number below to get your own account number for top-ups.</p>
             ) : null}

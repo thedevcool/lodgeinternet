@@ -32,8 +32,12 @@ export default function TransferSheet({
   /** `stillWaiting` is false once the order has failed. */
   onClose: (stillWaiting: boolean) => void;
 }) {
-  const [toTransferKobo, setToTransferKobo] = useState(0);
+  // From the order straight away (not only in the effect), so the first
+  // paint never says "Transfer ₦0".
+  const [toTransferKobo, setToTransferKobo] = useState(order?.toTransferKobo ?? 0);
   const [failure, setFailure] = useState("");
+  // Paid from the wallet; the code is still being issued.
+  const [paid, setPaid] = useState(false);
 
   // Latest onReady without restarting the poll each render.
   const onReadyRef = useRef(onReady);
@@ -44,6 +48,7 @@ export default function TransferSheet({
     if (!order) return;
     setToTransferKobo(order.toTransferKobo);
     setFailure("");
+    setPaid(false);
 
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
@@ -64,6 +69,7 @@ export default function TransferSheet({
           return;
         }
         if (ok && typeof data.toTransferKobo === "number") setToTransferKobo(data.toTransferKobo);
+        if (ok && data.paidFromWallet) setPaid(true);
       } catch {
         // Network blip — try again next tick.
       }
@@ -97,7 +103,9 @@ export default function TransferSheet({
             <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-[16px] bg-accent text-white">
               <Landmark className="h-7 w-7" />
             </span>
-            <h2 className="ui-title-2 mt-4 text-ink">Transfer {naira(toTransferKobo)} to your account</h2>
+            <h2 className="ui-title-2 mt-4 text-ink">
+              {paid ? "Paid — your code is on its way" : <>Transfer {naira(toTransferKobo)} to your account</>}
+            </h2>
             <p className="ui-subhead mx-auto mt-1.5 max-w-xs text-ink-2">
               Send it from any bank app. This account number is yours — it never changes.
             </p>

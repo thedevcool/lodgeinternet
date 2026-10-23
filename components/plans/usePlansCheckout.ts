@@ -306,6 +306,13 @@ export function usePlansCheckout(params: PlansParams) {
   //
   // null = not loaded / signed out / failed to load: only Card shows then.
   const [wallet, setWallet] = useState<Wallet | null>(null);
+  // Until the wallet has loaded, Pay waits: before then the method looks like
+  // Card, and a quick tap would open Paystack for a customer who shouldn't
+  // be offered it.
+  const [walletLoaded, setWalletLoaded] = useState(false);
+  // A wallet/transfer order waiting on re-authentication holds its code;
+  // cancelling the prompt gives it back.
+  const reauthHold = useRef("");
   // What the customer tapped; null = we pick (see payMethod below).
   const [methodChoice, setMethodChoice] = useState<PayMethod | null>(null);
   // A bank-transfer order waiting for the customer's transfer (TransferSheet).
@@ -340,9 +347,11 @@ export function usePlansCheckout(params: PlansParams) {
   const loadWallet = async () => {
     if (!currentUser) {
       setWallet(null);
+      setWalletLoaded(true);
       return;
     }
     setWallet(await fetchWallet());
+    setWalletLoaded(true);
   };
 
   // Clear selected plan if it becomes unavailable
@@ -1391,7 +1400,9 @@ export function usePlansCheckout(params: PlansParams) {
 
     // Purchasing stays on through both prompts; their cancel handlers clear it.
     if (data.code === "SESSION_EXPIRED") {
+      reauthHold.current = order.reservationId || "";
       setPendingAction(() => () => {
+        reauthHold.current = "";
         submitOrder(method, order);
       });
       setShowReAuth(true);
@@ -1569,9 +1580,11 @@ export function usePlansCheckout(params: PlansParams) {
     ? planAvailability[selectedPlan.id]?.available === false
     : false;
   // Paystack only has to be loaded for a card payment.
+  const walletPending = !!currentUser && !walletLoaded;
   const payDisabled =
-    purchasing || !!revealedCode || (payMethod === "card" && !paystackLoaded) || !email || codesNotAvailable;
-  const tvDisabled = purchasing || (payMethod === "card" && !paystackLoaded) || checkingTvMac;
+    purchasing || !!revealedCode || (payMethod === "card" && !paystackLoaded) || !email || codesNotAvailable ||
+    walletPending;
+  const tvDisabled = purchasing || (payMethod === "card" && !paystackLoaded) || checkingTvMac || walletPending;
   const showCodeSheet = processingClaim || !!revealedCode;
 
   const closeTvMac = () => {
@@ -1593,6 +1606,11 @@ export function usePlansCheckout(params: PlansParams) {
     setShowReAuth(false);
     setPendingAction(null);
     setPurchasing(false);
+    if (reauthHold.current) {
+      releaseReservation(reauthHold.current);
+      setActiveReservationId("");
+      reauthHold.current = "";
+    }
   };
 
   return {
