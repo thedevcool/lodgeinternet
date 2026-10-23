@@ -10,6 +10,9 @@ import { apiFetch } from "@/lib/apiClient";
  * `naira()`, never raw.
  */
 
+/** "Point at the wallet": fired by the welcome sheet on the dashboard. */
+export const WALLET_SETUP_EVENT = "lodge:wallet-setup";
+
 export type Dva = { account_number: string; bank_name: string; account_name: string };
 
 export type WalletActivity = {

@@ -17,6 +17,7 @@ import {
   requestDva,
   savePhone,
   startCardTopup,
+  WALLET_SETUP_EVENT,
   type CardTopup,
   type Wallet,
   type WalletActivity,
@@ -38,6 +39,11 @@ export default function WalletSection({ profileHasPhone }: { profileHasPhone?: b
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const autoOpened = useRef(false);
+  // Arrived from the "Meet your wallet" sheet (/dashboard?setup=wallet): the
+  // wallet card and the phone prompt glow for a few seconds so it's obvious
+  // what to tap.
+  const [glow, setGlow] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
   // Bumped by every load and every local change: a load that started
   // earlier is stale when it lands and is dropped, so it can't undo, say, a
   // failure we've just been told about.
@@ -70,6 +76,28 @@ export default function WalletSection({ profileHasPhone }: { profileHasPhone?: b
   };
 
   useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    let timer = 0;
+    const point = () => {
+      setGlow(true);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setGlow(false), 6000);
+    };
+    if (new URLSearchParams(window.location.search).get("setup") === "wallet") {
+      window.history.replaceState(null, "", window.location.pathname);
+      point();
+    }
+    window.addEventListener(WALLET_SETUP_EVENT, point);
+    return () => {
+      window.removeEventListener(WALLET_SETUP_EVENT, point);
+      window.clearTimeout(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (glow && wallet) sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [glow, wallet]);
 
   // Back from Paystack's card page: confirm the top-up, then tidy the URL.
   useEffect(() => {
@@ -110,9 +138,10 @@ export default function WalletSection({ profileHasPhone }: { profileHasPhone?: b
 
   return (
     <>
-      <section className="mt-8">
+      <section ref={sectionRef} className="mt-8 scroll-mt-24">
         <h2 className="ui-footnote mb-2 px-4 font-medium uppercase tracking-[0.04em] text-ink-2">Wallet</h2>
-        <div className="rounded-card bg-surface p-5 shadow-card">
+        <div className="relative rounded-card bg-surface p-5 shadow-card">
+          {glow && <Glow />}
           <p className="ui-subhead flex items-center gap-1.5 text-ink-2">
             <WalletIcon className="h-4 w-4" /> Balance
           </p>
@@ -149,7 +178,7 @@ export default function WalletSection({ profileHasPhone }: { profileHasPhone?: b
           {error && <InlineAlert className="mt-3">{error}</InlineAlert>}
         </div>
 
-        {!hasPhone && <PhonePrompt onSaved={afterPhoneSaved} />}
+        {!hasPhone && <PhonePrompt onSaved={afterPhoneSaved} glow={glow} />}
       </section>
 
       <GroupedList header="Wallet activity" className="mt-8">
@@ -295,8 +324,18 @@ function ActivityRow({ item }: { item: WalletActivity }) {
   );
 }
 
+/** A soft pulsing accent ring around a card, to point at it. */
+function Glow() {
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute -inset-1 animate-pulse rounded-card shadow-[0_0_24px_rgba(37,99,235,0.45)] ring-2 ring-accent"
+    />
+  );
+}
+
 /** "Add your phone number…" with an inline save (PATCH /api/account/phone). */
-function PhonePrompt({ onSaved }: { onSaved: () => void }) {
+function PhonePrompt({ onSaved, glow = false }: { onSaved: () => void; glow?: boolean }) {
   const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -324,8 +363,9 @@ function PhonePrompt({ onSaved }: { onSaved: () => void }) {
         e.preventDefault();
         save();
       }}
-      className="mt-3 rounded-card bg-surface p-5 shadow-card"
+      className="relative mt-3 rounded-card bg-surface p-5 shadow-card"
     >
+      {glow && <Glow />}
       <div className="flex items-start gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] bg-accent/10 text-accent-ink">
           <Smartphone className="h-5 w-5" />
