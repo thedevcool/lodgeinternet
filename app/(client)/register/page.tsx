@@ -548,6 +548,18 @@ function RegisterContent() {
           <Button type="submit" full loading={loading}>
             {loading ? "Creating account..." : "Create Account"}
           </Button>
+          {/* Agreement at sign-up: the moment the customer accepts the terms. */}
+          <p className="ui-footnote text-center text-ink-2">
+            By creating an account you agree to our{" "}
+            <Link href="/legal/terms" className="text-accent-ink underline-offset-2 hover:underline">
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link href="/legal/privacy" className="text-accent-ink underline-offset-2 hover:underline">
+              Privacy Policy
+            </Link>
+            .
+          </p>
         </form>
       )}
 

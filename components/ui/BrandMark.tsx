@@ -36,7 +36,7 @@ export default function BrandMark({ href = "/", compact }: { href?: string; comp
       className="inline-flex items-center gap-2.5 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent"
     >
       <BrandGlyph className="h-8 w-8" />
-      {!compact && <span className="text-[17px] font-semibold tracking-[-0.02em] text-ink">Lodge Internet</span>}
+      {!compact && <span className="brand-name text-[17px] font-semibold tracking-[-0.02em] text-ink">Lodge Internet</span>}
     </Link>
   );
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useEffect, type ReactNode } from "react";
 import { CircleCheck, CreditCard, Landmark, Lock, LogIn, Smartphone, Tv, Wallet, Wifi } from "lucide-react";
 import Button from "@/components/ui/Button";
@@ -238,9 +240,22 @@ function MethodOption({
 
 function SecureNote() {
   return (
-    <p className="ui-footnote flex items-center justify-center gap-1.5 text-ink-2">
-      <Lock className="h-3.5 w-3.5" /> Secure payment
-    </p>
+    <div className="space-y-1 text-center">
+      <p className="ui-footnote flex items-center justify-center gap-1.5 text-ink-2">
+        <Lock className="h-3.5 w-3.5" /> Secure payment
+      </p>
+      <p className="ui-footnote text-ink-3">
+        By paying you agree to our{" "}
+        <Link href="/legal/terms" className="underline-offset-2 hover:underline">
+          Terms
+        </Link>{" "}
+        and{" "}
+        <Link href="/legal/refunds" className="underline-offset-2 hover:underline">
+          Refund & Wallet Policy
+        </Link>
+        .
+      </p>
+    </div>
   );
 }
 

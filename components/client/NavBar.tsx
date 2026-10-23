@@ -62,7 +62,14 @@ export default function NavBar() {
               <span className="truncate">{chrome.back.label ?? "Back"}</span>
             </Link>
           )}
-          <span className={cx(chrome.back && "hidden md:inline-flex")}>
+          {/* On a phone, once the page title fades into the middle of the bar,
+              the brand keeps only its logo — the name would run into the title. */}
+          <span
+            className={cx(
+              chrome.back && "hidden md:inline-flex",
+              chrome.title && largeTitleHidden && "max-md:[&_.brand-name]:hidden",
+            )}
+          >
             <BrandMark />
           </span>
         </div>

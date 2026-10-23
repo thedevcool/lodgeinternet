@@ -2,11 +2,12 @@ import Link from "next/link";
 import { BrandGlyph } from "@/components/ui/BrandMark";
 import { telegramBotUrl } from "@/lib/telegram";
 import { whatsappBotUrl } from "@/lib/whatsapp";
+import { LEGAL_LINKS } from "@/lib/legal";
 import ThemeToggle from "./ThemeToggle";
 
 /**
- * Figma footer columns — but only links to pages that exist (there are no
- * Privacy / Terms / Careers pages, so those are left out).
+ * Figma footer columns — only links to pages that exist. The Legal column's
+ * pages are served by the backend (backend/app/legal, /legal/<slug>).
  */
 export default function Footer() {
   const wa = whatsappBotUrl("Hi Lodge Internet");
@@ -15,8 +16,9 @@ export default function Footer() {
 
   return (
     <footer className="mt-16 border-t border-hairline">
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-4 lg:px-8">
-        <div>
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-6 lg:px-8">
+        {/* Two columns wide: the appearance toggle needs the room. */}
+        <div className="md:col-span-2">
           <div className="flex items-center gap-2.5">
             <BrandGlyph className="h-7 w-7" />
             <span className="ui-headline text-ink">Lodge Internet</span>
@@ -51,6 +53,14 @@ export default function Footer() {
         <FooterColumn title="Account">
           <FooterLink href="/login">Sign in</FooterLink>
           <FooterLink href="/register">Create account</FooterLink>
+        </FooterColumn>
+
+        <FooterColumn title="Legal">
+          {LEGAL_LINKS.map((link) => (
+            <FooterLink key={link.slug} href={`/legal/${link.slug}`}>
+              {link.title}
+            </FooterLink>
+          ))}
         </FooterColumn>
       </div>
     </footer>
