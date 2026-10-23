@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { useAuthStore } from "@/store/authStore";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
 import ConfirmationModal from "@/components/ConfirmationModal";
+import SiteSubaccountCheck from "@/components/admin/SiteSubaccountCheck";
 import {
   AdminPage,
   GLASS_INPUT,
@@ -44,7 +45,9 @@ import {
   Wallet,
   Wifi,
 } from "lucide-react";
-import * as XLSX from "xlsx";
+// The Excel library is loaded only when something is exported (`loadXlsx`),
+// not with the page: it is large and most visits never export.
+const loadXlsx = () => import("xlsx");
 import type { Hostel } from "@/types";
 
 interface DataPurchaseRow {
@@ -1167,6 +1170,7 @@ export default function AdminTransactionsPage() {
             })),
           ]),
     ];
+    const XLSX = await loadXlsx();
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(
       wb,
@@ -1483,12 +1487,13 @@ export default function AdminTransactionsPage() {
     );
   }, [filteredSplits, splitFilterMonth, maintenancePct, paystackPct, getSplitTransactions]);
 
-  const exportSplitLog = (
+  const exportSplitLog = async (
     s: SplitRecord,
     txns: TransactionRow[],
     periodLabel?: string,
   ) => {
     if (txns.length === 0) return;
+    const XLSX = await loadXlsx();
     const mPct = s.maintenancePct ?? maintenancePct;
     const splittablePctExport = 100 - mPct - paystackPct;
     const grossRev = txns.reduce((a, t) => a + t.price, 0);
@@ -1551,8 +1556,9 @@ export default function AdminTransactionsPage() {
     XLSX.writeFile(wb, `split-log-${s.hostel}-${slug}.xlsx`);
   };
 
-  const exportSplitsToExcel = () => {
+  const exportSplitsToExcel = async () => {
     if (filteredSplits.length === 0) return;
+    const XLSX = await loadXlsx();
     const rows = filteredSplits.map((s) => ({
       "Created At": s.createdAt.toLocaleString(),
       Hostel: s.hostel,
@@ -1740,7 +1746,8 @@ export default function AdminTransactionsPage() {
           className={isExpanded ? "!bg-blue-100" : ""}>
           {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </IconButton>
-        {canEdit && (
+        {/* A payout record is evidence of what a partner was owed: superadmins only. */}
+        {canEdit && isSuperAdmin && (
           <IconButton
             label="Delete split"
             tone="danger"
@@ -2744,6 +2751,8 @@ export default function AdminTransactionsPage() {
                     {pinResetError && <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{pinResetError}</p>}
                   </div>
                 </Modal>
+
+                <SiteSubaccountCheck />
 
                 <Panel flush eyebrow="AUDIT TRAIL" title="Reserve allocations">
                   <ResponsiveTable

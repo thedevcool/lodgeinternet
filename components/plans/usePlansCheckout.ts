@@ -25,6 +25,10 @@
  *  5. A reservation is released only in Paystack's onClose.
  *  6. localStorage keys/formats: "lodgeCodes" (the dashboard reads it),
  *     "userEmail", "lodge-payment-return-warning:{uid}".
+ *
+ * Wallet and bank-transfer payments (no Paystack) branch off handlePurchase /
+ * handleTvPayment after the shared gates and live in their own section below
+ * ("Wallet + bank transfer"); none of the rules above apply to them.
  */
 import { apiFetch } from "@/lib/apiClient";
 
@@ -38,6 +42,20 @@ import { planTotal } from "@/lib/pricing";
 import { toHostelSlug } from "@/lib/hostelSlug";
 import type { DataPlan, Hostel } from "@/types";
 import { saveCodeToLocalStorage, type PendingPayment, type PlanView } from "./checkout";
+import {
+  fetchWallet,
+  postJson,
+  type ReadyOrder,
+  type WaitingOrder,
+  type Wallet,
+} from "@/components/wallet/walletApi";
+
+/** How the customer pays: wallet balance, transfer to their own account, or Paystack card. */
+export type PayMethod = "wallet" | "transfer" | "card";
+
+/** What the wallet / bank-transfer endpoints take. Code plans send the
+ * reservation from /api/data-codes/reserve; TV plans may send a MAC. */
+type OrderBody = { planId: string; hostel: string; reservationId?: string; macAddress?: string };
 
 export type PlansParams = { slug: string; hostelSlug?: string };
 
@@ -280,6 +298,52 @@ export function usePlansCheckout(params: PlansParams) {
   }, [hostelReady, selectedHostel]);
 
   const selectedPlan = plans.find((plan) => plan.id === selectedPlanId);
+
+  // ── Wallet + bank transfer ───────────────────────────────────────────────
+  // Two ways to pay besides the Paystack card. Neither opens Paystack, so the
+  // card rules at the top of this file don't apply to them — and the card
+  // flow itself is untouched: every new path branches off BEFORE it.
+  //
+  // null = not loaded / signed out / failed to load: only Card shows then.
+  const [wallet, setWallet] = useState<Wallet | null>(null);
+  // What the customer tapped; null = we pick (see payMethod below).
+  const [methodChoice, setMethodChoice] = useState<PayMethod | null>(null);
+  // A bank-transfer order waiting for the customer's transfer (TransferSheet).
+  const [transferOrder, setTransferOrder] = useState<(WaitingOrder & { planType?: string }) | null>(null);
+  // A PHONE_REQUIRED answer parks the action here; the phone sheet runs it
+  // again once the number is saved. Functional-updater form, as pendingAction.
+  const [phoneRetry, setPhoneRetry] = useState<(() => void) | null>(null);
+
+  const walletOn = Boolean(wallet && wallet.available);
+  const walletBalanceKobo = wallet && wallet.available ? wallet.balanceKobo : 0;
+  const planTotalKobo = selectedPlan ? planTotal(selectedPlan) * 100 : 0;
+  const walletCovers = walletOn && planTotalKobo > 0 && walletBalanceKobo >= planTotalKobo;
+  // Card is offered only when the bank couldn't open the customer's account
+  // number even with their phone (or there's no wallet at all): everyone
+  // else pays by wallet or transfer.
+  const cardOffered = !walletOn || Boolean(wallet && wallet.available && wallet.dvaFailed);
+  // The method actually used. No wallet → Card, exactly as before. Otherwise
+  // the customer's pick, except a wallet that can't cover this plan falls
+  // back to bank transfer (which still counts the balance), and Card only
+  // while it's offered. Untouched, it defaults to Wallet when the balance
+  // covers the plan, else Bank transfer — or Card when the bank couldn't
+  // open the account number (Bank transfer stays there as a retry).
+  const payMethod: PayMethod = !walletOn
+    ? "card"
+    : methodChoice === "wallet" && !walletCovers
+      ? "transfer"
+      : methodChoice === "card" && !cardOffered
+        ? "transfer"
+        : (methodChoice ?? (walletCovers ? "wallet" : cardOffered ? "card" : "transfer"));
+
+  /** (Re)load the wallet — the checkout panel calls this when it mounts. */
+  const loadWallet = async () => {
+    if (!currentUser) {
+      setWallet(null);
+      return;
+    }
+    setWallet(await fetchWallet());
+  };
 
   // Clear selected plan if it becomes unavailable
   useEffect(() => {
@@ -585,6 +649,14 @@ export function usePlansCheckout(params: PlansParams) {
       return;
     }
 
+    // Wallet / bank transfer leave here, after the same gates as card. No
+    // Paystack and no "keep this page open" warning: the code is shown right
+    // here, or emailed when the transfer lands.
+    if (payMethod !== "card") {
+      payCodePlanWithoutCard(payMethod);
+      return;
+    }
+
     if (!paystackLoaded || !window.PaystackPop) {
       setError(
         "Payment system is still loading. Please try again in a moment.",
@@ -731,11 +803,14 @@ export function usePlansCheckout(params: PlansParams) {
   };
 
   // Persist the code to the buyer's device (encrypted), then reveal it on
-  // screen. Shared by the direct claim path and the recovery poll so both
-  // surface the code identically.
-  const revealCode = async (code: string) => {
-    if (code && selectedPlan && currentUser?.uid) {
-      await saveCodeToLocalStorage(code, selectedPlan.name, currentUser.uid);
+  // screen. Shared by the direct claim path, the recovery poll and the
+  // wallet / bank-transfer paths so all surface the code identically.
+  // `planName` is passed by the bank-transfer path, whose code can arrive
+  // after the customer has moved on to another plan.
+  const revealCode = async (code: string, planName?: string) => {
+    const name = planName || selectedPlan?.name;
+    if (code && name && currentUser?.uid) {
+      await saveCodeToLocalStorage(code, name, currentUser.uid);
     }
     // Small settle delay so the "Processing…" state hands off cleanly.
     await new Promise((resolve) => setTimeout(resolve, 700));
@@ -929,6 +1004,13 @@ export function usePlansCheckout(params: PlansParams) {
   };
 
   const handleTvPayment = async (isExisting: boolean, warningAcknowledged = false) => {
+    // Wallet / bank transfer: sign-in, hostel and MAC steps are already done
+    // by handleTvPurchaseStart; only the card part below is skipped.
+    if (payMethod !== "card") {
+      payTvWithoutCard(payMethod);
+      return;
+    }
+
     if (!selectedPlan || !paystackLoaded || !window.PaystackPop) {
       setError("Payment system is not ready. Please try again.");
       return;
@@ -1205,6 +1287,239 @@ export function usePlansCheckout(params: PlansParams) {
     }
   };
 
+  // ── Wallet + bank transfer: paying ───────────────────────────────────────
+  // Both endpoints take the same order and answer the same way, so one
+  // submitOrder() handles them; only the start differs (code plans reserve a
+  // code first, TV plans check the device first).
+
+  /** Device / unlimited: reserve a code exactly as the card flow does, then order. */
+  const payCodePlanWithoutCard = async (method: PayMethod) => {
+    if (!selectedPlan) return;
+    const plan = selectedPlan;
+    setPurchasing(true);
+    setError("");
+    try {
+      // Same reserve call as handlePurchase (kept separate so the card flow
+      // stays byte-for-byte as it was).
+      const reserveRes = await apiFetch("/api/data-codes/reserve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId: plan.id, hostel: selectedHostel }),
+      });
+      const reserveData = await reserveRes.json().catch(() => ({}));
+      fetchPlanAvailability(plan.id);
+      if (!reserveRes.ok) {
+        setError(
+          reserveData?.error ||
+            `Sorry, there are no available codes for ${plan.name} at the moment. Please try another plan or check back later.`,
+        );
+        setPurchasing(false);
+        return;
+      }
+      setActiveReservationId(reserveData.reservationId);
+      await submitOrder(method, { planId: plan.id, hostel: selectedHostel, reservationId: reserveData.reservationId });
+    } catch (err: any) {
+      console.error("Error starting wallet/transfer checkout:", err);
+      setError(err?.message || "Failed to start payment. Please try again.");
+      setPurchasing(false);
+    }
+  };
+
+  /** TV: the same device check the card flow runs before Paystack, then order. */
+  const payTvWithoutCard = async (method: PayMethod) => {
+    if (!selectedPlan) return;
+    setPurchasing(true);
+    setError("");
+    const mac = tvMacAddress.trim();
+    if (mac) {
+      try {
+        const checkRes = await apiFetch("/api/tv/check-device", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ macAddress: mac, hostel: selectedHostel, email }),
+        });
+        const check = await checkRes.json();
+        if (checkRes.ok && check.allowed === false) {
+          setError(check.message || "This device cannot be used for a TV plan right now.");
+          setPurchasing(false);
+          return;
+        }
+        if (checkRes.ok && check.reason === "already_active") {
+          if (!window.confirm(`${check.message}\n\nContinue and extend it?`)) {
+            setPurchasing(false);
+            return;
+          }
+        }
+      } catch {
+        // A failed check is not a refusal; the purchase path checks again.
+      }
+    }
+    await submitOrder(method, { planId: selectedPlan.id, hostel: selectedHostel, ...(mac ? { macAddress: mac } : {}) });
+  };
+
+  /**
+   * Place the order with the wallet (POST /api/wallet/pay) or by bank
+   * transfer (POST /api/checkout/dva) and act on the answer:
+   *   ready             → reveal the code / finish the TV purchase
+   *   waiting + pending → open the "Transfer ₦X" sheet (bank transfer)
+   *   SESSION_EXPIRED   → re-auth, then retry (same as the card claim)
+   *   PHONE_REQUIRED    → ask for a phone number, then retry
+   *   anything else     → give the held code back and say why
+   */
+  const submitOrder = async (method: PayMethod, order: OrderBody) => {
+    const path = method === "wallet" ? "/api/wallet/pay" : "/api/checkout/dva";
+    // An error means no order exists to fill, so the held code goes back.
+    const giveBackCode = () => {
+      if (!order.reservationId) return;
+      releaseReservation(order.reservationId);
+      setActiveReservationId("");
+    };
+
+    let ok = false;
+    let data: any = {};
+    try {
+      ({ ok, data } = await postJson(path, order));
+    } catch {
+      // We can't tell whether the server took the order, so keep the code
+      // held (it expires on its own) rather than risk releasing a paid one.
+      setError(
+        "We couldn't confirm your order. If money left your wallet, your code will appear in your Account and email shortly.",
+      );
+      setPurchasing(false);
+      return;
+    }
+
+    // Purchasing stays on through both prompts; their cancel handlers clear it.
+    if (data.code === "SESSION_EXPIRED") {
+      setPendingAction(() => () => {
+        submitOrder(method, order);
+      });
+      setShowReAuth(true);
+      return;
+    }
+    if (data.code === "PHONE_REQUIRED") {
+      setPhoneRetry(() => () => {
+        submitOrder(method, order);
+      });
+      return;
+    }
+
+    if (ok && data.status === "ready") {
+      await finishOrder(data as ReadyOrder);
+      return;
+    }
+    if (ok && data.status === "waiting" && data.pendingId) {
+      // The order now owns the reservation: it is never released from here,
+      // even if the sheet is closed — the code is issued when money lands.
+      setActiveReservationId("");
+      setTransferOrder({ ...(data as WaitingOrder), planType: selectedPlan?.planType });
+      setPurchasing(false);
+      return;
+    }
+    if (ok && data.status === "waiting") {
+      // Paid from the wallet, but the code isn't issued yet.
+      setActiveReservationId("");
+      setError("Paid from your wallet — your code is being issued and will be emailed and saved to your Account shortly.");
+      setPurchasing(false);
+      return;
+    }
+    if (ok && data.status === "failed") {
+      // The server cancelled the order itself (e.g. sold out); money is in the wallet.
+      setActiveReservationId("");
+      setError(data.message || "This order couldn't be completed. Your money is safe in your wallet.");
+      setPurchasing(false);
+      return;
+    }
+
+    giveBackCode();
+    if (data.code === "WALLET_SHORT") {
+      // Bank transfer counts the balance and asks only for the difference.
+      setMethodChoice("transfer");
+      setError(
+        `${data.error || "Your wallet doesn't have enough for this plan."} Pay by bank transfer instead — what's in your wallet still counts.`,
+      );
+    } else if (data.code === "DVA_UNAVAILABLE") {
+      // The server has recorded the failure; card is offered from now on.
+      setWallet((w) => (w && w.available ? { ...w, dvaFailed: true } : w));
+      setMethodChoice("card");
+      setError(data.error || "Bank transfer isn't available right now. Please pay by card.");
+    } else {
+      setError(data.error || "Couldn't complete your order. Please try again.");
+    }
+    setPurchasing(false);
+  };
+
+  /** A paid order: show the code like a card payment, or finish a TV plan. */
+  const finishOrder = async (ready: ReadyOrder) => {
+    if (typeof ready.balanceKobo === "number") {
+      const balanceKobo = ready.balanceKobo;
+      setWallet((w) => (w && w.available ? { ...w, balanceKobo } : w));
+    }
+
+    if (ready.type === "tv") {
+      // Same ending as a returning customer's card TV purchase: the
+      // dashboard shows the subscription.
+      setPurchasing(false);
+      addToast({
+        type: "success",
+        title: "TV plan paid",
+        message: `${ready.planName} is set up. You'll find it on your Account page.`,
+      });
+      router.push("/dashboard");
+      return;
+    }
+
+    // The same reveal as the card claim: "Processing…" then the code sheet.
+    setProcessingClaim(true);
+    try {
+      await revealCode(ready.code, ready.planName);
+    } finally {
+      setProcessingClaim(false);
+      setPurchasing(false);
+    }
+  };
+
+  // TransferSheet: the transfer arrived and the order is paid.
+  const onTransferReady = (ready: ReadyOrder) => {
+    setTransferOrder(null);
+    finishOrder(ready);
+  };
+
+  // TransferSheet closed. Nothing is cancelled: the order completes (and the
+  // code is emailed) whenever the transfer arrives.
+  const closeTransfer = (stillWaiting: boolean) => {
+    const wasTv = transferOrder?.planType === "tv";
+    setTransferOrder(null);
+    if (stillWaiting) {
+      addToast({
+        type: "info",
+        title: "We'll finish your order",
+        message: wasTv
+          ? "Your TV plan starts when your transfer arrives. Check your Account page."
+          : "We'll email your code when your transfer arrives. It'll be in your Account too.",
+      });
+    }
+    loadWallet();
+  };
+
+  // Phone sheet: number saved → run the parked action again.
+  const phoneSaved = () => {
+    const retry = phoneRetry;
+    setPhoneRetry(null);
+    setWallet((w) => (w && w.available ? { ...w, hasPhone: true } : w));
+    retry?.();
+  };
+
+  // Phone sheet dismissed: no order was made, so give the held code back.
+  const cancelPhone = () => {
+    setPhoneRetry(null);
+    if (activeReservationId) {
+      releaseReservation(activeReservationId);
+      setActiveReservationId("");
+    }
+    setPurchasing(false);
+  };
+
   // ── Derived UI state ─────────────────────────────────────────────────────
   // These lived inline in the old page's JSX; the conditions are unchanged.
 
@@ -1244,9 +1559,10 @@ export function usePlansCheckout(params: PlansParams) {
   const codesNotAvailable = selectedPlan
     ? planAvailability[selectedPlan.id]?.available === false
     : false;
+  // Paystack only has to be loaded for a card payment.
   const payDisabled =
-    purchasing || !!revealedCode || !paystackLoaded || !email || codesNotAvailable;
-  const tvDisabled = purchasing || !paystackLoaded || checkingTvMac;
+    purchasing || !!revealedCode || (payMethod === "card" && !paystackLoaded) || !email || codesNotAvailable;
+  const tvDisabled = purchasing || (payMethod === "card" && !paystackLoaded) || checkingTvMac;
   const showCodeSheet = processingClaim || !!revealedCode;
 
   const closeTvMac = () => {
@@ -1351,6 +1667,22 @@ export function usePlansCheckout(params: PlansParams) {
     showReAuth,
     completeReAuth,
     cancelReAuth,
+    // wallet + bank transfer
+    wallet,
+    walletOn,
+    walletBalanceKobo,
+    walletCovers,
+    cardOffered,
+    planTotalKobo,
+    payMethod,
+    choosePayMethod: setMethodChoice,
+    loadWallet,
+    transferOrder,
+    onTransferReady,
+    closeTransfer,
+    showPhoneSheet: Boolean(phoneRetry),
+    phoneSaved,
+    cancelPhone,
     // support
     supportContacts,
     showSupportModal,

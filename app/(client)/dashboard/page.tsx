@@ -19,6 +19,7 @@ import WhatsAppCard from "@/components/ui/WhatsAppCard";
 import { GroupedList, ListRow } from "@/components/ui/GroupedList";
 import { EmptyState, ListSkeleton, Skeleton } from "@/components/ui/States";
 import { cx } from "@/components/ui/cx";
+import WalletSection from "@/components/wallet/WalletSection";
 
 /**
  * /dashboard — the customer's Account (iOS Settings style).
@@ -64,6 +65,8 @@ interface UserProfile {
   hostelSlug: string;
   collageSlug?: string;
   emailVerified: boolean;
+  /** False when we have no phone number (needed for the wallet's own account). */
+  hasPhone?: boolean;
 }
 
 interface TVSubscription {
@@ -385,6 +388,9 @@ export default function DashboardPage() {
           {profile?.displayName && <p className="ui-subhead truncate text-ink-2">{accountEmail}</p>}
         </div>
       </div>
+
+      {/* ── Wallet (renders nothing when the wallet is switched off) ────── */}
+      <WalletSection profileHasPhone={profile?.hasPhone} />
 
       {/* ── Hostel ──────────────────────────────────────────────────────── */}
       <GroupedList header="Your hostel" className="mt-8">

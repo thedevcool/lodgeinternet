@@ -16,6 +16,8 @@ import { LockedToYourHostel, useMyHostel } from "@/components/client/YourHostel"
 import { usePlansCheckout, type PlansParams } from "./usePlansCheckout";
 import { PlanList, PlanListSkeleton, PlanTypeTabs } from "./PlanPicker";
 import CheckoutPanel, { CheckoutBar } from "./CheckoutPanel";
+import TransferSheet from "@/components/wallet/TransferSheet";
+import PhoneSheet from "@/components/wallet/PhoneSheet";
 import {
   CodeSheet,
   HostelConfirmSheet,
@@ -169,6 +171,9 @@ export default function PlansScreen({ params }: { params: PlansParams }) {
       <TvPasswordSheet c={c} />
       <HostelConfirmSheet c={c} />
       <SupportContactsSheet c={c} />
+      {/* Wallet / bank transfer (state in usePlansCheckout) */}
+      <TransferSheet order={c.transferOrder} onReady={c.onTransferReady} onClose={c.closeTransfer} />
+      <PhoneSheet open={c.showPhoneSheet} onClose={c.cancelPhone} onSaved={() => c.phoneSaved()} />
       {c.showReAuth && <ReAuthModal onSuccess={c.completeReAuth} onCancel={c.cancelReAuth} />}
     </>
   );

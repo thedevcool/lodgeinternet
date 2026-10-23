@@ -3,6 +3,8 @@ import { adminFetch } from "@/lib/apiClient";
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
+import WalletModal from "@/components/admin/WalletModal";
+import { useAuthStore } from "@/store/authStore";
 import {
   AdminPage,
   EmptyState,
@@ -33,6 +35,7 @@ import {
   AlertTriangle,
   Trash2,
   Phone,
+  Wallet,
 } from "lucide-react";
 
 interface UserRow {
@@ -168,6 +171,10 @@ export default function AdminUsersPage() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+
+  // Wallet modal (superadmin only: wallets are money)
+  const isSuperAdmin = useAuthStore((s) => !!s.adminProfile?.isSuperAdmin);
+  const [walletUser, setWalletUser] = useState<UserRow | null>(null);
 
   // History modal
   const [historyUser, setHistoryUser] = useState<UserRow | null>(null);
@@ -590,6 +597,16 @@ export default function AdminUsersPage() {
                         History
                       </button>
 
+                      {isSuperAdmin && (
+                        <button
+                          onClick={() => setWalletUser(user)}
+                          className='glass-button px-3 text-slate-700 hover:text-emerald-700'
+                          title='View and correct this customer’s wallet'>
+                          <Wallet className='w-3.5 h-3.5' />
+                          Wallet
+                        </button>
+                      )}
+
                       {/* Enable / Disable */}
                       <button
                         onClick={() => handleToggle(user, !user.isActive)}
@@ -638,6 +655,10 @@ export default function AdminUsersPage() {
           </p>
         )}
       </AdminPage>
+
+      {walletUser && (
+        <WalletModal userId={walletUser.id} email={walletUser.email} onClose={() => setWalletUser(null)} />
+      )}
 
       {/* ── Payment History Modal ───────────────────────────────────────── */}
       {historyUser &&

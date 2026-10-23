@@ -3443,14 +3443,19 @@ export default function AdminDataCodesPage() {
               <label className="mb-2 block text-sm font-medium text-slate-700">
                 Price (₦)
               </label>
+              {/* Changing what a plan costs is a superadmin's call (the server refuses it otherwise). */}
               <input
                 type="number"
                 value={editPrice}
                 onChange={(e) => setEditPrice(Number(e.target.value))}
-                className="glass-input"
+                className="glass-input disabled:opacity-60"
                 placeholder="0"
                 min={0}
+                disabled={!adminProfile?.isSuperAdmin}
               />
+              {!adminProfile?.isSuperAdmin && (
+                <p className="mt-1 text-xs text-slate-500">Only a superadmin can change a plan&apos;s price.</p>
+              )}
             </div>
 
             {(editingPlan.planType === "device" ||

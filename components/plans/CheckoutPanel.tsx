@@ -1,24 +1,38 @@
 "use client";
 
-import { CircleCheck, CreditCard, Lock, LogIn, Smartphone, Tv, Wifi } from "lucide-react";
+import { useEffect, type ReactNode } from "react";
+import { CircleCheck, CreditCard, Landmark, Lock, LogIn, Smartphone, Tv, Wallet, Wifi } from "lucide-react";
 import Button from "@/components/ui/Button";
 import TextField from "@/components/ui/TextField";
 import InlineAlert from "@/components/ui/InlineAlert";
 import WhatsAppCard from "@/components/ui/WhatsAppCard";
 import { planTotal } from "@/lib/pricing";
 import type { DataPlan } from "@/types";
+import { cx } from "@/components/ui/cx";
+import { naira } from "@/components/wallet/walletApi";
 import { planTypeLine } from "./checkout";
-import type { PlansCheckout } from "./usePlansCheckout";
+import type { PayMethod, PlansCheckout } from "./usePlansCheckout";
 
 /**
- * "Complete your payment" (Figma): order summary, who's paying, the Paystack
- * method row, the Pay button, and the WhatsApp alternative.
+ * "Complete your payment" (Figma): order summary, who's paying, the payment
+ * method (Wallet / Bank transfer / Card — or just the Paystack row when the
+ * wallet is off), the Pay button, and the WhatsApp alternative.
  * Rendered in the desktop sidebar and inside the mobile checkout sheet.
  */
 export default function CheckoutPanel({ c }: { c: PlansCheckout }) {
+  // Fresh balance whenever the panel opens (a top-up may have just landed).
+  const uid = c.currentUser?.uid;
+  useEffect(() => {
+    c.loadWallet();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid]);
+
   const plan = c.selectedPlan;
   if (!plan) return null;
   const isCodePlan = plan.planType === "device" || plan.planType === "unlimited";
+  const total = `₦${planTotal(plan).toLocaleString()}`;
+  // "Loading payment..." only matters when the card (Paystack) is used.
+  const waitingForPaystack = c.payMethod === "card" && !c.paystackLoaded;
 
   return (
     <div className="space-y-4">
@@ -57,24 +71,28 @@ export default function CheckoutPanel({ c }: { c: PlansCheckout }) {
             <InlineAlert title="No codes available for this plan">Please select a different plan or try again later.</InlineAlert>
           )}
 
-          <PaymentMethodRow />
+          <PaymentMethods c={c} />
 
           <Button type="submit" full disabled={c.payDisabled} loading={c.purchasing}>
             {c.codesNotAvailable
               ? "No Codes Available"
-              : !c.paystackLoaded
+              : waitingForPaystack
                 ? "Loading payment..."
                 : c.purchasing
                   ? "Processing..."
-                  : `Pay ₦${planTotal(plan).toLocaleString()}`}
+                  : c.payMethod === "wallet"
+                    ? `Pay ${total} from wallet`
+                    : c.payMethod === "transfer"
+                      ? `Pay ${total} by transfer`
+                      : `Pay ${total}`}
           </Button>
           <SecureNote />
         </form>
       ) : (
         <div className="space-y-4">
-          <PaymentMethodRow />
+          <PaymentMethods c={c} />
           <Button full onClick={() => c.handleTvPurchaseStart()} disabled={c.tvDisabled} loading={c.checkingTvMac}>
-            {!c.paystackLoaded ? "Loading payment..." : c.checkingTvMac ? "Checking your TV..." : "Continue to Purchase"}
+            {waitingForPaystack ? "Loading payment..." : c.checkingTvMac ? "Checking your TV..." : "Continue to Purchase"}
           </Button>
           <SecureNote />
         </div>
@@ -126,6 +144,95 @@ function PaymentMethodRow() {
       </div>
       <CircleCheck className="h-6 w-6 text-accent-ink" fill="currentColor" stroke="rgb(var(--surface))" />
     </div>
+  );
+}
+
+/**
+ * The method picker. With no wallet (signed out, switched off, or not loaded)
+ * it is exactly the old single Paystack row. Otherwise Wallet and Bank
+ * transfer, plus Card only when the bank couldn't open the customer's account
+ * number; the selected one gets the accent ring and the filled check.
+ */
+function PaymentMethods({ c }: { c: PlansCheckout }) {
+  if (!c.walletOn) return <PaymentMethodRow />;
+
+  const shortKobo = Math.max(c.planTotalKobo - c.walletBalanceKobo, 0);
+  // Locked while paying so the method can't change under a running attempt.
+  const pick = (m: PayMethod) => !c.purchasing && c.choosePayMethod(m);
+
+  return (
+    <div role="radiogroup" aria-label="Payment method" className="space-y-2">
+      <MethodOption
+        selected={c.payMethod === "wallet"}
+        // Not enough balance: shown, but can't be picked.
+        disabled={!c.walletCovers}
+        onSelect={() => pick("wallet")}
+        icon={<Wallet className="h-[18px] w-[18px]" />}
+        title={<>Wallet <span className="font-normal text-ink-2">· {naira(c.walletBalanceKobo)}</span></>}
+        subtitle={c.walletCovers ? "Pays instantly from your balance" : `Top up ${naira(shortKobo)} more to use your wallet`}
+      />
+      <MethodOption
+        selected={c.payMethod === "transfer"}
+        onSelect={() => pick("transfer")}
+        icon={<Landmark className="h-[18px] w-[18px]" />}
+        title="Bank transfer"
+        subtitle="Transfer to your own account — no card needed"
+      />
+      {/* Only when the bank couldn't open the customer's account number. */}
+      {c.cardOffered && (
+        <MethodOption
+          selected={c.payMethod === "card"}
+          onSelect={() => pick("card")}
+          icon={<CreditCard className="h-[18px] w-[18px]" />}
+          title="Card"
+          subtitle="Pay securely with Paystack"
+        />
+      )}
+    </div>
+  );
+}
+
+function MethodOption({
+  selected,
+  disabled,
+  onSelect,
+  icon,
+  title,
+  subtitle,
+}: {
+  selected: boolean;
+  disabled?: boolean;
+  onSelect: () => void;
+  icon: ReactNode;
+  title: ReactNode;
+  subtitle: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      aria-disabled={disabled || undefined}
+      onClick={() => !disabled && onSelect()}
+      className={cx(
+        "flex w-full items-center gap-3 rounded-2xl bg-surface px-4 py-3.5 text-left shadow-card ring-1 transition",
+        selected ? "ring-accent/40" : "ring-transparent",
+        disabled && "cursor-not-allowed opacity-60",
+      )}
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-accent/10 text-accent-ink">
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="ui-subhead font-semibold text-ink">{title}</p>
+        <p className="ui-footnote text-ink-2">{subtitle}</p>
+      </div>
+      {selected ? (
+        <CircleCheck className="h-6 w-6 shrink-0 text-accent-ink" fill="currentColor" stroke="rgb(var(--surface))" />
+      ) : (
+        <span aria-hidden className="h-6 w-6 shrink-0 rounded-full ring-[1.5px] ring-inset ring-ink/20" />
+      )}
+    </button>
   );
 }
 

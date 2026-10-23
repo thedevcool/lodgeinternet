@@ -10,6 +10,7 @@ import Link from "next/link";
 import { displayName } from "@/lib/hostelSlug";
 import AuthShell, { AuthFallback } from "@/components/client/AuthShell";
 import TextField from "@/components/ui/TextField";
+import { looksLikePhone } from "@/components/wallet/walletApi";
 import Button from "@/components/ui/Button";
 import Monogram from "@/components/ui/Monogram";
 import Spinner from "@/components/ui/Spinner";
@@ -66,6 +67,9 @@ function RegisterContent() {
   const [selectedHostel, setSelectedHostel] = useState(prefillHostel);
   const [email, setEmail] = useState(prefillEmail);
   const [fullName, setFullName] = useState("");
+  // Optional: lets us open the customer's own bank account for wallet
+  // top-ups right away. The server does the real Nigerian-number check.
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -176,6 +180,13 @@ function RegisterContent() {
       return;
     }
 
+    // Required: the bank needs it to open the customer's own account number,
+    // which is created for them as soon as their email is verified.
+    if (!looksLikePhone(phone)) {
+      setError("Enter a Nigerian mobile number, e.g. 0803 123 4567.");
+      return;
+    }
+
     if (password.length < 6) {
       setError("Password must be at least 6 characters");
       return;
@@ -204,6 +215,9 @@ function RegisterContent() {
           email: email.trim().toLowerCase(),
           hostel: selectedHostel,
           displayName: fullName.trim(),
+          // Sent only when given; a bad one comes back as INVALID_PHONE with
+          // the server's message, shown via the error path below.
+          phone: phone.trim(),
         }),
       });
 
@@ -491,6 +505,17 @@ function RegisterContent() {
             autoComplete="email"
             inputMode="email"
             placeholder="your.email@example.com"
+          />
+          <TextField
+            label="Phone Number"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            required
+            autoComplete="tel"
+            inputMode="tel"
+            placeholder="0803 123 4567"
+            hint="Gets you your own bank account number, so you can pay by transfer without a card."
           />
           <TextField
             label="Password"
