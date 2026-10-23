@@ -1423,6 +1423,15 @@ export function usePlansCheckout(params: PlansParams) {
       setPurchasing(false);
       return;
     }
+    if (data.code === "WALLET_PAID_PENDING") {
+      // The money was taken but the code wasn't issued yet: the order keeps
+      // its code (never given back here) and the server finishes it.
+      setActiveReservationId("");
+      setError(data.error || "Your payment went through — your code will be emailed to you shortly.");
+      setPurchasing(false);
+      loadWallet();
+      return;
+    }
     if (ok && data.status === "failed") {
       // The server cancelled the order itself (e.g. sold out); money is in the wallet.
       setActiveReservationId("");
