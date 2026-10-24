@@ -14,10 +14,12 @@ import Spinner from "./Spinner";
  *   plain  — text-only link-style action
  *   wa     — WhatsApp green
  *   danger — destructive text-only action
+ *   destructive — solid red, for the final "delete" button (fixed red-600 so
+ *                 white text passes 4.5:1 in dark mode too)
  *
  * Every variant/size maps to a full literal class string so Tailwind keeps it.
  */
-type Variant = "filled" | "tinted" | "gray" | "plain" | "wa" | "danger";
+type Variant = "filled" | "tinted" | "gray" | "plain" | "wa" | "danger" | "destructive";
 type Size = "sm" | "md" | "lg";
 
 const VARIANTS: Record<Variant, string> = {
@@ -27,6 +29,7 @@ const VARIANTS: Record<Variant, string> = {
   plain: "bg-transparent text-accent-ink hover:bg-accent/10",
   wa: "bg-wa text-white hover:bg-wa/90",
   danger: "bg-transparent text-danger hover:bg-danger/10",
+  destructive: "bg-red-600 text-white hover:bg-red-600/90",
 };
 
 const SIZES: Record<Size, string> = {

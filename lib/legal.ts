@@ -6,9 +6,17 @@ import { apiUrl } from "@/lib/apiClient";
  * pages arrive fully written — readable by search engines and by Meta's
  * WhatsApp review, which checks the privacy page — and refreshed every 10 min.
  */
-export type LegalBlock = { type: "p"; text: string } | { type: "list"; items: string[] };
+export type LegalBlock = { type: "p"; text: string } | { type: "h"; text: string } | { type: "list"; items: string[] };
 export type LegalSection = { heading: string; blocks: LegalBlock[] };
-export type LegalSummary = { slug: string; title: string; summary: string; updated: string };
+export type LegalSummary = {
+  slug: string;
+  title: string;
+  summary: string;
+  updated: string;
+  /** Only on documents with a formal version (the privacy policy). */
+  effective?: string;
+  version?: string;
+};
 export type LegalDocument = LegalSummary & { company: string; contactEmail: string; sections: LegalSection[] };
 
 const REVALIDATE = { next: { revalidate: 600 } } as const;

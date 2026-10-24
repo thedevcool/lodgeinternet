@@ -9,6 +9,7 @@ import { ButtonLink } from "@/components/ui/Button";
 import { cx } from "@/components/ui/cx";
 import { useChromeState } from "./PageChrome";
 import { useCustomer } from "./CustomerProvider";
+import ProfileMenu from "./ProfileMenu";
 import ThemeToggle from "./ThemeToggle";
 
 /**
@@ -16,6 +17,7 @@ import ThemeToggle from "./ThemeToggle";
  *   Mobile:  brand (or a back chevron on nested pages) · inline title that
  *            fades in when the large title scrolls away · Sign in / avatar.
  *   Desktop: brand · Home, Hostels, Support · Sign in + Get started / Account.
+ *   Signed in, the avatar / Account button opens the ProfileMenu.
  * Transparent at the top of the page; turns to glass with a hairline edge once
  * content scrolls under it (iOS 27 hard scroll edge).
  */
@@ -39,7 +41,6 @@ export default function NavBar() {
   }, []);
 
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
-  const initial = (user?.email?.[0] || "A").toUpperCase();
   // Already on an auth page: a "Sign in" link here would be noise.
   const onAuthPage = /^\/(login|register|forgot-password)/.test(pathname);
 
@@ -108,18 +109,7 @@ export default function NavBar() {
         <div className="flex flex-1 items-center justify-end gap-2 md:flex-none">
           <ThemeToggle className="mr-1 hidden lg:inline-flex" />
           {user ? (
-            <>
-              <Link
-                href="/dashboard"
-                aria-label="Your account"
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/10 text-[15px] font-semibold text-accent-ink md:hidden"
-              >
-                {initial}
-              </Link>
-              <ButtonLink href="/dashboard" variant="gray" size="sm" className="hidden md:inline-flex">
-                Account
-              </ButtonLink>
-            </>
+            <ProfileMenu email={user.email} />
           ) : onAuthPage ? null : (
             <>
               <ButtonLink href="/login" variant="plain" size="sm">

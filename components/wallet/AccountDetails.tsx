@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import Button from "@/components/ui/Button";
+import { cx } from "@/components/ui/cx";
 import type { Dva } from "./walletApi";
 
 /** Small "Copy" button that flips to "Copied" for two seconds. */
@@ -27,10 +28,12 @@ export function CopyButton({ text, label = "Copy" }: { text: string; label?: str
 /**
  * The customer's own bank account: number large (it's what they type into
  * their banking app), then bank and account name.
+ * `panel` is the block's fill from the chosen wallet design (walletDesigns.ts);
+ * the text colours follow the card's tokens.
  */
-export function AccountDetails({ dva }: { dva: Dva }) {
+export function AccountDetails({ dva, panel = "bg-ink/[0.04]" }: { dva: Dva; panel?: string }) {
   return (
-    <div className="rounded-2xl bg-ink/[0.04] px-4 py-3.5">
+    <div className={cx("rounded-2xl px-4 py-3.5", panel)}>
       <p className="ui-footnote text-ink-2">Account number</p>
       <div className="mt-0.5 flex items-center justify-between gap-3">
         <span className="select-all font-mono text-[24px] font-bold tabular-nums tracking-[0.06em] text-ink">

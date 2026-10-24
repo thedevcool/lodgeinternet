@@ -9,6 +9,7 @@ import { GroupedList, ListRow } from "@/components/ui/GroupedList";
 import { EmptyState } from "@/components/ui/States";
 import { cx } from "@/components/ui/cx";
 import { AccountDetails } from "./AccountDetails";
+import { useWalletDesign } from "./walletDesigns";
 import {
   confirmCardTopup,
   fetchWallet,
@@ -48,6 +49,8 @@ export default function WalletSection() {
   // earlier is stale when it lands and is dropped, so it can't undo, say, a
   // failure we've just been told about.
   const version = useRef(0);
+  // Look picked in Settings → Wallet design.
+  const [design] = useWalletDesign();
 
   const load = () => {
     const mine = ++version.current;
@@ -142,7 +145,7 @@ export default function WalletSection() {
     <>
       <section ref={sectionRef} className="mt-8 scroll-mt-24">
         <h2 className="ui-footnote mb-2 px-4 font-medium uppercase tracking-[0.04em] text-ink-2">Wallet</h2>
-        <div className="relative rounded-card bg-surface p-5 shadow-card">
+        <div className={cx("relative rounded-card p-5 shadow-card", design.card)}>
           {glow && <Glow />}
           <p className="ui-subhead flex items-center gap-1.5 text-ink-2">
             <WalletIcon className="h-4 w-4" /> Balance
@@ -155,7 +158,7 @@ export default function WalletSection() {
           <div className="mt-4">
             {wallet.dva ? (
               <>
-                <AccountDetails dva={wallet.dva} />
+                <AccountDetails dva={wallet.dva} panel={design.panel} />
                 <p className="ui-footnote mt-3 text-ink-2">
                   Transfer any amount to this account to top up. Your balance pays for plans instantly.
                 </p>
@@ -213,9 +216,11 @@ function CardTopUp() {
   const [error, setError] = useState("");
   const [ready, setReady] = useState<CardTopup | null>(null);
 
+  // Both views pin --accent back to blue: a coloured wallet design turns it
+  // white inside the card, and these filled buttons have white text.
   if (ready) {
     return (
-      <div className="mt-4 rounded-2xl bg-ink/[0.04] p-4">
+      <div className="mt-4 rounded-2xl bg-ink/[0.04] p-4 [--accent:37_99_235]">
         <dl className="ui-subhead space-y-1 text-ink-2">
           <div className="flex justify-between gap-3">
             <dt>To your wallet</dt>
@@ -264,7 +269,7 @@ function CardTopUp() {
         e.preventDefault();
         start();
       }}
-      className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start"
+      className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start [--accent:37_99_235]"
     >
       <TextField
         label="Top up by card"

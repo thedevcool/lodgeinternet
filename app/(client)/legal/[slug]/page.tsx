@@ -22,7 +22,11 @@ export default async function LegalPage({ params }: { params: { slug: string } }
     <Container className="pb-16">
       <PageHeader
         title={doc.title}
-        subtitle={`Last updated ${formatLegalDate(doc.updated)}`}
+        subtitle={
+          doc.effective
+            ? `Version ${doc.version} · Effective ${formatLegalDate(doc.effective)} · Last updated ${formatLegalDate(doc.updated)}`
+            : `Last updated ${formatLegalDate(doc.updated)}`
+        }
         back={{ href: "/legal", label: "Legal" }}
       />
 
@@ -32,7 +36,11 @@ export default async function LegalPage({ params }: { params: { slug: string } }
             <section key={section.heading} className="mt-8 first:mt-0">
               <h2 className="ui-title-3 text-ink">{section.heading}</h2>
               {section.blocks.map((block, i) =>
-                block.type === "p" ? (
+                block.type === "h" ? (
+                  <h3 key={i} className="ui-headline mt-5 text-ink">
+                    {block.text}
+                  </h3>
+                ) : block.type === "p" ? (
                   <p key={i} className="ui-body mt-3 leading-relaxed text-ink-2">
                     {block.text}
                   </p>
