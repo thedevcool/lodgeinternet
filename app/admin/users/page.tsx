@@ -4,6 +4,7 @@ import { adminFetch } from "@/lib/apiClient";
 import { useEffect, useState, useCallback, useRef } from "react";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
 import WalletModal from "@/components/admin/WalletModal";
+import UsersInsights, { type UsersAnalytics } from "@/components/admin/UsersInsights";
 import { useAuthStore } from "@/store/authStore";
 import {
   AdminPage,
@@ -19,6 +20,7 @@ import {
 import {
   Search,
   Users,
+  BarChart3,
   CheckCircle,
   XCircle,
   Clock,
@@ -183,7 +185,17 @@ export default function AdminUsersPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Tab: "all" | "needs-setup"
-  const [userTab, setUserTab] = useState<"all" | "needs-setup">("all");
+  const [userTab, setUserTab] = useState<"all" | "needs-setup" | "insights">("all");
+
+  // The analytics cards and the Insights tab (backend: admin_users_analytics.py).
+  const [analytics, setAnalytics] = useState<UsersAnalytics | null>(null);
+  const loadAnalytics = useCallback(() => {
+    adminFetch("/api/admin/users/analytics")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setAnalytics(d))
+      .catch(() => {});
+  }, []);
+  useEffect(loadAnalytics, [loadAnalytics]);
 
   // Reminder email state
   const [sendingReminder, setSendingReminder] = useState<string | null>(null); // userId or "bulk"
@@ -427,16 +439,39 @@ export default function AdminUsersPage() {
         eyebrow='USERS'
         title='User Management'
         actions={
-          <IconButton label='Refresh' onClick={loadUsers} disabled={loading}>
+          <IconButton
+            label='Refresh'
+            onClick={() => {
+              loadUsers();
+              loadAnalytics();
+            }}
+            disabled={loading}>
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </IconButton>
         }>
-        {/* Stats Row */}
-        <div className='kpi-grid lg:!grid-cols-4 2xl:!grid-cols-4'>
-          <Kpi label='Total Users' value={totalUsers} tone='blue' />
-          <Kpi label='Active & Verified' value={activeUsers} tone='green' />
-          <Kpi label='Unverified' value={unverifiedUsers} tone='orange' />
-          <Kpi label='Disabled' value={disabledUsers} tone='red' />
+        {/* Analytics cards: 2 across on a phone. */}
+        <div className='kpi-grid grid-cols-2 lg:!grid-cols-3 2xl:!grid-cols-6'>
+          <Kpi label='Total users' value={analytics?.totals.users ?? totalUsers} tone='blue' />
+          <Kpi
+            label='Online now'
+            value={analytics?.onlineNow ?? "—"}
+            tone='green'
+            note={analytics ? `Used the site or bot in the last ${analytics.onlineWindowMinutes} min` : undefined}
+          />
+          <Kpi
+            label='New this month'
+            value={analytics?.totals.newThisMonth ?? "—"}
+            tone='violet'
+            note={analytics ? `${analytics.totals.newLastMonth} last month` : undefined}
+          />
+          <Kpi label='Average a month' value={analytics?.totals.averagePerMonth ?? "—"} tone='teal' note='New users, last 12 months' />
+          <Kpi
+            label='Have bought'
+            value={analytics?.totals.buyers ?? "—"}
+            tone='orange'
+            note={analytics && analytics.totals.users ? `${Math.round((analytics.totals.buyers / analytics.totals.users) * 100)}% of users` : undefined}
+          />
+          <Kpi label='Verified' value={analytics?.totals.verified ?? activeUsers} tone='slate' note={`${unverifiedUsers} unverified · ${disabledUsers} disabled`} />
         </div>
 
         {/* View Tabs */}
@@ -451,9 +486,14 @@ export default function AdminUsersPage() {
               icon: <AlertTriangle className='w-4 h-4' />,
               count: needsSetupUsers.length,
             },
+            { value: "insights", label: "Insights", icon: <BarChart3 className='w-4 h-4' /> },
           ]}
         />
 
+        {userTab === "insights" ? (
+          <UsersInsights data={analytics} />
+        ) : (
+          <>
         {/* Filters */}
         <Panel>
           <div className='flex flex-col gap-3 lg:flex-row lg:items-center'>
@@ -462,7 +502,7 @@ export default function AdminUsersPage() {
               <Search className={GLASS_INPUT_ICON} />
               <input
                 type='text'
-                placeholder='Search by name, email, phone or hostel…'
+                placeholder='Search name, email or phone'
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className={`${GLASS_INPUT} pl-11 pr-11`}
@@ -676,10 +716,10 @@ export default function AdminUsersPage() {
                                   <dd className='text-slate-700'>{fmtDate(user.createdAt)}</dd>
                                 </div>
                               </dl>
-                              <div className='flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end'>
+                              <div className='grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center [&>button]:justify-center'>
                                 {fb && (
                                   <span
-                                    className={`w-full text-xs font-medium lg:w-auto ${fb.type === "success" ? "text-emerald-600" : "text-rose-500"}`}>
+                                    className={`col-span-2 text-xs font-medium sm:w-full ${fb.type === "success" ? "text-emerald-600" : "text-rose-500"}`}>
                                     {fb.text}
                                   </span>
                                 )}
@@ -770,6 +810,8 @@ export default function AdminUsersPage() {
               ? `${needsSetupUsers.length} user${needsSetupUsers.length !== 1 ? "s" : ""} without a hostel`
               : `Showing ${users.length} user${users.length !== 1 ? "s" : ""}${selectedHostel ? ` in ${selectedHostel}` : ""}${search ? ` matching "${search}"` : ""}`}
           </p>
+        )}
+          </>
         )}
       </AdminPage>
 

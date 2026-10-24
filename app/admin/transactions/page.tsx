@@ -2517,7 +2517,7 @@ export default function AdminTransactionsPage() {
                       onClick={() => togglePartner(p.id)}
                       aria-expanded={open}
                       aria-controls={`partner-${p.id}`}
-                      className={`flex w-full flex-wrap items-center justify-between gap-3 p-4 text-left sm:p-5 ${open ? "border-b border-white/70" : ""}`}
+                      className={`flex w-full items-center gap-3 p-4 text-left sm:p-5 ${open ? "border-b border-white/70" : ""}`}
                     >
                       <div className="flex min-w-0 items-center gap-3">
                         <div className="controller-icon shrink-0 !bg-purple-100 !text-purple-600">
@@ -2530,10 +2530,14 @@ export default function AdminTransactionsPage() {
                             {" · "}
                             {p.rows.length === 1 ? "1 hostel" : `${p.rows.length} hostels`}
                           </p>
+                          {/* Phone: the amount is a line of its own, never squeezed beside the name. */}
+                          <p className="mt-1 text-base font-bold text-purple-600 sm:hidden">
+                            You pay ₦{p.totalCut.toLocaleString()}
+                          </p>
                         </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-3">
-                        <div className="text-right">
+                      <div className="ml-auto flex shrink-0 items-center gap-3">
+                        <div className="hidden text-right sm:block">
                           <p className="text-xs text-slate-500">You pay</p>
                           <p className="text-xl font-bold text-purple-600">₦{p.totalCut.toLocaleString()}</p>
                         </div>
@@ -2565,16 +2569,16 @@ export default function AdminTransactionsPage() {
                           { key: "yours", header: "Your share", align: "right", cell: (r) => `₦${r.adminGain.toLocaleString()}` },
                         ]}
                         renderCard={(r) => (
-                          <MobileCard
-                            title={r.name}
-                            aside={<span className="text-purple-600">₦{r.cut.toLocaleString()}</span>}
-                            subtitle="Partner cut"
-                            lines={[
-                              { label: "Revenue", value: `₦${r.gross.toLocaleString()}` },
-                              { label: "Split", value: `${r.pct}%` },
-                              { label: "Your share", value: `₦${r.adminGain.toLocaleString()}` },
-                            ]}
-                          />
+                          // Phone: one compact row per hostel instead of a tall card.
+                          <div className="px-4 py-3">
+                            <div className="flex items-baseline justify-between gap-3">
+                              <p className="min-w-0 truncate font-medium text-slate-900">{r.name}</p>
+                              <p className="shrink-0 font-semibold text-purple-600">₦{r.cut.toLocaleString()}</p>
+                            </div>
+                            <p className="mt-0.5 text-xs text-slate-500">
+                              Revenue ₦{r.gross.toLocaleString()} · {r.pct}% · yours ₦{r.adminGain.toLocaleString()}
+                            </p>
+                          </div>
                         )}
                         footer={{
                           cells: (
@@ -2593,15 +2597,15 @@ export default function AdminTransactionsPage() {
                             </tr>
                           ),
                           card: (
-                            <MobileCard
-                              title="Total"
-                              aside={<span className="text-purple-600">₦{p.totalCut.toLocaleString()}</span>}
-                              subtitle="Partner cut"
-                              lines={[
-                                { label: "Revenue", value: `₦${p.totalGross.toLocaleString()}` },
-                                { label: "Your share", value: `₦${p.adminGain.toLocaleString()}` },
-                              ]}
-                            />
+                            <div className="border-t border-slate-200/70 bg-white/40 px-4 py-3">
+                              <div className="flex items-baseline justify-between gap-3">
+                                <p className="font-semibold text-slate-900">Total</p>
+                                <p className="font-bold text-purple-600">₦{p.totalCut.toLocaleString()}</p>
+                              </div>
+                              <p className="mt-0.5 text-xs text-slate-500">
+                                Revenue ₦{p.totalGross.toLocaleString()} · yours ₦{p.adminGain.toLocaleString()}
+                              </p>
+                            </div>
                           ),
                         }}
                       />
