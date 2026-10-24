@@ -28,13 +28,13 @@ import {
   ShieldOff,
   X,
   History,
+  ChevronDown,
   Tv,
   Wifi,
   Receipt,
   Mail,
   AlertTriangle,
   Trash2,
-  Phone,
   Wallet,
 } from "lucide-react";
 
@@ -50,7 +50,27 @@ interface UserRow {
   createdAt: string | null;
   updatedAt: string | null;
   lastActivityAt: string | null;
+  /** Closed their account and asked to be erased (Refunds & deletions). */
+  deletionRequested?: boolean;
 }
+
+interface Controller {
+  id: string;
+  name: string;
+  memberHostels: string[];
+}
+
+type StatusFilter = "all" | "verified" | "unverified" | "disabled" | "deletion";
+
+const STATUS_FILTERS: { value: StatusFilter; label: string; test: (u: UserRow) => boolean }[] = [
+  { value: "all", label: "All", test: () => true },
+  { value: "verified", label: "Verified", test: (u) => u.emailVerified && u.isActive },
+  { value: "unverified", label: "Unverified", test: (u) => !u.emailVerified },
+  { value: "disabled", label: "Disabled", test: (u) => !u.isActive && !u.deletionRequested },
+  { value: "deletion", label: "Deletion requested", test: (u) => !!u.deletionRequested },
+];
+
+const NO_HOSTEL = "No hostel";
 
 interface Purchase {
   id: string;
@@ -176,6 +196,21 @@ export default function AdminUsersPage() {
   const isSuperAdmin = useAuthStore((s) => !!s.adminProfile?.isSuperAdmin);
   const [walletUser, setWalletUser] = useState<UserRow | null>(null);
 
+  // Filters beyond search + hostel: controller (superadmin; others can't
+  // list controllers) narrows the hostels, and a status chip narrows users.
+  const [controllers, setControllers] = useState<Controller[]>([]);
+  const [selectedController, setSelectedController] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  // Cards open on demand, so a long list stays scannable.
+  const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
+  const toggleUser = (id: string) =>
+    setExpandedUsers((open) => {
+      const next = new Set(open);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
   // History modal
   const [historyUser, setHistoryUser] = useState<UserRow | null>(null);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
@@ -190,6 +225,14 @@ export default function AdminUsersPage() {
       .then((d) => setHostels(d.hostels || []))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    adminFetch("/api/admin/controllers")
+      .then((r) => (r.ok ? r.json() : { controllers: [] }))
+      .then((d) => setControllers(d.controllers || []))
+      .catch(() => {});
+  }, [isSuperAdmin]);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -361,7 +404,22 @@ export default function AdminUsersPage() {
     (u) => !u.hostelId || u.hostelId === "Unknown",
   );
 
-  const listUsers = userTab === "needs-setup" ? needsSetupUsers : users;
+  const controller = controllers.find((c) => c.id === selectedController);
+  // The hostel menu offers only the chosen controller's hostels.
+  const hostelOptions = controller ? hostels.filter((h) => controller.memberHostels.includes(h.name)) : hostels;
+  const statusTest = STATUS_FILTERS.find((f) => f.value === statusFilter)?.test ?? (() => true);
+  const inScope = (u: UserRow) => !controller || selectedHostel !== "" || controller.memberHostels.includes(u.hostelId);
+  const scopedUsers = (userTab === "needs-setup" ? needsSetupUsers : users).filter(inScope);
+  const listUsers = scopedUsers.filter(statusTest);
+
+  // Grouped by hostel (alphabetical, "No hostel" last), each group newest first.
+  const groups = Object.entries(
+    listUsers.reduce<Record<string, UserRow[]>>((acc, u) => {
+      const key = u.hostelId && u.hostelId !== "Unknown" ? u.hostelId : NO_HOSTEL;
+      (acc[key] ||= []).push(u);
+      return acc;
+    }, {}),
+  ).sort(([a], [b]) => (a === NO_HOSTEL ? 1 : b === NO_HOSTEL ? -1 : a.localeCompare(b)));
 
   return (
     <ProtectedRoute module='users'>
@@ -419,35 +477,63 @@ export default function AdminUsersPage() {
               )}
             </div>
 
-            {/* Hostel Tabs — hidden in needs-setup view. One sideways row on
-                a phone, wrapping from sm up. */}
+            {/* Controller → hostel (the hostel list narrows to the controller's). */}
             {userTab === "all" && (
-              <div className='ui-scroll-x -mx-4 px-4 sm:mx-0 sm:overflow-visible sm:px-0'>
-                <div className='flex min-w-max items-center gap-2 sm:min-w-0 sm:flex-wrap'>
+              <div className='flex flex-col gap-3 sm:flex-row lg:shrink-0'>
+                {isSuperAdmin && controllers.length > 0 && (
+                  <select
+                    aria-label='Controller'
+                    value={selectedController}
+                    onChange={(e) => {
+                      setSelectedController(e.target.value);
+                      setSelectedHostel("");
+                    }}
+                    className={`${GLASS_INPUT} sm:w-48`}>
+                    <option value=''>All controllers</option>
+                    {controllers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <select
+                  aria-label='Hostel'
+                  value={selectedHostel}
+                  onChange={(e) => setSelectedHostel(e.target.value)}
+                  className={`${GLASS_INPUT} sm:w-56`}>
+                  <option value=''>{controller ? `All ${controller.name} hostels` : "All hostels"}</option>
+                  {hostelOptions.map((h) => (
+                    <option key={h.id} value={h.name}>
+                      {h.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* Status chips, with how many each would show. */}
+          <div className='ui-scroll-x -mx-4 mt-3 px-4 sm:mx-0 sm:overflow-visible sm:px-0'>
+            <div className='flex min-w-max items-center gap-2 sm:min-w-0 sm:flex-wrap'>
+              {STATUS_FILTERS.map((f) => {
+                const count = scopedUsers.filter(f.test).length;
+                if (f.value === "deletion" && count === 0) return null;
+                return (
                   <button
-                    onClick={() => setSelectedHostel("")}
-                    className={`min-h-[40px] shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
-                      selectedHostel === ""
+                    key={f.value}
+                    type='button'
+                    onClick={() => setStatusFilter(f.value)}
+                    className={`min-h-[36px] shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
+                      statusFilter === f.value
                         ? "bg-slate-900 text-white shadow-sm"
                         : "border border-white/80 bg-white/70 text-slate-600 hover:bg-white"
                     }`}>
-                    All
+                    {f.label} <span className='opacity-60'>{count}</span>
                   </button>
-                  {hostels.map((h) => (
-                    <button
-                      key={h.id}
-                      onClick={() => setSelectedHostel(h.name)}
-                      className={`min-h-[40px] shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
-                        selectedHostel === h.name
-                          ? "bg-slate-900 text-white shadow-sm"
-                          : "border border-white/80 bg-white/70 text-slate-600 hover:bg-white"
-                      }`}>
-                      {h.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+                );
+              })}
+            </div>
           </div>
         </Panel>
 
@@ -497,11 +583,13 @@ export default function AdminUsersPage() {
             <EmptyState
               icon={<Users className='w-12 h-12 text-slate-300' />}
               title={userTab === "needs-setup" ? "All users have a hostel set up" : "No users found"}>
-              {userTab === "all" && (search || selectedHostel) && (
+              {userTab === "all" && (search || selectedHostel || selectedController || statusFilter !== "all") && (
                 <button
                   onClick={() => {
                     setSearch("");
                     setSelectedHostel("");
+                    setSelectedController("");
+                    setStatusFilter("all");
                   }}
                   className='glass-link min-h-[40px]'>
                   Clear filters
@@ -509,140 +597,169 @@ export default function AdminUsersPage() {
               )}
             </EmptyState>
           ) : (
-            <div className='divide-y divide-slate-200/60'>
-              {listUsers.map((user) => {
-                const isBusy = togglingId === user.id || deletingId === user.id;
-                const fb = feedback?.id === user.id ? feedback : null;
-                return (
-                  <div
-                    key={user.id}
-                    className={`flex flex-col gap-3 px-4 py-4 transition hover:bg-white/50 sm:px-7 lg:flex-row lg:items-center lg:justify-between ${!user.isActive ? "opacity-60" : ""}`}>
-                    {/* Left: avatar + info */}
-                    <div className='flex min-w-0 items-start gap-3 lg:items-center'>
-                      <UserInitials name={user.displayName} email={user.email} />
-                      <div className='min-w-0 flex-1'>
-                        <div className='flex flex-wrap items-center gap-2'>
-                          <p className='min-w-0 max-w-full truncate text-sm font-semibold text-slate-900'>
-                            {user.displayName || user.email.split("@")[0]}
-                          </p>
-                          {user.emailVerified ? (
-                            <span className='status-chip inline-flex items-center gap-1 text-xs'>
-                              <CheckCircle className='w-3 h-3' /> Verified
-                            </span>
-                          ) : (
-                            <span className='warning-chip inline-flex items-center gap-1 text-xs'>
-                              <Clock className='w-3 h-3' /> Unverified
-                            </span>
-                          )}
-                          {!user.isActive && (
-                            <span className='glass-red inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold'>
-                              <XCircle className='w-3 h-3' /> Disabled
-                            </span>
-                          )}
-                        </div>
-                        <p className='text-xs text-slate-500 mt-0.5 break-all'>{user.email}</p>
-                        <div className='flex flex-wrap items-center gap-x-3 gap-y-1 mt-1'>
-                          {user.hostelId && (
-                            <span className='inline-flex items-center gap-1 text-xs text-slate-500'>
-                              <Building2 className='w-3 h-3' />
-                              {user.hostelId}
-                            </span>
-                          )}
-                          {user.phone && (
-                            <span className='inline-flex items-center gap-1 text-xs text-slate-500'>
-                              <Phone className='w-3 h-3' />
-                              {user.phone}
-                            </span>
-                          )}
-                          <span className='inline-flex items-center gap-1 text-xs text-slate-400'>
-                            <Clock className='w-3 h-3' />
-                            Last active: {fmtRelative(user.lastActivityAt)}
-                          </span>
-                          <span className='text-xs text-slate-400'>Joined: {fmtDate(user.createdAt)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right: actions — wrap on a phone */}
-                    <div className='flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end'>
-                      {fb && (
-                        <span
-                          className={`w-full text-xs font-medium lg:w-auto ${fb.type === "success" ? "text-emerald-600" : "text-rose-500"}`}>
-                          {fb.text}
-                        </span>
-                      )}
-
-                      {/* Send Registration Reminder (Needs Setup only) */}
-                      {userTab === "needs-setup" && (
-                        <button
-                          onClick={() => sendReminder([user.id])}
-                          disabled={sendingReminder === user.id}
-                          title='Send registration reminder email'
-                          className='glass-button px-3 text-amber-700'>
-                          {sendingReminder === user.id ? (
-                            <div className='w-3.5 h-3.5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin' />
-                          ) : (
-                            <Mail className='w-3.5 h-3.5' />
-                          )}
-                          Send Email
-                        </button>
-                      )}
-
-                      {/* Payment History */}
-                      <button
-                        onClick={() => openHistory(user)}
-                        className='glass-button px-3 text-slate-700 hover:text-blue-600'
-                        title='View payment history'>
-                        <History className='w-3.5 h-3.5' />
-                        History
-                      </button>
-
-                      {isSuperAdmin && (
-                        <button
-                          onClick={() => setWalletUser(user)}
-                          className='glass-button px-3 text-slate-700 hover:text-emerald-700'
-                          title='View and correct this customer’s wallet'>
-                          <Wallet className='w-3.5 h-3.5' />
-                          Wallet
-                        </button>
-                      )}
-
-                      {/* Enable / Disable */}
-                      <button
-                        onClick={() => handleToggle(user, !user.isActive)}
-                        disabled={isBusy}
-                        title={user.isActive ? "Disable account" : "Enable account"}
-                        className={`glass-button px-3 ${user.isActive ? "text-rose-600" : "text-emerald-700"}`}>
-                        {togglingId === user.id ? (
-                          <div className='w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin' />
-                        ) : user.isActive ? (
-                          <ShieldOff className='w-3.5 h-3.5' />
-                        ) : (
-                          <ShieldCheck className='w-3.5 h-3.5' />
-                        )}
-                        {user.isActive ? "Disable" : "Enable"}
-                      </button>
-
-                      {/* Delete */}
-                      <button
-                        onClick={() => {
-                          setDeleteConfirmText("");
-                          setDeleteModal(user);
-                        }}
-                        disabled={isBusy}
-                        title='Delete account and all footprints'
-                        className='glass-danger px-4'>
-                        {deletingId === user.id ? (
-                          <div className='w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin' />
-                        ) : (
-                          <Trash2 className='w-3.5 h-3.5' />
-                        )}
-                        Delete
-                      </button>
-                    </div>
+            <div>
+              {groups.map(([hostel, members]) => (
+                <section key={hostel}>
+                  <div className='flex items-center justify-between gap-3 border-b border-slate-200/60 bg-white/40 px-4 py-2.5 sm:px-7'>
+                    <p className='flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500'>
+                      <Building2 className='h-3.5 w-3.5 shrink-0' />
+                      <span className='truncate'>{hostel}</span>
+                    </p>
+                    <span className='text-xs font-semibold text-slate-400'>{members.length}</span>
                   </div>
-                );
-              })}
+                  <div className='divide-y divide-slate-200/60'>
+                    {members.map((user) => {
+                      const isBusy = togglingId === user.id || deletingId === user.id;
+                      const fb = feedback?.id === user.id ? feedback : null;
+                      const open = expandedUsers.has(user.id);
+                      return (
+                        <div key={user.id} className={!user.isActive ? "opacity-70" : ""}>
+                          {/* Collapsed: who, where and status. Tap for details and actions. */}
+                          <button
+                            type='button'
+                            onClick={() => toggleUser(user.id)}
+                            aria-expanded={open}
+                            className='flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-white/50 sm:px-7'>
+                            <UserInitials name={user.displayName} email={user.email} />
+                            <div className='min-w-0 flex-1'>
+                              <div className='flex flex-wrap items-center gap-2'>
+                                <p className='min-w-0 max-w-full truncate text-sm font-semibold text-slate-900'>
+                                  {user.displayName || user.email.split("@")[0]}
+                                </p>
+                                {user.deletionRequested ? (
+                                  <span className='glass-red inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold'>
+                                    <Trash2 className='w-3 h-3' /> Deletion requested
+                                  </span>
+                                ) : !user.isActive ? (
+                                  <span className='glass-red inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold'>
+                                    <XCircle className='w-3 h-3' /> Disabled
+                                  </span>
+                                ) : user.emailVerified ? (
+                                  <span className='status-chip inline-flex items-center gap-1 text-xs'>
+                                    <CheckCircle className='w-3 h-3' /> Verified
+                                  </span>
+                                ) : (
+                                  <span className='warning-chip inline-flex items-center gap-1 text-xs'>
+                                    <Clock className='w-3 h-3' /> Unverified
+                                  </span>
+                                )}
+                              </div>
+                              <p className='mt-0.5 truncate text-xs text-slate-500'>{user.email}</p>
+                            </div>
+                            <span className='hidden shrink-0 text-xs text-slate-400 sm:inline'>
+                              {fmtRelative(user.lastActivityAt)}
+                            </span>
+                            <ChevronDown
+                              className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+                              aria-hidden
+                            />
+                          </button>
+
+                          {/* Expanded: the details and actions as before. */}
+                          {open && (
+                            <div className='space-y-3 px-4 pb-4 sm:px-7 sm:pl-[4.75rem]'>
+                              <dl className='grid gap-x-6 gap-y-1.5 text-xs sm:grid-cols-2'>
+                                <div className='flex gap-2'>
+                                  <dt className='text-slate-400'>Phone</dt>
+                                  <dd className='text-slate-700'>{user.phone || "—"}</dd>
+                                </div>
+                                <div className='flex gap-2'>
+                                  <dt className='text-slate-400'>Hostel</dt>
+                                  <dd className='text-slate-700'>{user.hostelId || "—"}</dd>
+                                </div>
+                                <div className='flex gap-2'>
+                                  <dt className='text-slate-400'>Last active</dt>
+                                  <dd className='text-slate-700'>{fmtRelative(user.lastActivityAt)}</dd>
+                                </div>
+                                <div className='flex gap-2'>
+                                  <dt className='text-slate-400'>Joined</dt>
+                                  <dd className='text-slate-700'>{fmtDate(user.createdAt)}</dd>
+                                </div>
+                              </dl>
+                              <div className='flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end'>
+                                {fb && (
+                                  <span
+                                    className={`w-full text-xs font-medium lg:w-auto ${fb.type === "success" ? "text-emerald-600" : "text-rose-500"}`}>
+                                    {fb.text}
+                                  </span>
+                                )}
+          
+                                {/* Send Registration Reminder (Needs Setup only) */}
+                                {userTab === "needs-setup" && (
+                                  <button
+                                    onClick={() => sendReminder([user.id])}
+                                    disabled={sendingReminder === user.id}
+                                    title='Send registration reminder email'
+                                    className='glass-button px-3 text-amber-700'>
+                                    {sendingReminder === user.id ? (
+                                      <div className='w-3.5 h-3.5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin' />
+                                    ) : (
+                                      <Mail className='w-3.5 h-3.5' />
+                                    )}
+                                    Send Email
+                                  </button>
+                                )}
+          
+                                {/* Payment History */}
+                                <button
+                                  onClick={() => openHistory(user)}
+                                  className='glass-button px-3 text-slate-700 hover:text-blue-600'
+                                  title='View payment history'>
+                                  <History className='w-3.5 h-3.5' />
+                                  History
+                                </button>
+          
+                                {isSuperAdmin && (
+                                  <button
+                                    onClick={() => setWalletUser(user)}
+                                    className='glass-button px-3 text-slate-700 hover:text-emerald-700'
+                                    title='View and correct this customer’s wallet'>
+                                    <Wallet className='w-3.5 h-3.5' />
+                                    Wallet
+                                  </button>
+                                )}
+          
+                                {/* Enable / Disable */}
+                                <button
+                                  onClick={() => handleToggle(user, !user.isActive)}
+                                  disabled={isBusy}
+                                  title={user.isActive ? "Disable account" : "Enable account"}
+                                  className={`glass-button px-3 ${user.isActive ? "text-rose-600" : "text-emerald-700"}`}>
+                                  {togglingId === user.id ? (
+                                    <div className='w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin' />
+                                  ) : user.isActive ? (
+                                    <ShieldOff className='w-3.5 h-3.5' />
+                                  ) : (
+                                    <ShieldCheck className='w-3.5 h-3.5' />
+                                  )}
+                                  {user.isActive ? "Disable" : "Enable"}
+                                </button>
+          
+                                {/* Delete */}
+                                <button
+                                  onClick={() => {
+                                    setDeleteConfirmText("");
+                                    setDeleteModal(user);
+                                  }}
+                                  disabled={isBusy}
+                                  title='Delete account and all footprints'
+                                  className='glass-danger px-4'>
+                                  {deletingId === user.id ? (
+                                    <div className='w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin' />
+                                  ) : (
+                                    <Trash2 className='w-3.5 h-3.5' />
+                                  )}
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
             </div>
           )}
         </Panel>

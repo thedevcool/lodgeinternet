@@ -421,6 +421,16 @@ export default function AdminTransactionsPage() {
   // ── Partner Payouts view (admin-only) ──────────────────────────────────────
   const [partners, setPartners] = useState<PartnerRow[]>([]);
   // Period scope for the payouts totals: all-time, or a specific YYYY-MM month.
+  // Partner payout cards open on demand: the list stays scannable, one
+  // header per partner, and the hostel table shows when you expand it.
+  const [expandedPartners, setExpandedPartners] = useState<Set<string>>(new Set());
+  const togglePartner = (id: string) =>
+    setExpandedPartners((open) => {
+      const next = new Set(open);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const [payoutMode, setPayoutMode] = useState<"all" | "month">("all");
   const [payoutMonth, setPayoutMonth] = useState<string>(() => {
     const d = new Date();
@@ -2486,9 +2496,29 @@ export default function AdminTransactionsPage() {
               </section>
             ) : (
               <div className="space-y-4">
-                {partnerPayouts.map((p) => (
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="glass-button text-sm"
+                    onClick={() => setExpandedPartners(new Set(partnerPayouts.map((p) => p.id)))}
+                  >
+                    Expand all
+                  </button>
+                  <button type="button" className="glass-button text-sm" onClick={() => setExpandedPartners(new Set())}>
+                    Collapse all
+                  </button>
+                </div>
+                {partnerPayouts.map((p) => {
+                  const open = expandedPartners.has(p.id);
+                  return (
                   <section key={p.id} className="glass-panel !p-0">
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/70 p-4 sm:p-5">
+                    <button
+                      type="button"
+                      onClick={() => togglePartner(p.id)}
+                      aria-expanded={open}
+                      aria-controls={`partner-${p.id}`}
+                      className={`flex w-full flex-wrap items-center justify-between gap-3 p-4 text-left sm:p-5 ${open ? "border-b border-white/70" : ""}`}
+                    >
                       <div className="flex min-w-0 items-center gap-3">
                         <div className="controller-icon shrink-0 !bg-purple-100 !text-purple-600">
                           <Wallet size={18} />
@@ -2497,16 +2527,25 @@ export default function AdminTransactionsPage() {
                           <p className="break-words font-semibold text-slate-900">{p.username}</p>
                           <p className="text-xs text-slate-500">
                             {p.mode === "perHostel" ? "Per-hostel split" : "Same split for all hostels"}
+                            {" · "}
+                            {p.rows.length === 1 ? "1 hostel" : `${p.rows.length} hostels`}
                           </p>
                         </div>
                       </div>
-                      <div className="shrink-0 text-right">
-                        <p className="text-xs text-slate-500">You pay</p>
-                        <p className="text-xl font-bold text-purple-600">₦{p.totalCut.toLocaleString()}</p>
+                      <div className="flex shrink-0 items-center gap-3">
+                        <div className="text-right">
+                          <p className="text-xs text-slate-500">You pay</p>
+                          <p className="text-xl font-bold text-purple-600">₦{p.totalCut.toLocaleString()}</p>
+                        </div>
+                        <ChevronDown
+                          size={18}
+                          className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+                          aria-hidden
+                        />
                       </div>
-                    </div>
+                    </button>
 
-                    {p.rows.length === 0 ? (
+                    {!open ? null : p.rows.length === 0 ? (
                       <div className="p-5 text-sm text-slate-500">No revenue in this period.</div>
                     ) : (
                       <ResponsiveTable
@@ -2568,7 +2607,8 @@ export default function AdminTransactionsPage() {
                       />
                     )}
                   </section>
-                ))}
+                  );
+                })}
               </div>
             )}
           </>
