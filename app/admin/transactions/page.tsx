@@ -141,6 +141,34 @@ interface PartnerRow {
   partnerHostelSplits: Record<string, number>;
 }
 
+/** /api/admin/partner-payouts: what each partner is owed, per hostel. */
+interface PayoutHostelRow {
+  hostelId: string;
+  name: string;
+  gross: number;
+  pct: number;
+  cut: number;
+  adminGain: number;
+  sales: number;
+}
+
+interface PayoutPartner {
+  id: string;
+  username: string;
+  mode: "whole" | "perHostel";
+  rows: PayoutHostelRow[];
+  totalGross: number;
+  totalCut: number;
+  adminGain: number;
+}
+
+interface PayoutsReport {
+  month: string | null;
+  partners: PayoutPartner[];
+  partnerTotal: number;
+  adminTotal: number;
+}
+
 interface ReserveAllocation {
   id: string;
   source: string;
@@ -436,6 +464,9 @@ export default function AdminTransactionsPage() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   });
+  const [payouts, setPayouts] = useState<PayoutsReport | null>(null);
+  const [payoutsLoading, setPayoutsLoading] = useState(false);
+  const [payoutsError, setPayoutsError] = useState("");
 
   // Transaction filters — hostel/controller/planType/paymentSource/date are
   // sent to the backend (it does the filtering; see fetchTransactions), so
@@ -525,13 +556,13 @@ export default function AdminTransactionsPage() {
     }
   }, []);
 
-  // Payouts and Splits are the only tabs that need the complete, unfiltered
-  // ledger — by far the most expensive request in the admin. Fetch it the
-  // first time one of those tabs is opened rather than on every page load.
+  // Splits is the only tab that needs the complete, unfiltered ledger — by
+  // far the most expensive request in the admin. Fetch it the first time the
+  // tab is opened rather than on every page load.
   const allTransactionsLoaded = useRef(false);
   useEffect(() => {
     if (isPartner) return;
-    if (activeTab !== "payouts" && activeTab !== "splits") return;
+    if (activeTab !== "splits") return;
     if (allTransactionsLoaded.current) return;
     allTransactionsLoaded.current = true;
     void fetchAllTransactions();
@@ -1018,70 +1049,40 @@ export default function AdminTransactionsPage() {
     : totalPartnerShareAll;
 
   // ── Partner Payouts (admin-only) ──────────────────────────────────────────
-  // For each partner, sum each of their hostels' FULL revenue over the selected
-  // period, apply their split (whole or per-hostel), and show their cut plus the
-  // admin's kept share (gross − cut). No split records are created.
-  const payoutTransactions = useMemo(() => {
-    if (payoutMode === "all") return allTransactions;
-    return allTransactions.filter((t) => {
-      if (!t.purchasedAt) return false;
-      const d = new Date(t.purchasedAt);
-      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      return ym === payoutMonth;
-    });
-  }, [allTransactions, payoutMode, payoutMonth]);
-
-  const hostelNameById = useMemo(() => {
-    const m: Record<string, string> = {};
-    for (const h of hostels) m[h.id] = h.name;
-    return m;
-  }, [hostels]);
-
-  const grossByHostelName = useMemo(() => {
-    const m: Record<string, number> = {};
-    for (const t of payoutTransactions) {
-      const name = t.hostel ?? "Unknown";
-      m[name] = (m[name] ?? 0) + (t.price || 0);
+  // Worked out by the backend (/api/admin/partner-payouts) by the same rules
+  // as each partner's own page, so the two always agree. It used to be done
+  // here, over the browser's copy of the ledger: inactive hostels went
+  // missing, undelivered and refunded sales counted, and months followed the
+  // browser's clock while the partner's page followed UTC.
+  const fetchPayouts = useCallback(async () => {
+    setPayoutsLoading(true);
+    setPayoutsError("");
+    try {
+      const query = payoutMode === "month" ? `?month=${encodeURIComponent(payoutMonth)}` : "";
+      const res = await adminFetch(`/api/admin/partner-payouts${query}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setPayoutsError(data.error || "Couldn't load partner payouts.");
+        return;
+      }
+      setPayouts(data as PayoutsReport);
+    } catch {
+      setPayoutsError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setPayoutsLoading(false);
     }
-    return m;
-  }, [payoutTransactions]);
+  }, [payoutMode, payoutMonth]);
 
-  const partnerPayouts = useMemo(() => {
-    return partners.map((p) => {
-      // Empty hostels array = all hostels.
-      const scopeIds = p.hostels.length ? p.hostels : hostels.map((h) => h.id);
-      const rows = scopeIds
-        .map((hostelId) => {
-          const name = hostelNameById[hostelId] ?? hostelId;
-          const gross = grossByHostelName[name] ?? 0;
-          const pct =
-            p.partnerSplitMode === "perHostel"
-              ? p.partnerHostelSplits[hostelId] ?? 0
-              : p.partnerSplitPercent;
-          const cut = Math.round((gross * pct) / 100);
-          return { hostelId, name, gross, pct, cut, adminGain: gross - cut };
-        })
-        .filter((r) => r.gross > 0)
-        .sort((a, b) => b.gross - a.gross);
-      const totalGross = rows.reduce((s, r) => s + r.gross, 0);
-      const totalCut = rows.reduce((s, r) => s + r.cut, 0);
-      return {
-        id: p.id,
-        username: p.username,
-        mode: p.partnerSplitMode,
-        rows,
-        totalGross,
-        totalCut,
-        adminGain: totalGross - totalCut,
-      };
-    });
-  }, [partners, hostels, hostelNameById, grossByHostelName]);
+  useEffect(() => {
+    if (isPartner || !isSuperAdmin || activeTab !== "payouts") return;
+    void fetchPayouts();
+  }, [activeTab, isPartner, isSuperAdmin, fetchPayouts]);
 
-  const payoutTotals = useMemo(() => {
-    const partnerTotal = partnerPayouts.reduce((s, p) => s + p.totalCut, 0);
-    const adminTotal = partnerPayouts.reduce((s, p) => s + p.adminGain, 0);
-    return { partnerTotal, adminTotal };
-  }, [partnerPayouts]);
+  const partnerPayouts = payouts?.partners ?? [];
+  const payoutTotals = {
+    partnerTotal: payouts?.partnerTotal ?? 0,
+    adminTotal: payouts?.adminTotal ?? 0,
+  };
 
   const knownHostels = useMemo(() => {
     const names = new Set<string>();
@@ -2189,7 +2190,8 @@ export default function AdminTransactionsPage() {
               label: "Partner Payouts",
               icon: <Wallet size={16} />,
               count: partners.length,
-              hidden: isPartner,
+              // A money page: superadmin only, like Platform Reserve.
+              hidden: isPartner || !isSuperAdmin,
             },
             {
               value: "splits",
@@ -2451,7 +2453,7 @@ export default function AdminTransactionsPage() {
         )}
 
         {/* ── PARTNER PAYOUTS TAB (admin-only) ─────────────────────────── */}
-        {!isPartner && activeTab === "payouts" && (
+        {!isPartner && isSuperAdmin && activeTab === "payouts" && (
           <>
             {/* Period control */}
             <div className="flex flex-wrap items-center gap-3">
@@ -2474,18 +2476,27 @@ export default function AdminTransactionsPage() {
               )}
             </div>
 
+            {payoutsError && (
+              <section className="glass-panel flex flex-wrap items-center justify-between gap-3 text-sm text-red-600">
+                <p>{payoutsError}</p>
+                <button type="button" className="glass-button text-sm" onClick={() => void fetchPayouts()}>
+                  Try again
+                </button>
+              </section>
+            )}
+
             {/* Grand totals */}
             <div className="kpi-grid lg:grid-cols-4">
               <Kpi
                 label="Total to pay partners"
                 tone="purple"
-                value={loading ? "—" : `₦${payoutTotals.partnerTotal.toLocaleString()}`}
+                value={payoutsLoading || !payouts ? "—" : `₦${payoutTotals.partnerTotal.toLocaleString()}`}
                 note={payoutMode === "all" ? "All time" : payoutMonth}
               />
               <Kpi
                 label="Your share from partnered hostels"
                 tone="slate"
-                value={loading ? "—" : `₦${payoutTotals.adminTotal.toLocaleString()}`}
+                value={payoutsLoading || !payouts ? "—" : `₦${payoutTotals.adminTotal.toLocaleString()}`}
               />
             </div>
 
