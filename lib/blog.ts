@@ -44,6 +44,18 @@ export type BlogReviewRow = Omit<BlogSummary, "published" | "updated"> & {
   reviewNote: string | null;
   reviewedBy: string | null;
   reviewedAt: string | null;
+  /** The superadmin has unpublished edits on this post. */
+  edited: boolean;
+  /** The file changed after those edits were made. */
+  draftStale: boolean;
+};
+
+/** One post on the review page: as it would go live (edits applied), what
+ * the editor starts from, and any never-publish rule it breaks. */
+export type BlogReviewPage = BlogReviewRow & {
+  blocks: BlogBlock[];
+  editor: { title: string; summary: string; body: string };
+  problems: string[];
 };
 
 const REVALIDATE = { next: { revalidate: 60 } } as const;

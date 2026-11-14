@@ -61,17 +61,18 @@ export default function BlogReviewDesk() {
     load();
   }, [load]);
 
+  // A post with unpublished edits waits for a yes, wherever it stands.
+  const tabOf = (post: BlogReviewRow): Tab =>
+    post.edited ? "waiting" : (TABS.find((t) => t.statuses.includes(post.status))?.key ?? "waiting");
+
   const counts = useMemo(() => {
     const out: Record<Tab, number> = { waiting: 0, live: 0, rejected: 0 };
-    for (const post of desk?.posts ?? []) {
-      const owner = TABS.find((t) => t.statuses.includes(post.status));
-      if (owner) out[owner.key] += 1;
-    }
+    for (const post of desk?.posts ?? []) out[tabOf(post)] += 1;
     return out;
   }, [desk]);
 
   const shown = (desk?.posts ?? [])
-    .filter((post) => TABS.find((t) => t.key === tab)!.statuses.includes(post.status))
+    .filter((post) => tabOf(post) === tab)
     .sort((a, b) => a.sectionTitle.localeCompare(b.sectionTitle) || a.title.localeCompare(b.title));
 
   return (
@@ -140,6 +141,7 @@ export default function BlogReviewDesk() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <Badge tone={STATUS_BADGE[post.status].tone}>{STATUS_BADGE[post.status].label}</Badge>
+                        {post.edited && <Badge tone="warning">Edited</Badge>}
                         <span className="ui-footnote text-ink-3">{post.sectionTitle}</span>
                       </div>
                       <p className="ui-headline mt-1.5 text-ink">{post.title}</p>
