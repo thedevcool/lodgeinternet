@@ -1,15 +1,34 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BrandGlyph } from "@/components/ui/BrandMark";
 import { telegramBotUrl } from "@/lib/telegram";
 import { whatsappBotUrl } from "@/lib/whatsapp";
 import { LEGAL_LINKS } from "@/lib/legal";
+import { apiFetch } from "@/lib/apiClient";
 import ThemeToggle from "./ThemeToggle";
 
 /**
  * Figma footer columns — only links to pages that exist. The Legal column's
  * pages are served by the backend (backend/app/legal, /legal/<slug>).
  */
+// Whether the blog has a live post, asked once per page load (P7: no link to
+// an empty blog).
+let blogLive: Promise<boolean> | null = null;
+function hasBlogPosts(): Promise<boolean> {
+  blogLive ??= apiFetch("/api/blog")
+    .then((r) => (r.ok ? r.json() : { posts: [] }))
+    .then((d) => (d.posts ?? []).length > 0)
+    .catch(() => false);
+  return blogLive;
+}
+
 export default function Footer() {
+  const [showBlog, setShowBlog] = useState(false);
+  useEffect(() => {
+    hasBlogPosts().then(setShowBlog);
+  }, []);
   const wa = whatsappBotUrl("Hi Lodge Internet");
   const tg = telegramBotUrl("footer");
   const year = new Date().getFullYear();
@@ -34,6 +53,7 @@ export default function Footer() {
         <FooterColumn title="Explore">
           <FooterLink href="/">Home</FooterLink>
           <FooterLink href="/hostels">Hostels</FooterLink>
+          {showBlog && <FooterLink href="/blog">Blog</FooterLink>}
         </FooterColumn>
 
         <FooterColumn title="Support">

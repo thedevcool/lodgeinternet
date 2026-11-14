@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/authStore";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
 import { AdminPage, Panel, Modal, GLASS_INPUT } from "@/components/admin/ui";
+import AppSettingsPanel from "@/components/admin/AppSettingsPanel";
 import {
   Lock,
   Unlock,
@@ -267,6 +268,9 @@ export default function AdminSettingsPage() {
             </>
           )}
         </Panel>
+
+        {/* The mobile app's switches: superadmin only, like the backend route. */}
+        {isSuperAdmin && <AppSettingsPanel />}
       </AdminPage>
 
       {/* ── Confirmation Modal ───────────────────────────────────────── */}

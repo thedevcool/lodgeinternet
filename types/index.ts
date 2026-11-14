@@ -161,6 +161,9 @@ export interface Hostel {
   // nothing sells here and any running TV access has been revoked. Written by
   // POST /api/admin/hostels/status, never by this record's own create/update.
   isActive?: boolean;
+  // The mobile app's map pin. Both or neither.
+  latitude?: number | null;
+  longitude?: number | null;
   createdAt: Date;
   updatedAt: Date;
 }

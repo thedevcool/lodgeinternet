@@ -12,6 +12,7 @@
 import {
   Activity,
   BarChart3,
+  Smartphone,
   HandCoins,
   Building2,
   LineChart,
@@ -66,6 +67,8 @@ export const ADMIN_NAV: AdminNavItem[] = [
     description: "Wallet refunds, and closed accounts waiting to be erased." },
   { label: "Bot Analytics", href: "/admin/bot-analytics", icon: Activity, module: "bot-analytics", superAdminOnly: true,
     description: "WhatsApp checkouts, payment methods and drop-off." },
+  { label: "App", href: "/admin/app", icon: Smartphone, module: "bot-analytics", superAdminOnly: true,
+    description: "App sign-ups, sign-ins and money, and the Cookie jar." },
   { label: "Bot Usage", href: "/admin/bot-usage", icon: MessageCircle, module: "bot-analytics", superAdminOnly: true,
     description: "Who messages the WhatsApp bot, and how much." },
   { label: "TV Users", href: "/admin/tv-users", icon: Tv, module: "tv-users",

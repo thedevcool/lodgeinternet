@@ -1,5 +1,6 @@
 import type { Viewport } from "next";
 import type { ReactNode } from "react";
+import { headers } from "next/headers";
 import { CustomerProvider } from "@/components/client/CustomerProvider";
 import ClientChrome from "@/components/client/ClientChrome";
 import WelcomeSheet from "@/components/client/WelcomeSheet";
@@ -29,6 +30,9 @@ function apiOriginFromEnv(): string {
 
 export default function ClientLayout({ children }: { children: ReactNode }) {
   const apiOrigin = apiOriginFromEnv();
+  // The CSP (middleware.ts) refuses any inline script without this request's
+  // nonce. Read it so the pre-paint theme script below is allowed to run.
+  const nonce = headers().get("x-nonce") ?? undefined;
   return (
     <div className="client-root flex min-h-dvh flex-col">
       {/* Open the connection to the API while the page is still parsing, so the
@@ -40,7 +44,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
         </>
       )}
       {/* Apply a saved Light/Dark choice before first paint (no flash). */}
-      <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       <CustomerProvider>
         <ClientChrome>{children}</ClientChrome>
         <WelcomeSheet />

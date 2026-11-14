@@ -638,8 +638,7 @@ export function usePlansCheckout(params: PlansParams) {
     // Hostel / verification gate
     if (!checkHostelGate("device")) return;
 
-    // Unlimited plans draw from the same code pool as device plans, so both
-    // have to be checked — only TV issues no code.
+    // Unlimited plans draw from the same code pool as device plans, so both have to be checked — only TV issues no code.
     if (selectedPlan.planType !== "tv") {
       const availability = planAvailability[selectedPlan.id];
       if (!availability?.available) {
@@ -697,10 +696,7 @@ export function usePlansCheckout(params: PlansParams) {
     setError("");
 
     try {
-      // Reserve a code atomically before opening Paystack. This guarantees
-      // exclusive access to one code while the user pays — concurrent buyers
-      // racing for the last code will get a clean "no codes" response here
-      // instead of taking each other's code mid-payment.
+      // Reserve a code atomically before opening Paystack. This guarantees exclusive access to one code while the user pays — concurrent buyers racing for the last code will get a clean "no codes" response here instead of taking each other's code mid-payment.
       const reserveRes = await apiFetch("/api/data-codes/reserve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

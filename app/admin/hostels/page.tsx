@@ -22,6 +22,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import type { Hostel, HostelCollage, HostelSchool } from "@/types";
+import HostelAccessPoints from "@/components/admin/HostelAccessPoints";
 
 export default function AdminHostelsPage() {
   const { canWrite, adminProfile } = useAuthStore();
@@ -85,6 +86,9 @@ export default function AdminHostelsPage() {
   const [editPlanTypes, setEditPlanTypes] = useState<string[]>([]);
   const [editDeviceCounts, setEditDeviceCounts] = useState<number[]>([]);
   const [editCollageId, setEditCollageId] = useState("");
+  // The mobile app's map pin, as typed (both empty = no pin).
+  const [editLat, setEditLat] = useState("");
+  const [editLng, setEditLng] = useState("");
   const [saving, setSaving] = useState(false);
 
   // Delete hostel
@@ -174,6 +178,8 @@ export default function AdminHostelsPage() {
         : [3, 5],
     );
     setEditCollageId(hostel.collageId ?? "");
+    setEditLat(typeof hostel.latitude === "number" ? String(hostel.latitude) : "");
+    setEditLng(typeof hostel.longitude === "number" ? String(hostel.longitude) : "");
   };
 
   const cancelEdit = () => {
@@ -202,6 +208,9 @@ export default function AdminHostelsPage() {
           // Only meaningful when device plans are enabled; harmless otherwise.
           deviceUserCounts: editDeviceCounts,
           collageId: editCollageId || undefined,
+          // Both blank clears the pin; the backend checks the numbers.
+          latitude: editLat.trim() ? Number(editLat) : null,
+          longitude: editLng.trim() ? Number(editLng) : null,
         }),
       });
       const data = await res.json();
@@ -1162,6 +1171,19 @@ export default function AdminHostelsPage() {
                           </optgroup>
                         </select>
                       </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-500">
+                          Map pin (for the app)
+                        </label>
+                        <div className="flex gap-2">
+                          <input className={GLASS_INPUT} inputMode="decimal" placeholder="Latitude, e.g. 7.7212"
+                            value={editLat} onChange={(e) => setEditLat(e.target.value)} />
+                          <input className={GLASS_INPUT} inputMode="decimal" placeholder="Longitude, e.g. 5.2481"
+                            value={editLng} onChange={(e) => setEditLng(e.target.value)} />
+                        </div>
+                        <p className="mt-1 text-xs text-slate-400">From Google Maps: press and hold the hostel, copy the two numbers. Leave both blank for no pin.</p>
+                      </div>
+                      <HostelAccessPoints hostel={hostel.name} />
                       <p className="text-xs text-slate-400">
                         {editPlanTypes.length === 0 ||
                         editPlanTypes.length === 3
