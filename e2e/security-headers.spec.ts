@@ -65,6 +65,26 @@ test("the nonce is new on every request, and the scripts on the page carry it", 
   expect(secondNonce).not.toBe(firstNonce);
 });
 
+// The admin console lives outside the customer layout, and its pages are
+// client pages that Next would otherwise build once at deploy time. A page
+// built ahead of time has no nonce on its start-up scripts, the policy blocks
+// them, and the page is blank: that was production on 2026-11-15.
+for (const path of ["/admin/login", "/admin/dashboard"]) {
+  test(`${path}: the admin console's scripts carry the nonce, so the page is not blank`, async ({ page }) => {
+    const response = await page.goto(path);
+    const nonce = /'nonce-([^']+)'/.exec(response!.headers()["content-security-policy"])![1];
+
+    const nonces = await page.locator("script").evaluateAll((scripts) => scripts.map((script) => (script as HTMLScriptElement).nonce));
+    expect(nonces.length).toBeGreaterThan(0);
+    expect(new Set(nonces)).toEqual(new Set([nonce]));
+
+    // Signed out, the dashboard sends the admin to sign in; either way the
+    // sign-in form is what a working console shows here.
+    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+    await expect(page.getByPlaceholder("Enter username")).toBeVisible();
+  });
+}
+
 test.describe("an injected script", () => {
   // The policy refusing it is the point: that refusal must not fail the test.
   test.use({ policyBlocksExpected: true });
