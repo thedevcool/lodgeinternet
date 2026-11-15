@@ -1,0 +1,130 @@
+{
+  "_about": "The customers who exist before a test starts, and the codes the stand-in 'emails'. Every customer signs in with 'password'. amaka has bought before; tunde is brand new; kemi never confirmed her email; bola has an account but no hostel yet. New sign-ups made during a test live only in that test's session. 'tvSubscription' is the TV plan a returning TV customer already has (scenario knob tv: 'returning').",
+  "password": "Lodge-e2e-1",
+  "verificationCode": "424242",
+  "resetCode": "135790",
+  "customers": {
+    "amaka": {
+      "uid": "cus_amaka",
+      "email": "amaka.okafor@example.com",
+      "displayName": "Chiamaka Okafor",
+      "hostelId": "Unity Lodge",
+      "hostelSlug": "unity-lodge",
+      "collageSlug": "unity-estate",
+      "emailVerified": true,
+      "phone": "08031234567",
+      "purchases": [
+        {
+          "id": "pur_1003",
+          "planId": "unity-lodge--20gb-monthly",
+          "planName": "20GB Monthly",
+          "planType": "device",
+          "price": 3350,
+          "paymentRef": "LDG-UNITY-DEV-7K2M9Q",
+          "hostel": "Unity Lodge",
+          "purchasedAt": "2026-11-02T18:24:00Z",
+          "hasCode": true,
+          "deliveryStatus": "delivered",
+          "emailSent": true
+        },
+        {
+          "id": "pur_1002",
+          "planId": "unity-lodge--unlimited-weekly",
+          "planName": "Unlimited Weekly",
+          "planType": "unlimited",
+          "price": 8633,
+          "paymentRef": "LDG-UNITY-UNL-4H8T1C",
+          "hostel": "Unity Lodge",
+          "purchasedAt": "2026-10-20T07:05:00Z",
+          "hasCode": false,
+          "deliveryStatus": "no_stock",
+          "emailSent": false
+        },
+        {
+          "id": "pur_1001",
+          "planId": "unity-lodge--5gb-weekly",
+          "planName": "5GB Weekly",
+          "planType": "device",
+          "price": 1705,
+          "paymentRef": "LDG-UNITY-DEV-2B6X5R",
+          "hostel": "Unity Lodge",
+          "purchasedAt": "2026-10-11T12:40:00Z",
+          "hasCode": true,
+          "deliveryStatus": "delivered",
+          "emailSent": true
+        }
+      ],
+      "purchaseCodes": {
+        "pur_1003": "73915264",
+        "pur_1001": "48213907"
+      },
+      "balances": [
+        {
+          "purchaseId": "pur_1003",
+          "code": "73915264",
+          "planName": "20GB Monthly",
+          "hostel": "Unity Lodge",
+          "status": "active",
+          "dataRemainingGb": 12.4,
+          "dataTotalGb": 20,
+          "dataUsedGb": 7.6,
+          "dataUsedPercent": 38,
+          "daysRemaining": 17,
+          "checkedAt": "2026-11-15T08:00:00Z"
+        }
+      ]
+    },
+    "tunde": {
+      "uid": "cus_tunde",
+      "email": "tunde.adeyemi@example.com",
+      "displayName": "Babatunde Adeyemi",
+      "hostelId": "Palm Court",
+      "hostelSlug": "palm-court",
+      "collageSlug": "palm-grove",
+      "emailVerified": true,
+      "phone": "08059876543",
+      "purchases": [],
+      "purchaseCodes": {},
+      "balances": []
+    },
+    "kemi": {
+      "uid": "cus_kemi",
+      "email": "kemi.balogun@example.com",
+      "displayName": "Oluwakemi Balogun",
+      "hostelId": "Unity Lodge",
+      "hostelSlug": "unity-lodge",
+      "collageSlug": "unity-estate",
+      "emailVerified": false,
+      "phone": "08120001111",
+      "purchases": [],
+      "purchaseCodes": {},
+      "balances": []
+    },
+    "bola": {
+      "uid": "cus_bola",
+      "email": "bola.eze@example.com",
+      "displayName": "Bolanle Eze",
+      "hostelId": "",
+      "hostelSlug": "",
+      "collageSlug": null,
+      "emailVerified": true,
+      "phone": "07061112222",
+      "purchases": [],
+      "purchaseCodes": {},
+      "balances": []
+    }
+  },
+  "tvSubscription": {
+    "id": "tv_0007",
+    "planName": "TV Monthly",
+    "duration": 30,
+    "price": 4370,
+    "hostel": "Unity Lodge",
+    "subscriptionStatus": "active",
+    "expiresAt": "2026-12-10T10:00:00Z",
+    "activatedAt": "2026-11-10T10:00:00Z",
+    "paidAt": "2026-11-10T09:58:00Z",
+    "createdAt": "2026-11-10T09:58:00Z",
+    "hasMacAddress": true
+  }
+}

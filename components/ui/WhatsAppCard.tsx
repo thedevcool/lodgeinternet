@@ -85,7 +85,7 @@ export default function WhatsAppCard({
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-wa px-5 text-[16px] font-semibold text-white transition active:scale-[0.97] hover:bg-wa/90 sm:w-auto"
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-wa px-5 text-[16px] font-semibold text-white transition active:scale-[0.97] hover:bg-wa-hover sm:w-auto"
         >
           <WhatsAppIcon className="h-5 w-5" />
           {cta}
@@ -96,7 +96,7 @@ export default function WhatsAppCard({
             href={tg}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-tg px-5 text-[16px] font-semibold text-white transition active:scale-[0.97] hover:bg-tg/90 sm:w-auto"
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-tg px-5 text-[16px] font-semibold text-white transition active:scale-[0.97] hover:bg-tg-hover sm:w-auto"
           >
             <TelegramIcon className="h-5 w-5" />
             Use Telegram

@@ -47,7 +47,7 @@ export default function Footer() {
             <br />A product of Davo-Nexus Limited.
           </p>
           <p className="ui-footnote mt-5 font-semibold text-ink">Appearance</p>
-          <ThemeToggle withLabels className="mt-2 w-full max-w-[272px]" />
+          <ThemeToggle withLabels className="mt-1.5 w-full max-w-[272px]" />
         </div>
 
         <FooterColumn title="Explore">

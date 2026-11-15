@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { SearchX } from "lucide-react";
+import { Building2, SearchX } from "lucide-react";
 import { displayName } from "@/lib/hostelSlug";
 import { useHostelDirectory } from "@/lib/useHostelDirectory";
 import Container from "@/components/ui/Container";
@@ -74,6 +74,10 @@ function AllHostels() {
         <ListSkeleton rows={6} />
       ) : dir.error ? (
         <ErrorState onRetry={dir.retry} />
+      ) : groups.length === 0 ? (
+        // Nothing to list at all. The search message below ("No hostels
+        // match") would blame a search the visitor never made.
+        <EmptyState icon={<Building2 />} title="No hostels available yet" message="Please contact support." />
       ) : (
         <>
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">

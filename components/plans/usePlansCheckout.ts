@@ -12,16 +12,20 @@
  *
  * Please keep these behaviours exactly as they are:
  *  1. handlePurchase(warningAcknowledged) and handleTvPayment(isExisting, …)
- *     take booleans first. Never pass them a click event
- *     (onClick={handlePurchase}) — the event is truthy and skips the
- *     one-time payment warning. Call them as () => handlePurchase().
+ *     take booleans first. Call them as () => handlePurchase(), never as
+ *     onClick={handlePurchase}. Only the boolean `true` counts as "warning
+ *     acknowledged": a click event handed in by mistake used to be truthy
+ *     and skipped the one-time payment warning.
  *  2. setPendingAction(() => fn) — functional-updater form stores the function.
  *  3. setProcessingClaim(true) runs synchronously in the Paystack callback,
  *     before any await, so the processing sheet appears immediately.
- *  4. /claim and /claim-status read activeReservationId from the render that
- *     opened Paystack (so they send undefined); the server relies on the
- *     Paystack metadata.reservationId. Don't "fix" this with refs/useCallback
- *     without deciding to.
+ *  4. /claim and /claim-status are sent the reservation id as an ARGUMENT
+ *     (handlePaymentSuccess(reference, reservationId)), taken from the same
+ *     run of handlePurchase that opened Paystack. Never read
+ *     activeReservationId inside the Paystack callback: the callback was made
+ *     in the render before the id was set, so it only ever sees "" there
+ *     (which until 2026-11-15 left the held code parked while the server sold
+ *     another from the pool).
  *  5. A reservation is released only in Paystack's onClose.
  *  6. localStorage keys/formats: "lodgeCodes" (the dashboard reads it),
  *     "userEmail", "lodge-payment-return-warning:{uid}".
@@ -29,6 +33,17 @@
  * Wallet and bank-transfer payments (no Paystack) branch off handlePurchase /
  * handleTvPayment after the shared gates and live in their own section below
  * ("Wallet + bank transfer"); none of the rules above apply to them.
+ *
+ * Changed on 2026-11-15, each pinned by a test in
+ * tests/unit/components/plans/usePlansCheckout.test.tsx:
+ *  - a failed plans request is kept (`plansLoadFailed`) so the page can say
+ *    so and offer "Try again", instead of reading as "no plans";
+ *  - Pay goes on to reserve when the stock check itself got no answer (only
+ *    a plan the server said is sold out is refused before reserving);
+ *  - a dropped connection while reserving shows our own message, never the
+ *    browser's "Failed to fetch";
+ *  - a tab tapped while the hostel is still loading is kept (it used to be
+ *    put back on the default tab when the hostel arrived).
  */
 import { apiFetch } from "@/lib/apiClient";
 
@@ -85,6 +100,9 @@ export function usePlansCheckout(params: PlansParams) {
   const [plans, setPlans] = useState<DataPlan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  // The plans request failed (server error or no connection). Not the same
+  // as a hostel with no plans: the page offers "Try again" for this one.
+  const [plansLoadFailed, setPlansLoadFailed] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
   const [showPaymentWarning, setShowPaymentWarning] = useState(false);
   const [pendingPayment, setPendingPayment] = useState<PendingPayment | null>(null);
@@ -195,6 +213,7 @@ export function usePlansCheckout(params: PlansParams) {
     setSelectedHostel("");
     setHostelObj(null);
     setPlans([]);
+    setPlansLoadFailed(false);
     setLoading(true);
 
     if (params.hostelSlug) {
@@ -378,6 +397,9 @@ export function usePlansCheckout(params: PlansParams) {
   };
 
   const fetchPlans = async () => {
+    // Also the "Try again" of the error state: back to the skeleton first.
+    setLoading(true);
+    setPlansLoadFailed(false);
     try {
       const response = await apiFetch(
         `/api/data-plans?hostel=${encodeURIComponent(selectedHostel)}&kind=all`,
@@ -401,6 +423,7 @@ export function usePlansCheckout(params: PlansParams) {
       }
     } catch (err) {
       console.error("Error fetching plans:", err);
+      setPlansLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -490,10 +513,27 @@ export function usePlansCheckout(params: PlansParams) {
   // Open on a tab the hostel actually offers — e.g. if only 5-user device
   // plans are enabled, don't land on the now-hidden "3 Devices" tab. Runs
   // once, after the hostel config loads.
+  //
+  // The tabs are on screen before the hostel has loaded, so a customer can
+  // tap one first. That tap is kept when the hostel offers the tab: this
+  // effect used to put them back on "3 Devices" the moment the hostel arrived.
   const defaultTabPicked = useRef(false);
+  const tabTappedEarly = useRef<{ view: PlanView; deviceCount: number } | null>(null);
   useEffect(() => {
     if (!hostelObj || defaultTabPicked.current) return;
     defaultTabPicked.current = true;
+
+    const tapped = tabTappedEarly.current;
+    if (tapped) {
+      const offered =
+        tapped.view === "device"
+          ? tapped.deviceCount === 5
+            ? allow5Devices
+            : allow3Devices
+          : !hostelPlanTypes?.length || hostelPlanTypes.includes(tapped.view);
+      if (offered) return;
+    }
+
     if (allow3Devices) {
       setPlanView("device");
       setSelectedDeviceCount(3);
@@ -639,9 +679,14 @@ export function usePlansCheckout(params: PlansParams) {
     if (!checkHostelGate("device")) return;
 
     // Unlimited plans draw from the same code pool as device plans, so both have to be checked — only TV issues no code.
+    // Refused here only when the server SAID the plan is sold out. When the
+    // stock check itself got no answer there is no entry for the plan, and
+    // Pay goes on to reserve, which is the real gate: the plan card already
+    // shows such a plan as buyable, and this used to turn the customer away
+    // with "No codes are currently available" without asking the server.
     if (selectedPlan.planType !== "tv") {
       const availability = planAvailability[selectedPlan.id];
-      if (!availability?.available) {
+      if (availability?.available === false) {
         addToast({
           type: "error",
           title: "Plan Not Available",
@@ -682,8 +727,10 @@ export function usePlansCheckout(params: PlansParams) {
       return;
     }
 
+    // `!== true`, not `!warningAcknowledged`: a click event passed in by
+    // mistake is truthy and must not count as "acknowledged" (rule 1).
     if (
-      !warningAcknowledged &&
+      warningAcknowledged !== true &&
       paymentWarningKey &&
       localStorage.getItem(paymentWarningKey) !== "acknowledged"
     ) {
@@ -773,16 +820,18 @@ export function usePlansCheckout(params: PlansParams) {
           // so the user gets visual confirmation before any API call runs.
           // It will morph into the code-reveal state once /claim returns.
           setProcessingClaim(true);
-          handlePaymentSuccess(response.reference);
+          handlePaymentSuccess(response.reference, reservationId);
         },
       });
 
       handler.openIframe();
-    } catch (err: any) {
+    } catch (err) {
+      // Nothing thrown in this block is written for a customer: it is the
+      // browser's "Failed to fetch" (no connection), a body that isn't JSON,
+      // or Paystack's own error. The server's messages are shown above, from
+      // its answer. So the customer gets our words, and the log gets the rest.
       console.error("Error during reserve/payment setup:", err);
-      setError(
-        err?.message || "Failed to start payment. Please try again.",
-      );
+      setError("Failed to start payment. Please try again.");
       setPurchasing(false);
     }
   };
@@ -830,7 +879,7 @@ export function usePlansCheckout(params: PlansParams) {
   // blip, browser closed too early), poll /claim-status until the code is issued
   // — by us, the webhook, or this poll itself — or we learn it's genuinely
   // unfulfilled. The payment is already safe on the server throughout.
-  const recoverCode = async (reference: string) => {
+  const recoverCode = async (reference: string, reservationId: string) => {
     setRecovering(true);
     const MAX_ATTEMPTS = 18; // ~75s total at 4s spacing
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -843,7 +892,7 @@ export function usePlansCheckout(params: PlansParams) {
             paymentRef: reference,
             planId: selectedPlanId,
             hostel: selectedHostel,
-            reservationId: activeReservationId || undefined,
+            reservationId: reservationId || undefined,
           }),
         });
         const data = await res.json().catch(() => ({}));
@@ -871,7 +920,9 @@ export function usePlansCheckout(params: PlansParams) {
     );
   };
 
-  const handlePaymentSuccess = async (reference: string) => {
+  // `reservationId` is the code held for this payment, handed in by the
+  // Paystack callback (rule 4 at the top of this file).
+  const handlePaymentSuccess = async (reference: string, reservationId: string) => {
     try {
       try {
         // Abort a hung claim after 15s so we fall through to recovery rather
@@ -888,7 +939,7 @@ export function usePlansCheckout(params: PlansParams) {
               email: email,
               paymentRef: reference,
               hostel: selectedHostel,
-              reservationId: activeReservationId || undefined,
+              reservationId: reservationId || undefined,
             }),
             signal: controller.signal,
           });
@@ -901,7 +952,7 @@ export function usePlansCheckout(params: PlansParams) {
         // Session too old — re-auth, then retry the claim (unchanged flow).
         if (result.code === "SESSION_EXPIRED") {
           setPendingAction(() => () => {
-            handlePaymentSuccess(reference);
+            handlePaymentSuccess(reference, reservationId);
           });
           setShowReAuth(true);
           return;
@@ -917,7 +968,7 @@ export function usePlansCheckout(params: PlansParams) {
         console.error("Claim failed, entering recovery:", claimErr);
       }
 
-      await recoverCode(reference);
+      await recoverCode(reference, reservationId);
     } finally {
       setPurchasing(false);
       // Cleared on success too (the modal flips to reveal via revealedCode).
@@ -1031,8 +1082,9 @@ export function usePlansCheckout(params: PlansParams) {
       return;
     }
 
+    // `!== true` for the same reason as in handlePurchase (rule 1).
     if (
-      !warningAcknowledged &&
+      warningAcknowledged !== true &&
       paymentWarningKey &&
       localStorage.getItem(paymentWarningKey) !== "acknowledged"
     ) {
@@ -1172,6 +1224,14 @@ export function usePlansCheckout(params: PlansParams) {
       if (result.isNewUser) {
         // Show password creation modal
         setTvPurchaseStep("password");
+      } else if (result.accessGranted === false && result.message) {
+        // Paid, but the TV isn't on the network yet: no MAC address on file,
+        // or the controller refused it. The server says which; show that
+        // before the dashboard, where the customer finishes it.
+        addToast({ type: "warning", title: "Payment received", message: result.message });
+        setTimeout(() => {
+          window.location.href = "/dashboard";
+        }, 4000);
       } else {
         // Redirect to dashboard
         window.location.href = "/dashboard";
@@ -1323,9 +1383,11 @@ export function usePlansCheckout(params: PlansParams) {
       }
       setActiveReservationId(reserveData.reservationId);
       await submitOrder(method, { planId: plan.id, hostel: selectedHostel, reservationId: reserveData.reservationId });
-    } catch (err: any) {
+    } catch (err) {
+      // As in handlePurchase: what is thrown here is the browser's own text
+      // for a dropped connection, never a message for the customer.
       console.error("Error starting wallet/transfer checkout:", err);
-      setError(err?.message || "Failed to start payment. Please try again.");
+      setError("Failed to start payment. Please try again.");
       setPurchasing(false);
     }
   };
@@ -1546,6 +1608,10 @@ export function usePlansCheckout(params: PlansParams) {
 
   // Tab click: switch view (and device count), clear selection and TV step.
   const selectTab = (view: PlanView, deviceCount?: number) => {
+    // Before the hostel has loaded: remembered for the default-tab effect.
+    if (!defaultTabPicked.current) {
+      tabTappedEarly.current = { view, deviceCount: deviceCount ?? selectedDeviceCount };
+    }
     setPlanView(view);
     if (deviceCount !== undefined) setSelectedDeviceCount(deviceCount);
     setSelectedPlanId("");
@@ -1631,6 +1697,8 @@ export function usePlansCheckout(params: PlansParams) {
     planStock,
     loading,
     showLoading,
+    plansLoadFailed,
+    retryPlans: fetchPlans,
     // customer
     currentUser,
     email,

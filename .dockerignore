@@ -1,0 +1,11 @@
+# What stays on the Mac when the working tree is uploaded to the test server
+# (tools/test_server.sh). Vercel builds from git, not from this.
+.git
+node_modules
+.next
+.env*
+coverage
+test-results
+test-results-server
+playwright-report
+blob-report

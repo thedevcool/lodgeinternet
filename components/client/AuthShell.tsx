@@ -7,20 +7,27 @@ import Spinner from "@/components/ui/Spinner";
  * phones get a full-screen large-title form; desktop gets the centred card.
  * `tabs` shows the Log in ⇄ Create account switch (real links, so the URL
  * and back button behave).
+ *
+ * `redirect` is where the visitor was heading (a plans page, when Pay sent
+ * them here). The two tabs carry it across, so switching from "Create
+ * Account" to "Log in" still ends back on that page and not the dashboard.
  */
 export default function AuthShell({
   tabs,
+  redirect,
   icon,
   title,
   subtitle,
   children,
 }: {
   tabs?: "login" | "register";
+  redirect?: string | null;
   icon?: ReactNode;
   title: string;
   subtitle?: ReactNode;
   children: ReactNode;
 }) {
+  const carried = redirect ? `?redirect=${encodeURIComponent(redirect)}` : "";
   return (
     <div className="mx-auto w-full max-w-[460px] px-4 pb-16 pt-2 sm:px-6 md:pt-12">
       <div className="md:rounded-sheet md:bg-surface md:p-8 md:shadow-card">
@@ -29,8 +36,8 @@ export default function AuthShell({
             ariaLabel="Account"
             value={tabs}
             segments={[
-              { value: "login", label: "Log in", href: "/login" },
-              { value: "register", label: "Create Account", href: "/register" },
+              { value: "login", label: "Log in", href: `/login${carried}` },
+              { value: "register", label: "Create Account", href: `/register${carried}` },
             ]}
             className="mb-7"
           />

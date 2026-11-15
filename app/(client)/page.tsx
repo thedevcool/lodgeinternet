@@ -25,6 +25,10 @@ import type { Hostel } from "@/types";
  * Home — "find your hostel" first (hero → search → locations), then the
  * Figma marketing sections. Signed-in customers with a verified profile see
  * only their own hostel, exactly as before.
+ *
+ * A school or location with no hostel to buy from is left out of the list
+ * and the search (standard P7: what isn't live doesn't appear). It used to
+ * be listed with a "Coming soon" label.
  */
 
 /** A row in the locations list: a school, a location, or a standalone hostel. */
@@ -34,7 +38,6 @@ type Entry = {
   name: string;
   href: string;
   subtitle: string;
-  empty?: boolean; // location with no hostels yet
 };
 
 export default function HomePage() {
@@ -47,21 +50,27 @@ export default function HomePage() {
   // ── Top-level list: schools, standalone locations, standalone hostels ─────
   const entries = useMemo<Entry[]>(() => {
     if (!dir.data) return [];
-    const schools: Entry[] = dir.data.schools.map((s) => {
-      const n = dir.collagesBySchool.get(s.id)?.length ?? 0;
-      return { key: `s-${s.id}`, kind: "school", name: displayName(s.name), href: `/${s.slug}`, subtitle: n === 0 ? "Coming soon" : plural(n, "college"), empty: n === 0 };
-    });
-    const locations: Entry[] = dir.data.collages
-      .filter((c) => !c.schoolId)
-      .map((c) => {
-        const n = dir.hostelsByCollage.get(c.id)?.length ?? 0;
-        return { key: `c-${c.id}`, kind: "location", name: displayName(c.name), href: `/${c.slug}`, subtitle: n === 0 ? "Coming soon" : plural(n, "hostel"), empty: n === 0 };
-      });
+    const hostelCount = (collageId: string) => dir.hostelsByCollage.get(collageId)?.length ?? 0;
+
+    // A school is listed with its colleges that have hostels; with none, not at all.
+    const schools: Entry[] = [];
+    for (const s of dir.data.schools) {
+      const n = (dir.collagesBySchool.get(s.id) ?? []).filter((c) => hostelCount(c.id) > 0).length;
+      if (n === 0) continue;
+      schools.push({ key: `s-${s.id}`, kind: "school", name: displayName(s.name), href: `/${s.slug}`, subtitle: plural(n, "college") });
+    }
+    const locations: Entry[] = [];
+    for (const c of dir.data.collages) {
+      if (c.schoolId) continue;
+      const n = hostelCount(c.id);
+      if (n === 0) continue;
+      locations.push({ key: `c-${c.id}`, kind: "location", name: displayName(c.name), href: `/${c.slug}`, subtitle: plural(n, "hostel") });
+    }
     const hostels: Entry[] = dir.data.hostels
       .filter((h) => !h.collageId)
       .map((h) => ({ key: `h-${h.id}`, kind: "hostel", name: h.name, href: dir.plansPathFor(h), subtitle: "View plans" }));
 
-    const byName = (a: Entry, b: Entry) => Number(a.empty) - Number(b.empty) || a.name.localeCompare(b.name);
+    const byName = (a: Entry, b: Entry) => a.name.localeCompare(b.name);
     return [...schools.sort(byName), ...locations.sort(byName), ...hostels.sort(byName)];
   }, [dir]);
 
@@ -72,10 +81,12 @@ export default function HomePage() {
     const locations: Entry[] = [
       ...entries.filter((e) => e.kind === "school" && e.name.toLowerCase().includes(q)),
       ...dir.data.collages
+        // Only locations with a hostel to buy from (P7), as in the list above.
+        .filter((c) => (dir.hostelsByCollage.get(c.id)?.length ?? 0) > 0)
         .filter((c) => displayName(c.name).toLowerCase().includes(q))
         .map((c) => {
           const n = dir.hostelsByCollage.get(c.id)?.length ?? 0;
-          return { key: `c-${c.id}`, kind: "location" as const, name: displayName(c.name), href: dir.locationPathFor(c), subtitle: plural(n, "hostel"), empty: n === 0 };
+          return { key: `c-${c.id}`, kind: "location" as const, name: displayName(c.name), href: dir.locationPathFor(c), subtitle: plural(n, "hostel") };
         }),
     ];
     const hostels: Entry[] = dir.data.hostels
@@ -184,13 +195,9 @@ function EntryList({ entries }: { entries: Entry[] }) {
             <Monogram name={e.name} kind={e.kind} />
             <div className="min-w-0 flex-1">
               <p className="ui-headline truncate text-ink">{e.name}</p>
-              {e.empty ? (
-                <p className="ui-subhead mt-0.5 text-ink-3">Coming soon</p>
-              ) : (
-                <p className="ui-subhead mt-0.5 text-accent-ink">
-                  {e.kind === "hostel" ? "View plans available" : e.subtitle} <span aria-hidden>→</span>
-                </p>
-              )}
+              <p className="ui-subhead mt-0.5 text-accent-ink">
+                {e.kind === "hostel" ? "View plans available" : e.subtitle} <span aria-hidden>→</span>
+              </p>
             </div>
           </Link>
         ))}

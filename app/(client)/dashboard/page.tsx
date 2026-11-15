@@ -17,13 +17,17 @@ import Button, { ButtonLink } from "@/components/ui/Button";
 import InlineAlert from "@/components/ui/InlineAlert";
 import WhatsAppCard from "@/components/ui/WhatsAppCard";
 import { GroupedList, ListRow } from "@/components/ui/GroupedList";
-import { EmptyState, ListSkeleton, Skeleton } from "@/components/ui/States";
+import { EmptyState, ErrorState, ListSkeleton, Skeleton } from "@/components/ui/States";
 import { cx } from "@/components/ui/cx";
 import WalletSection from "@/components/wallet/WalletSection";
 
 /**
  * /dashboard — the customer's Account (iOS Settings style).
  * All data logic below is unchanged; only the presentation was redesigned.
+ *
+ * One addition since: when the account can't be loaded the page says so and
+ * offers "Try again" (`loadFailed`). It used to draw an empty account, which
+ * told a customer with purchases that she had none.
  */
 
 interface Purchase {
@@ -146,6 +150,8 @@ export default function DashboardPage() {
   const [tvSubscriptions, setTvSubscriptions] = useState<TVSubscription[]>([]);
   const [savedCodes, setSavedCodes] = useState<StoredCode[]>([]);
   const [loading, setLoading] = useState(true);
+  // The account request failed (server error or no connection).
+  const [loadFailed, setLoadFailed] = useState(false);
   const [copiedRef, setCopiedRef] = useState("");
   const [revealedCodes, setRevealedCodes] = useState<Set<number>>(new Set());
   const [, forceUpdate] = useState({});
@@ -183,6 +189,7 @@ export default function DashboardPage() {
 
   const fetchUserData = async (userId: string) => {
     setLoading(true);
+    setLoadFailed(false);
     try {
       const res = await apiFetch(`/api/auth/user?userId=${userId}`);
       if (!res.ok) {
@@ -212,6 +219,7 @@ export default function DashboardPage() {
       void fetchBalances();
     } catch (err) {
       console.error("Error fetching user data:", err);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -351,7 +359,7 @@ export default function DashboardPage() {
       case "unlimited":
         return "bg-sky-500/15 text-sky-500";
       default:
-        return "bg-success/10 text-success";
+        return "bg-success/10 text-success-ink";
     }
   };
 
@@ -370,6 +378,23 @@ export default function DashboardPage() {
           <ListSkeleton rows={3} />
         </div>
         <p className="ui-footnote mt-4 text-center text-ink-2">Loading your dashboard...</p>
+      </Container>
+    );
+  }
+
+  // Not the page below with nothing in it: "No purchases yet" would be a
+  // lie to a customer whose purchases we simply couldn't fetch.
+  if (loadFailed) {
+    return (
+      <Container>
+        <PageHeader title="Account" />
+        <div className="rounded-card bg-surface shadow-card">
+          <ErrorState
+            title="Couldn’t load your account"
+            message="Your purchases and codes are safe. Check your connection and try again."
+            onRetry={() => user && fetchUserData(user.uid)}
+          />
+        </div>
       </Container>
     );
   }
@@ -408,10 +433,12 @@ export default function DashboardPage() {
           header={
             <span className="flex items-center justify-between gap-3">
               <span>Your balances</span>
+              {/* 44 px to tap (standard F5); the negative margin keeps the
+                  header row the height of its one line of text. */}
               <button
                 onClick={fetchBalances}
                 disabled={balancesLoading}
-                className="ui-footnote inline-flex items-center gap-1.5 font-medium text-accent-ink disabled:opacity-50"
+                className="ui-footnote -my-[13px] inline-flex min-h-[44px] min-w-[44px] items-center justify-end gap-1.5 font-medium text-accent-ink disabled:opacity-50"
               >
                 <RefreshCw className={cx("h-3.5 w-3.5", balancesLoading && "animate-spin")} />
                 Refresh
@@ -442,7 +469,7 @@ export default function DashboardPage() {
                 </div>
 
                 {unavailable ? (
-                  <p className="ui-footnote mt-3 text-danger">{balance.error || "Could not check this code right now."}</p>
+                  <p className="ui-footnote mt-3 text-danger-ink">{balance.error || "Could not check this code right now."}</p>
                 ) : (
                   <div className="mt-3">
                     {balance.dataRemainingGb === null || balance.dataRemainingGb === undefined ? (
@@ -498,15 +525,16 @@ export default function DashboardPage() {
                   >
                     {revealedCodes.has(i) ? sc.code : "••••••••"}
                   </span>
+                  {/* 44 px to tap (standard F5) with the eye centred; it was 28. */}
                   <button
                     onClick={() => toggleCodeReveal(i)}
                     aria-label={revealedCodes.has(i) ? "Hide code" : "Show code"}
-                    className="rounded-full p-1.5 text-ink-3 transition hover:text-ink-2"
+                    className="-my-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-3 transition hover:text-ink-2"
                   >
                     {revealedCodes.has(i) ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                <p className="ui-footnote mt-0.5 flex items-center gap-1 font-medium text-warning">
+                <p className="ui-footnote mt-0.5 flex items-center gap-1 font-medium text-warning-ink">
                   <Clock className="h-3 w-3" /> Expires in {getTimeLeft(sc.savedAt)}
                 </p>
               </div>
@@ -566,7 +594,7 @@ export default function DashboardPage() {
                         {statusLabel}
                       </Badge>
                       {expires && running && (
-                        <span className={cx("ui-footnote", expiringSoon ? "font-semibold text-warning" : "text-ink-2")}>
+                        <span className={cx("ui-footnote", expiringSoon ? "font-semibold text-warning-ink" : "text-ink-2")}>
                           {daysLeft !== null && daysLeft >= 0
                             ? daysLeft === 0
                               ? "Expires today"
@@ -577,7 +605,7 @@ export default function DashboardPage() {
                       {sub.hostel && sub.hostel !== "N/A" && <span className="ui-footnote text-ink-2">· {sub.hostel}</span>}
                     </div>
                     {sub.subscriptionStatus === "blocked" && (
-                      <p className="ui-footnote mt-1.5 text-danger">
+                      <p className="ui-footnote mt-1.5 text-danger-ink">
                         We could not activate this device — support has been notified.
                       </p>
                     )}
@@ -594,9 +622,11 @@ export default function DashboardPage() {
                     </Button>
                   </InlineAlert>
                 ) : (
+                  // 44 px to tap (standard F5): the 12 px it gains above replace
+                  // the old top margin, and -mb-3 takes back the 12 px below.
                   <button
                     onClick={() => setMacModalSub(sub)}
-                    className="ui-subhead mt-3 inline-flex items-center gap-1.5 font-medium text-accent-ink"
+                    className="ui-subhead -mb-3 inline-flex min-h-[44px] items-center gap-1.5 font-medium text-accent-ink"
                   >
                     <Pencil className="h-3.5 w-3.5" /> Update MAC address
                   </button>
@@ -671,9 +701,11 @@ export default function DashboardPage() {
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="ui-subhead font-semibold tabular-nums text-ink">₦{purchase.price.toLocaleString()}</p>
+                    {/* 44 x 44 px to tap (standard F5); it was one 18 px line.
+                        The negative margins keep the row its old height. */}
                     <button
                       onClick={() => copyToClipboard(purchase.paymentRef, purchase.id)}
-                      className="ui-footnote mt-0.5 inline-flex items-center gap-1 font-medium text-accent-ink"
+                      className="ui-footnote -mb-3 -mt-[11px] inline-flex min-h-[44px] min-w-[44px] items-center justify-end gap-1 font-medium text-accent-ink"
                     >
                       {copiedRef === purchase.id ? (
                         <>
@@ -723,9 +755,12 @@ export default function DashboardPage() {
                               </>
                             )}
                           </Button>
+                          {/* 44 px to tap (standard F5); it was one 18 px line.
+                              The margins tuck it under Copy and into the
+                              panel's own padding. */}
                           <button
                             onClick={() => revealPurchaseCode(purchase)}
-                            className="ui-footnote px-2 font-medium text-ink-2 hover:text-ink"
+                            className="ui-footnote -mb-3 -mt-1 min-h-[44px] min-w-[44px] px-2 font-medium text-ink-2 hover:text-ink"
                           >
                             Hide
                           </button>
@@ -779,11 +814,11 @@ export default function DashboardPage() {
           onClick={handleLogout}
           chevron={false}
           leading={
-            <span className="flex h-10 w-10 items-center justify-center rounded-[11px] bg-danger/10 text-danger">
+            <span className="flex h-10 w-10 items-center justify-center rounded-[11px] bg-danger/10 text-danger-ink">
               <LogOut className="h-5 w-5" />
             </span>
           }
-          title={<span className="text-danger">Sign Out</span>}
+          title={<span className="text-danger-ink">Sign Out</span>}
         />
       </GroupedList>
 

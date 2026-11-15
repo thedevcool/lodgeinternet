@@ -12,6 +12,7 @@ import SegmentedControl from "@/components/ui/SegmentedControl";
 import TextField from "@/components/ui/TextField";
 import { ErrorState, Skeleton } from "@/components/ui/States";
 import BlogBody from "@/components/blog/BlogBody";
+import BlogCover from "@/components/blog/BlogCover";
 import { adminFetch } from "@/lib/apiClient";
 import { AUDIENCE_LABEL, STATUS_BADGE, formatBlogDate, readingMinutes, type BlogReviewPage } from "@/lib/blog";
 
@@ -168,10 +169,14 @@ export default function BlogReviewPost({ params }: { params: { slug: string } })
             {post.published && <span className="ui-footnote text-ink-3">First published {formatBlogDate(post.published)}</span>}
           </div>
           {post.status === "update" && (
-            <p className="ui-subhead mt-2 text-ink-2">An earlier version is live. Readers keep seeing it until you approve this one.</p>
+            <p className="ui-subhead mt-2 text-ink-2">
+              {post.coverOnly
+                ? "The words are live already. Only the cover illustration is new: readers see it once you approve."
+                : "An earlier version is live. Readers keep seeing it until you approve this one."}
+            </p>
           )}
           {post.draftStale && (
-            <p className="ui-subhead mt-2 text-warning">
+            <p className="ui-subhead mt-2 text-warning-ink">
               The post was rewritten after you edited it. Your edits are kept: check them against the new text in Edit.
             </p>
           )}
@@ -182,7 +187,7 @@ export default function BlogReviewPost({ params }: { params: { slug: string } })
           )}
           {post.note && (
             <div className="mt-3 flex gap-2 rounded-inner bg-warning/10 p-3">
-              <StickyNote className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+              <StickyNote className="mt-0.5 h-4 w-4 shrink-0 text-warning-ink" />
               <p className="ui-subhead text-ink">
                 <span className="font-semibold">Note for you: </span>
                 {post.note}
@@ -220,7 +225,8 @@ export default function BlogReviewPost({ params }: { params: { slug: string } })
             <h1 className="ui-title-1 mt-3 text-ink sm:ui-large-title">{post.title}</h1>
             <p className="ui-callout mt-3 text-ink-2">{post.summary}</p>
             <p className="ui-footnote mt-4 text-ink-3">Lodge Internet · {readingMinutes(post.blocks)} min read</p>
-            <div className="mt-8 border-t border-hairline pt-6">
+            <BlogCover svg={post.coverSvg} className="mt-6 rounded-card" />
+            <div className={post.coverSvg ? "mt-8" : "mt-8 border-t border-hairline pt-6"}>
               <BlogBody blocks={post.blocks} />
             </div>
             <p className="ui-footnote mt-12 rounded-inner bg-ink/[0.04] px-4 py-3 text-ink-2">
@@ -322,7 +328,13 @@ export default function BlogReviewPost({ params }: { params: { slug: string } })
                 {(post.status !== "live" || editsWaiting) && (
                   <Button size="lg" full onClick={() => verdict("approve")} disabled={busy || post.problems.length > 0}>
                     <Check className="h-5 w-5" />{" "}
-                    {editsWaiting ? "Publish with my edits" : post.status === "update" ? "Approve this update" : "Approve and publish"}
+                    {editsWaiting
+                      ? "Publish with my edits"
+                      : post.coverOnly
+                        ? "Approve the new cover"
+                        : post.status === "update"
+                          ? "Approve this update"
+                          : "Approve and publish"}
                   </Button>
                 )}
                 {post.status !== "rejected" && post.status !== "live" && (

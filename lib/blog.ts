@@ -29,13 +29,15 @@ export type BlogSummary = {
   checked: string;
   published: string | null;
   updated: string | null;
+  /** The approved cover illustration's address on the API, if the post has one. */
+  cover: string | null;
 };
 
 export type BlogPost = BlogSummary & { blocks: BlogBlock[] };
 
 /** What the superadmin's review page gets for each post. */
 export type BlogReviewStatus = "waiting" | "update" | "live" | "rejected";
-export type BlogReviewRow = Omit<BlogSummary, "published" | "updated"> & {
+export type BlogReviewRow = Omit<BlogSummary, "published" | "updated" | "cover"> & {
   note: string;
   covers: string[];
   contentHash: string;
@@ -48,12 +50,17 @@ export type BlogReviewRow = Omit<BlogSummary, "published" | "updated"> & {
   edited: boolean;
   /** The file changed after those edits were made. */
   draftStale: boolean;
+  hasCover: boolean;
+  /** Live words, and only the cover illustration is new: one tap approves all of these. */
+  coverOnly: boolean;
 };
 
 /** One post on the review page: as it would go live (edits applied), what
  * the editor starts from, and any never-publish rule it breaks. */
 export type BlogReviewPage = BlogReviewRow & {
   blocks: BlogBlock[];
+  /** The cover as drawn now (SVG text), for the reviewer to look at. */
+  coverSvg: string | null;
   editor: { title: string; summary: string; body: string };
   problems: string[];
 };

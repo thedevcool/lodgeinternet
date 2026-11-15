@@ -1,8 +1,12 @@
 import { encryptForStorage } from "@/lib/localStorageCrypto";
 
 /**
- * Module-level helpers for the plans page, moved unchanged from
+ * Module-level helpers for the plans page, moved from
  * app/[slug]/plans/page.tsx.
+ *
+ * Saving a code on the device is a convenience (the dashboard shows it for
+ * six hours); the purchase itself lives on the server. So nothing here may
+ * stop the checkout, and nothing here logs a code.
  */
 
 interface StoredCode {
@@ -11,16 +15,39 @@ interface StoredCode {
   savedAt: number;
 }
 
+const SAVED_CODES_KEY = "lodgeCodes";
+
+/**
+ * The codes already saved on this device, or a fresh list when the saved
+ * value can't be read. A damaged value (cut off mid-write, or edited by
+ * hand) used to make JSON.parse throw on every purchase after it, so no code
+ * was ever saved on that device again.
+ */
+function readSavedCodes(): StoredCode[] {
+  const raw = localStorage.getItem(SAVED_CODES_KEY);
+  if (!raw) return [];
+  try {
+    const saved: unknown = JSON.parse(raw);
+    if (Array.isArray(saved)) return saved as StoredCode[];
+    console.warn("Saved codes on this device were not a list; starting a fresh one.");
+  } catch (err) {
+    console.warn("Saved codes on this device could not be read; starting a fresh list.", err);
+  }
+  return [];
+}
+
 export async function saveCodeToLocalStorage(code: string, planName: string, uid: string) {
   try {
-    const raw = localStorage.getItem("lodgeCodes");
-    const codes: StoredCode[] = raw ? JSON.parse(raw) : [];
+    const codes = readSavedCodes();
     const encrypted = await encryptForStorage(code, uid);
     codes.unshift({ code: encrypted, planName, savedAt: Date.now() });
     if (codes.length > 20) codes.length = 20;
-    localStorage.setItem("lodgeCodes", JSON.stringify(codes));
-  } catch {
-    // localStorage or crypto unavailable
+    localStorage.setItem(SAVED_CODES_KEY, JSON.stringify(codes));
+  } catch (err) {
+    // The browser blocks storage or has no crypto (private mode, quota).
+    // The customer still has the code on screen, in their Account and by
+    // email, so the checkout carries on; the reason is logged, the code is not.
+    console.warn("Could not save the code on this device.", err);
   }
 }
 

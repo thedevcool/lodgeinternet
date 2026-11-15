@@ -51,7 +51,11 @@ function LocationPageContent({ params }: { params: { slug: string } }) {
 
   // ── School → colleges ─────────────────────────────────────────────────────
   if (school) {
-    const colleges = [...(dir.collagesBySchool.get(school.id) ?? [])].sort((a, b) => a.name.localeCompare(b.name));
+    // Only colleges with a hostel to buy from (standard P7): one with none
+    // used to be listed with a "Coming soon" label.
+    const colleges = (dir.collagesBySchool.get(school.id) ?? [])
+      .filter((c) => (dir.hostelsByCollage.get(c.id)?.length ?? 0) > 0)
+      .sort((a, b) => a.name.localeCompare(b.name));
     const name = displayName(school.name);
     return (
       <Container wide>
@@ -73,7 +77,7 @@ function LocationPageContent({ params }: { params: { slug: string } }) {
                   href={`/${school.slug}/${c.slug}`}
                   leading={<Monogram name={c.name} kind="location" />}
                   title={displayName(c.name)}
-                  subtitle={n === 0 ? "Coming soon" : `${n} hostel${n === 1 ? "" : "s"}`}
+                  subtitle={`${n} hostel${n === 1 ? "" : "s"}`}
                 />
               );
             })}

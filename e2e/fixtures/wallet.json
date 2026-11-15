@@ -1,0 +1,31 @@
+{
+  "_about": "Wallet states the stand-in can serve (GET /api/wallet), picked by the scenario's 'wallet' knob. Every amount is in kobo: 1250000 is N12,500. 'off' is the wallet switched off for everyone, which is when the checkout offers only the card.",
+  "dva": { "account_number": "9012345678", "bank_name": "Wema Bank", "account_name": "LODGE INTERNET / CHIAMAKA OKAFOR" },
+  "states": {
+    "off": { "available": false },
+    "funded": {
+      "available": true,
+      "balanceKobo": 1250000,
+      "hasDva": true,
+      "dvaFailed": false,
+      "hasPhone": true,
+      "activity": [
+        { "type": "wallet_topup", "reference": "TRF-20261110-0091", "changeKobo": 1500000, "at": "2026-11-10T09:12:00Z", "metadata": { "channel": "dedicated_nuban" } },
+        { "type": "wallet_spend", "reference": "pending:ord_0456", "changeKobo": -335000, "at": "2026-11-02T18:24:00Z", "metadata": { "planName": "20GB Monthly" } },
+        { "type": "wallet_spend_reversal", "reference": "pending:ord_0431", "changeKobo": 85000, "at": "2026-10-21T15:00:00Z", "metadata": {} }
+      ]
+    },
+    "short": {
+      "available": true,
+      "balanceKobo": 50000,
+      "hasDva": true,
+      "dvaFailed": false,
+      "hasPhone": true,
+      "activity": [
+        { "type": "wallet_topup", "reference": "TRF-20261112-0007", "changeKobo": 50000, "at": "2026-11-12T11:30:00Z", "metadata": { "channel": "dedicated_nuban" } }
+      ]
+    },
+    "new": { "available": true, "balanceKobo": 0, "hasDva": true, "dvaFailed": false, "hasPhone": true, "activity": [] },
+    "dva-failed": { "available": true, "balanceKobo": 0, "hasDva": false, "dvaFailed": true, "hasPhone": true, "activity": [] }
+  }
+}

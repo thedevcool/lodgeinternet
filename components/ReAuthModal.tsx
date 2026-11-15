@@ -55,7 +55,7 @@ export default function ReAuthModal({ onSuccess, onCancel }: ReAuthModalProps) {
   return (
     <Sheet open onClose={onCancel} layer="sheet-over" ariaLabel="Confirm your identity">
       <div className="pb-2 pt-2 text-center">
-        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-[16px] bg-warning/15 text-warning">
+        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-[16px] bg-warning/15 text-warning-ink">
           <ShieldCheck className="h-7 w-7" />
         </span>
         <h2 className="ui-title-2 mt-4 text-ink">Confirm your identity</h2>

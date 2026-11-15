@@ -238,13 +238,19 @@ export default function Sheet({
                 <div className="flex min-h-[36px] items-center justify-between gap-3 pt-1">
                   <h2 className="ui-title-3 text-ink">{title}</h2>
                   {showClose && canDismiss && (
+                    // 44 px to tap (standard F5) around the 32 px circle that
+                    // is drawn. The negative margins (6 px a side, the
+                    // difference halved) keep the circle where it was and
+                    // the header no taller.
                     <button
                       type="button"
                       onClick={() => onCloseRef.current?.()}
                       aria-label="Close"
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink/[0.08] text-ink-2 transition hover:bg-ink/[0.12]"
+                      className="group -my-1.5 -mr-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
                     >
-                      <X className="h-4 w-4" strokeWidth={2.6} />
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink/[0.08] text-ink-2 transition group-hover:bg-ink/[0.12]">
+                        <X className="h-4 w-4" strokeWidth={2.6} />
+                      </span>
                     </button>
                   )}
                 </div>

@@ -15,7 +15,11 @@ const STEPS = [
   { icon: Signal, title: "Get connected", text: "Your access details arrive immediately after payment." },
 ];
 
-/** Mobile: swipeable cards with page dots. Desktop: three cards in a row. */
+/**
+ * Mobile: swipeable cards with page dots. Desktop: three cards in a row.
+ * The row can be focused and has a name, so a keyboard can scroll it with
+ * the arrow keys: before, steps two and three were out of a keyboard's reach.
+ */
 export function HowItWorks() {
   const scroller = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
@@ -32,7 +36,10 @@ export function HowItWorks() {
       <div
         ref={scroller}
         onScroll={onScroll}
-        className="ui-scroll-x -mx-4 flex gap-3 px-4 pb-2 sm:-mx-6 sm:px-6 md:mx-0 md:grid md:grid-cols-3 md:gap-5 md:overflow-visible md:px-0"
+        tabIndex={0}
+        role="region"
+        aria-label="How it works, step by step"
+        className="ui-scroll-x -mx-4 flex gap-3 px-4 pb-2 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent sm:-mx-6 sm:px-6 md:mx-0 md:grid md:grid-cols-3 md:gap-5 md:overflow-visible md:px-0"
       >
         {STEPS.map((s, i) => (
           <div
@@ -69,7 +76,8 @@ export function AboutBand() {
         <div aria-hidden className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
         <div className="relative grid items-center gap-8 md:grid-cols-2">
           <div>
-            <p className="ui-eyebrow text-white/75">About Lodge Internet</p>
+            {/* Full white: at 75% this small line was 3.6:1 on the blue. */}
+            <p className="ui-eyebrow text-white">About Lodge Internet</p>
             <p className="ui-title-1 mt-2">Fast internet should feel effortless</p>
             <p className="ui-body mt-3 text-white/85">
               Managed, high-speed internet built for hostels — no complicated setups, no hidden fees.

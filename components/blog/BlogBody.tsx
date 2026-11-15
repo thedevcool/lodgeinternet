@@ -14,8 +14,12 @@ import BlogHostels from "./BlogHostels";
  * such links before a post can be approved, so this is only a backstop).
  */
 
-const INLINE = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*\s][^*]*\*)|(\[[^\]]+\]\([^)\s]+\))/g;
+// Bold may hold single asterisks, so italic inside bold stays one bold run.
+const INLINE = /(`[^`]+`)|(\*\*(?:[^*]|\*(?!\*))+\*\*)|(\*[^*\s][^*]*\*)|(\[[^\]]+\]\([^)\s]+\))/g;
 const OWN_SITE = /^https:\/\/(www\.)?lodgeinternet\.com(\/|$)/;
+// One of our own pages: a single leading slash. "//host" and "/\host" also
+// start with a slash, but a browser reads both as another site.
+const OWN_PAGE = /^\/(?![/\\])/;
 
 function Inline({ text }: { text: string }) {
   const parts: ReactNode[] = [];
@@ -47,7 +51,7 @@ function Inline({ text }: { text: string }) {
     } else {
       const label = token.slice(1, token.indexOf("]("));
       const href = token.slice(token.indexOf("](") + 2, -1);
-      if (href.startsWith("/")) {
+      if (OWN_PAGE.test(href)) {
         parts.push(
           <Link key={key} href={href} className="font-medium text-accent-ink underline decoration-accent/30 underline-offset-2 hover:decoration-accent">
             {label}
@@ -107,8 +111,15 @@ function Block({ block }: { block: BlogBlock }) {
       );
     }
     case "code":
+      // A sample wider than the phone scrolls sideways inside its box. It can
+      // be focused and has a name so a keyboard can reach it and scroll it.
       return (
-        <pre className="mt-5 overflow-x-auto rounded-inner bg-surface-2 px-4 py-3.5 text-[13.5px] leading-[1.65] text-ink ring-1 ring-hairline">
+        <pre
+          tabIndex={0}
+          role="region"
+          aria-label="Code sample"
+          className="mt-5 overflow-x-auto rounded-inner bg-surface-2 px-4 py-3.5 text-[13.5px] leading-[1.65] text-ink outline-none ring-1 ring-hairline focus-visible:ring-2 focus-visible:ring-accent"
+        >
           <code className="font-mono">{block.text}</code>
         </pre>
       );

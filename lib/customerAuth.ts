@@ -130,12 +130,21 @@ export function currentCustomer(): Customer | null {
   return customer;
 }
 
-/** Calls `callback` once it is known who is signed in, and on every change after. */
+/**
+ * Calls `callback` once it is known who is signed in, and on every change after.
+ *
+ * The page joins the listeners only after it has been told the first answer.
+ * It used to join at once, so a page that subscribed before the first check
+ * came back was told twice when that answer was a signed-in customer (once
+ * as a "change" from nobody, once as the first answer) and loaded the
+ * customer's profile twice.
+ */
 export function onCustomerChange(callback: (customer: Customer | null) => void): () => void {
-  listeners.add(callback);
   let active = true;
   void ready().then(() => {
-    if (active) callback(customer);
+    if (!active) return;
+    listeners.add(callback);
+    callback(customer);
   });
   return () => {
     active = false;

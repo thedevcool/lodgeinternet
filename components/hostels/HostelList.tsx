@@ -59,7 +59,7 @@ export default function HostelList({
               </div>
               <Link
                 href={hrefFor(h)}
-                className="mt-5 inline-flex h-11 items-center justify-center gap-1.5 rounded-full bg-accent text-[15px] font-semibold text-white transition active:scale-[0.97] hover:bg-accent/90"
+                className="mt-5 inline-flex h-11 items-center justify-center gap-1.5 rounded-full bg-accent text-[15px] font-semibold text-white transition active:scale-[0.97] hover:bg-accent-hover"
               >
                 View Plans <ArrowRight className="h-4 w-4" />
               </Link>

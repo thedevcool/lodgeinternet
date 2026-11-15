@@ -2,11 +2,10 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Check, FileText, Smartphone, Trash2 } from "lucide-react";
+import { Check, FileText, Trash2 } from "lucide-react";
 import DeleteAccountSheet from "@/components/account/DeleteAccountSheet";
 import { useCustomer } from "@/components/client/CustomerProvider";
 import ThemeToggle from "@/components/client/ThemeToggle";
-import Badge from "@/components/ui/Badge";
 import Container from "@/components/ui/Container";
 import PageHeader from "@/components/ui/PageHeader";
 import { GroupedList, ListRow } from "@/components/ui/GroupedList";
@@ -15,8 +14,9 @@ import { cx } from "@/components/ui/cx";
 import { useWalletDesign, WALLET_DESIGNS, type WalletDesign } from "@/components/wallet/walletDesigns";
 
 /**
- * /settings — Appearance, Wallet design, the Lodge app teaser, Legal and
- * "Delete my account". Signed-in customers only.
+ * /settings — Appearance, Wallet design, Legal and "Delete my account".
+ * Signed-in customers only. (The "Lodge app — Coming soon" card that sat
+ * here is gone: standard P7, what isn't live doesn't appear.)
  */
 export default function SettingsPage() {
   const router = useRouter();
@@ -67,24 +67,6 @@ export default function SettingsPage() {
         <p className="ui-footnote mt-2 px-4 text-ink-2">Changes how your wallet card looks on your Account page.</p>
       </section>
 
-      <section className="mt-8">
-        <h2 className="ui-footnote mb-2 px-4 font-medium uppercase tracking-[0.04em] text-ink-2">Lodge app</h2>
-        <div className="flex items-start gap-4 rounded-card bg-surface p-5 shadow-card">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[13px] bg-gradient-to-br from-sky-500 to-blue-700 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
-            <Smartphone className="h-6 w-6" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="ui-headline text-ink">Lodge for iPhone and Android</p>
-              <Badge tone="accent">Coming soon</Badge>
-            </div>
-            <p className="ui-subhead mt-1 text-ink-2">
-              Buy plans, top up your wallet and check your data in a tap — all from your home screen.
-            </p>
-          </div>
-        </div>
-      </section>
-
       <GroupedList header="Account" className="mt-8">
         <ListRow
           href="/legal"
@@ -94,8 +76,8 @@ export default function SettingsPage() {
         />
         <ListRow
           onClick={() => setDeleting(true)}
-          leading={<Tile className="bg-danger/10 text-danger"><Trash2 className="h-5 w-5" /></Tile>}
-          title={<span className="text-danger">Delete my account</span>}
+          leading={<Tile className="bg-danger/10 text-danger-ink"><Trash2 className="h-5 w-5" /></Tile>}
+          title={<span className="text-danger-ink">Delete my account</span>}
           subtitle="Close your account for good"
         />
       </GroupedList>

@@ -7,6 +7,13 @@ import { cx } from "./cx";
 /**
  * Labelled text input, 50px tall. Password fields get a show/hide toggle.
  * All native input props pass straight through (value, onChange, required…).
+ *
+ * The line under the input (the error, or else the hint) is tied to the
+ * input with aria-describedby, so a screen reader reads the reason along
+ * with the field. It used to say "invalid" and nothing more. The line sits
+ * in a polite live region that is always on the page, so an error that
+ * appears while the customer is typing is read out too, without cutting off
+ * what the reader was saying (role="alert" would).
  */
 type Props = InputHTMLAttributes<HTMLInputElement> & {
   label: string;
@@ -21,6 +28,8 @@ const TextField = forwardRef<HTMLInputElement, Props>(function TextField(
 ) {
   const autoId = useId();
   const inputId = id || autoId;
+  const messageId = `${inputId}-message`;
+  const hasMessage = Boolean(error || hint);
   const [reveal, setReveal] = useState(false);
   const isPassword = type === "password";
 
@@ -43,25 +52,34 @@ const TextField = forwardRef<HTMLInputElement, Props>(function TextField(
           id={inputId}
           type={isPassword && reveal ? "text" : type}
           aria-invalid={error ? true : undefined}
+          aria-describedby={hasMessage ? messageId : undefined}
           className="h-full min-w-0 flex-1 bg-transparent text-[17px] text-ink outline-none placeholder:text-ink-3"
           {...rest}
         />
         {isPassword && (
+          // 44 px to tap (standard F5) with the eye centred; it was 32 px.
+          // The negative margin leaves the eye where it was in the field.
           <button
             type="button"
             onClick={() => setReveal((r) => !r)}
             aria-label={reveal ? "Hide password" : "Show password"}
-            className="-mr-1 rounded-full p-1.5 text-ink-3 transition hover:text-ink-2"
+            className="-mr-2.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-3 transition hover:text-ink-2"
           >
             {reveal ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
           </button>
         )}
       </div>
-      {error ? (
-        <p className="ui-footnote mt-1.5 px-1 text-danger">{error}</p>
-      ) : hint ? (
-        <div className="ui-footnote mt-1.5 px-1 text-ink-2">{hint}</div>
-      ) : null}
+      <div aria-live="polite">
+        {error ? (
+          <p id={messageId} className="ui-footnote mt-1.5 px-1 text-danger-ink">
+            {error}
+          </p>
+        ) : hint ? (
+          <div id={messageId} className="ui-footnote mt-1.5 px-1 text-ink-2">
+            {hint}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 });

@@ -57,7 +57,7 @@ export default function NavBar() {
           {chrome.back && (
             <Link
               href={chrome.back.href}
-              className="-ml-2 inline-flex h-10 max-w-[45vw] items-center gap-0.5 rounded-full pr-2 text-[17px] text-accent-ink md:hidden"
+              className="-ml-2 inline-flex h-11 min-w-[44px] max-w-[45vw] items-center gap-0.5 rounded-full pr-2 text-[17px] text-accent-ink md:hidden"
             >
               <ChevronLeft className="h-7 w-7 shrink-0" strokeWidth={2.2} />
               <span className="truncate">{chrome.back.label ?? "Back"}</span>

@@ -18,22 +18,28 @@ import Spinner from "./Spinner";
  *                 white text passes 4.5:1 in dark mode too)
  *
  * Every variant/size maps to a full literal class string so Tailwind keeps it.
+ *
+ * Every size is at least 44 px tall (standard F5): `sm` keeps its smaller
+ * text and tighter padding, but it was 36 px high and easy to miss with a
+ * thumb. A filled button darkens to a solid shade under the finger; the 90%
+ * tint it used before left white text at 4.3:1, and on a phone that colour
+ * stays until the next tap.
  */
 type Variant = "filled" | "tinted" | "gray" | "plain" | "wa" | "danger" | "destructive";
 type Size = "sm" | "md" | "lg";
 
 const VARIANTS: Record<Variant, string> = {
-  filled: "bg-accent text-white hover:bg-accent/90",
+  filled: "bg-accent text-white hover:bg-accent-hover",
   tinted: "bg-accent/10 text-accent-ink hover:bg-accent/15",
   gray: "bg-ink/[0.06] text-ink hover:bg-ink/10",
   plain: "bg-transparent text-accent-ink hover:bg-accent/10",
-  wa: "bg-wa text-white hover:bg-wa/90",
-  danger: "bg-transparent text-danger hover:bg-danger/10",
-  destructive: "bg-red-600 text-white hover:bg-red-600/90",
+  wa: "bg-wa text-white hover:bg-wa-hover",
+  danger: "bg-transparent text-danger-ink hover:bg-danger/10",
+  destructive: "bg-red-600 text-white hover:bg-red-700",
 };
 
 const SIZES: Record<Size, string> = {
-  sm: "h-9 px-4 text-[15px] gap-1.5",
+  sm: "h-11 px-4 text-[15px] gap-1.5",
   md: "h-11 px-5 text-[16px] gap-2",
   lg: "h-[52px] px-6 text-[17px] gap-2",
 };
@@ -76,13 +82,20 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
 
 export default Button;
 
-/** Same look as Button, for navigation (Next.js Link or external href). */
+/**
+ * Same look as Button, for navigation (Next.js Link or external href).
+ *
+ * `reload` makes it a plain link, so the browser asks the server for the page
+ * again. It is the "Try again" of a server-written page (blog, legal): a
+ * Next.js Link there would redraw the copy of the failed page it already has.
+ */
 export function ButtonLink({
   href,
   variant = "filled",
   size = "lg",
   full,
   external,
+  reload,
   className,
   children,
 }: {
@@ -91,10 +104,18 @@ export function ButtonLink({
   size?: Size;
   full?: boolean;
   external?: boolean;
+  reload?: boolean;
   className?: string;
   children: ReactNode;
 }) {
   const cls = classes(variant, size, full, className);
+  if (reload) {
+    return (
+      <a href={href} className={cls}>
+        {children}
+      </a>
+    );
+  }
   if (external) {
     return (
       <a href={href} target="_blank" rel="noopener noreferrer" className={cls}>

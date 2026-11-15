@@ -20,7 +20,17 @@ import { NextRequest, NextResponse } from "next/server";
  * plain <script src> we don't control the render of. style-src keeps
  * 'unsafe-inline' deliberately: Next and next/font inject inline <style>, and
  * CSS injection can't run code, so the risk is not worth the breakage.
+ *
+ * Local development and the end-to-end tests point NEXT_PUBLIC_API_BASE_URL
+ * at an API on this machine. Only then is that one origin added to
+ * connect-src and img-src (blog covers are images served by the API), and
+ * requests are not upgraded to https, which localhost doesn't serve. A production API address never matches LOCAL_API, so the
+ * production policy is exactly the list below.
  */
+const LOCAL_API = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(process.env.NEXT_PUBLIC_API_BASE_URL ?? "")
+  ? (process.env.NEXT_PUBLIC_API_BASE_URL as string)
+  : "";
+
 export function middleware(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
 
@@ -28,15 +38,15 @@ export function middleware(request: NextRequest) {
     `default-src 'self'`,
     `script-src 'self' 'nonce-${nonce}' https://js.paystack.co`,
     `style-src 'self' 'unsafe-inline'`,
-    `img-src 'self' data: blob: https:`,
+    `img-src 'self' data: blob: https:${LOCAL_API ? ` ${LOCAL_API}` : ""}`,
     `font-src 'self' data:`,
-    `connect-src 'self' https://api.lodgeinternet.com https://api.lodge-internet.com https://api.paystack.co`,
+    `connect-src 'self' https://api.lodgeinternet.com https://api.lodge-internet.com https://api.paystack.co${LOCAL_API ? ` ${LOCAL_API}` : ""}`,
     `frame-src https://checkout.paystack.com https://*.paystack.com`,
     `frame-ancestors 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,
     `object-src 'none'`,
-    `upgrade-insecure-requests`,
+    ...(LOCAL_API ? [] : [`upgrade-insecure-requests`]),
   ].join("; ");
 
   const requestHeaders = new Headers(request.headers);

@@ -1,28 +1,55 @@
 "use client";
+
+/**
+ * /maintenance — where MaintenanceWatch sends every customer page while the
+ * site is locked down (the switch is the backend's: /api/service-status).
+ *
+ * The page asks the backend for the admin's message, and whether the site is
+ * still locked. Once it is not, the customer is sent home: "Check again" used
+ * only to reload this page, which never looked at `locked`, so a customer
+ * stayed on "Site Temporarily Unavailable" after the lockdown had ended, on a
+ * page with no other link.
+ */
 import { apiFetch } from "@/lib/apiClient";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Lock, RefreshCw } from "lucide-react";
 import { BrandGlyph } from "@/components/ui/BrandMark";
 import Button from "@/components/ui/Button";
 
 export default function MaintenancePage() {
+  const router = useRouter();
   const [message, setMessage] = useState(
     "We're currently performing scheduled maintenance. We'll be back shortly.",
   );
+  const [checking, setChecking] = useState(false);
+
+  // Ask the backend, fresh each time (this is the public status route: a
+  // visitor has no admin token, so the admin settings route answered 401 and
+  // the message an admin had written never reached anybody).
+  const checkStatus = useCallback(async () => {
+    setChecking(true);
+    try {
+      const response = await apiFetch("/api/service-status");
+      const status = await response.json();
+      // Only a clear "not locked" sends the customer on. An answer we can't
+      // read leaves them here, where the button lets them ask again.
+      if (response.ok && status.locked === false) {
+        router.replace("/");
+        return;
+      }
+      if (status.message) setMessage(status.message);
+    } catch {
+      // No answer: the site may still be locked, so the notice stays up.
+    } finally {
+      setChecking(false);
+    }
+  }, [router]);
 
   useEffect(() => {
-    // Fetch the admin-set message fresh each load — bypasses any page cache.
-    // This reads the public status route, not the admin settings one: a
-    // visitor here has no admin token, so that call returned 401 and the
-    // message an admin had written never actually reached anybody.
-    apiFetch("/api/service-status")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.message) setMessage(data.message);
-      })
-      .catch(() => {});
-  }, []);
+    void checkStatus();
+  }, [checkStatus]);
 
   // No nav/tab bar here (ClientChrome hides them): during a lockdown every
   // link would just bounce back to this page.
@@ -39,8 +66,8 @@ export default function MaintenancePage() {
         <h1 className="ui-title-1 mt-8 text-ink">Site Temporarily Unavailable</h1>
         <p className="ui-body mt-3 text-ink-2">{message}</p>
 
-        <Button variant="gray" size="md" className="mt-8" onClick={() => window.location.reload()}>
-          <RefreshCw className="h-4 w-4" /> Check again
+        <Button variant="gray" size="md" className="mt-8" onClick={checkStatus} loading={checking}>
+          {!checking && <RefreshCw className="h-4 w-4" />} Check again
         </Button>
 
         <p className="ui-footnote mt-8 text-ink-3">

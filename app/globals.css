@@ -211,24 +211,39 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ── Tokens (RGB channels so Tailwind opacity modifiers work) ───────────── */
+/* Text colours are sized against WCAG 4.5:1 on every fill they are used on
+   (white cards, the grey canvas, 4 to 10% tints, the glass bar), not only on
+   white: the axe scan in e2e/support/checks.ts measures each one. A fill and
+   the text drawn in its colour are separate tokens (`--accent` / `--accent-ink`,
+   `--success` / `--success-ink`, ...), so text can be darkened without
+   repainting buttons. The mobile app mirrors these values (standard A5). */
 :root {
   --canvas: 245 245 247;      /* #F5F5F7 apple.com page grey */
   --surface: 255 255 255;     /* cards */
   --surface-2: 242 242 247;   /* inputs / grouped fills on white */
   --ink: 29 29 31;            /* #1D1D1F primary text */
-  --ink-2: 110 110 115;       /* #6E6E73 secondary text (4.9:1 on white) */
-  --ink-3: 134 134 139;       /* #86868B placeholders, icons, dividers only */
+  --ink-2: 99 99 102;         /* #636366 secondary text (4.7:1 or better on tinted fills) */
+  --ink-3: 110 110 115;       /* #6E6E73 placeholders, icons, small labels on white or canvas (4.6:1). On a tint use ink-2. */
   --hairline: rgb(60 60 67 / 0.14);
   --accent: 37 99 235;        /* #2563EB Figma blue — fills with white text */
-  --accent-ink: 37 99 235;    /* links / tinted text */
-  --success: 21 128 61;       /* #15803D */
-  --warning: 180 83 9;        /* #B45309 */
-  --danger: 220 38 38;        /* #DC2626 */
+  --accent-hover: 29 78 216;  /* #1D4ED8 a filled button under the finger (white text 6.7:1) */
+  --accent-ink: 29 78 216;    /* #1D4ED8 links / tinted text (5.0:1 or better on its own tints) */
+  --success: 21 128 61;       /* #15803D fills */
+  --success-ink: 22 101 52;   /* #166534 text, also on its own 10% tint */
+  --warning: 180 83 9;        /* #B45309 fills */
+  --warning-ink: 146 64 14;   /* #92400E text, also on its own 10% tint */
+  --danger: 220 38 38;        /* #DC2626 fills */
+  --danger-ink: 185 28 28;    /* #B91C1C text, also on its own 10% tint */
   --wa: 21 128 61;            /* WhatsApp fill, darkened so white text passes 4.5:1 */
-  --wa-ink: 21 128 61;
+  --wa-hover: 22 101 52;      /* #166534 the WhatsApp button under the finger */
+  --wa-ink: 22 101 52;        /* #166534 */
   --tg: 0 119 182;            /* Telegram fill, darkened from #229ED9 so white text passes 4.5:1 */
+  --tg-hover: 0 99 153;       /* #006399 the Telegram button under the finger */
   --tg-ink: 0 119 182;
   --glass: 255 255 255;
+  /* How solid the glass is. 0.72 let a green or blue card under the tab bar
+     pull a tab's label below 4.5:1; at 0.88 the label holds over both. */
+  --glass-alpha: 0.88;
   --glass-edge: rgb(0 0 0 / 0.08);
   --glass-highlight: rgb(255 255 255 / 0.75);
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 12px 32px -20px rgb(0 0 0 / 0.18);
@@ -251,16 +266,22 @@
     --surface-2: 44 44 46;     /* #2C2C2E */
     --ink: 245 245 247;
     --ink-2: 161 161 166;      /* #A1A1A6 */
-    --ink-3: 110 110 115;
+    --ink-3: 142 142 147;      /* #8E8E93 (6.4:1 on black, 5.2:1 on a card) */
     --hairline: rgb(84 84 88 / 0.5);
     --accent: 37 99 235;
+    --accent-hover: 29 78 216;
     --accent-ink: 96 165 250;  /* #60A5FA */
     --success: 74 222 128;
+    --success-ink: 74 222 128;
     --warning: 251 191 36;
+    --warning-ink: 251 191 36;
     --danger: 248 113 113;
+    --danger-ink: 248 113 113;
     --wa: 21 128 61;
+    --wa-hover: 22 101 52;
     --wa-ink: 74 222 128;
     --tg: 0 119 182;
+    --tg-hover: 0 99 153;
     --tg-ink: 56 189 248;
     --glass: 30 30 32;
     --glass-edge: rgb(255 255 255 / 0.12);
@@ -277,16 +298,22 @@
   --surface-2: 44 44 46;     /* #2C2C2E */
   --ink: 245 245 247;
   --ink-2: 161 161 166;      /* #A1A1A6 */
-  --ink-3: 110 110 115;
+  --ink-3: 142 142 147;      /* #8E8E93 (6.4:1 on black, 5.2:1 on a card) */
   --hairline: rgb(84 84 88 / 0.5);
   --accent: 37 99 235;
+  --accent-hover: 29 78 216;
   --accent-ink: 96 165 250;  /* #60A5FA */
   --success: 74 222 128;
+  --success-ink: 74 222 128;
   --warning: 251 191 36;
+  --warning-ink: 251 191 36;
   --danger: 248 113 113;
+  --danger-ink: 248 113 113;
   --wa: 21 128 61;
+  --wa-hover: 22 101 52;
   --wa-ink: 74 222 128;
   --tg: 0 119 182;
+  --tg-hover: 0 99 153;
   --tg-ink: 56 189 248;
   --glass: 30 30 32;
   --glass-edge: rgb(255 255 255 / 0.12);
@@ -320,10 +347,11 @@ html.ui-scroll-locked body {
 
 @layer components {
   /* ── Liquid Glass (iOS 27) ─────────────────────────────────────────────
-     More opaque than iOS 26, a defined 1px edge instead of a heavy shadow,
-     and a bright specular line along the top. Floating chrome only. */
+     More opaque than iOS 26 (--glass-alpha, see the tokens for why), a
+     defined 1px edge instead of a heavy shadow, and a bright specular line
+     along the top. Floating chrome only. */
   .ui-glass {
-    background-color: rgb(var(--glass) / 0.72);
+    background-color: rgb(var(--glass) / var(--glass-alpha));
     -webkit-backdrop-filter: blur(24px) saturate(180%);
     backdrop-filter: blur(24px) saturate(180%);
     border: 1px solid var(--glass-edge);

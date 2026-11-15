@@ -1,0 +1,28 @@
+{
+  "_about": "The plan catalogue every fixture hostel sells, as GET /api/data-plans returns it. 'price' is the bare plan price and 'total' is what the customer pays, both in whole naira and both decided by the server. '20GB Monthly' carries a total (3350) that the website's old fallback formula would NOT produce from its price (that gives 3304): if a page ever recomputes instead of showing the server's figure, the buying tests see the wrong number. 'stock' is how many codes each plan has left; 90GB is sold out.",
+  "plans": [
+    { "key": "5gb-weekly", "name": "5GB Weekly", "planType": "device", "usersCount": 3, "duration": 7, "price": 1500, "charges": 205, "total": 1705 },
+    { "key": "20gb-monthly", "name": "20GB Monthly", "planType": "device", "usersCount": 3, "duration": 30, "price": 3000, "charges": 350, "total": 3350 },
+    { "key": "40gb-monthly", "name": "40GB Monthly", "planType": "device", "usersCount": 3, "duration": 30, "price": 5000, "charges": 435, "total": 5435 },
+    { "key": "90gb-monthly", "name": "90GB Monthly", "planType": "device", "usersCount": 3, "duration": 30, "price": 10000, "charges": 764, "total": 10764 },
+    { "key": "40gb-monthly-5", "name": "40GB Monthly", "planType": "device", "usersCount": 5, "duration": 30, "price": 6000, "charges": 501, "total": 6501 },
+    { "key": "unlimited-weekly", "name": "Unlimited Weekly", "planType": "unlimited", "usersCount": 3, "duration": 7, "unlimitedPeriod": "weekly", "price": 8000, "charges": 633, "total": 8633 },
+    { "key": "tv-monthly", "name": "TV Monthly", "planType": "tv", "usersCount": null, "duration": 30, "price": 4000, "charges": 370, "total": 4370 }
+  ],
+  "stock": {
+    "5gb-weekly": 12,
+    "20gb-monthly": 3,
+    "40gb-monthly": 1,
+    "90gb-monthly": 0,
+    "40gb-monthly-5": 8,
+    "unlimited-weekly": 6
+  },
+  "codes": {
+    "5gb-weekly": "48213907",
+    "20gb-monthly": "73915264",
+    "40gb-monthly": "60482715",
+    "40gb-monthly-5": "91530268",
+    "unlimited-weekly": "25709413"
+  },
+  "reserveSplit": { "subaccountCode": "ACCT_e2e_reserve", "ratePercent": 2.5 }
+}

@@ -38,11 +38,13 @@ export default function SearchField({
         className="h-full min-w-0 flex-1 bg-transparent text-[17px] text-ink outline-none placeholder:text-ink-3 [&::-webkit-search-cancel-button]:hidden"
       />
       {value && (
+        // 44 px to tap (standard F5) with the icon centred; it was 26 px.
+        // The negative margin leaves the icon 16 px from the field's edge.
         <button
           type="button"
           onClick={() => onChange("")}
           aria-label="Clear search"
-          className="-mr-1 rounded-full p-1 text-ink-3 transition hover:text-ink-2"
+          className="-mr-[13px] flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-3 transition hover:text-ink-2"
         >
           <XCircle className="h-[18px] w-[18px]" fill="currentColor" stroke="rgb(var(--surface))" />
         </button>

@@ -26,19 +26,35 @@ const config: Config = {
           3: "rgb(var(--ink-3) / <alpha-value>)",
         },
         hairline: "var(--hairline)",
+        // A fill and its text are separate tokens: `bg-success` paints, and
+        // `text-success-ink` writes (dark enough to read on `bg-success/10`).
+        // `-hover` is a filled button under the finger: a solid darker shade,
+        // because a 90% tint drops white text below 4.5:1.
         accent: {
           DEFAULT: "rgb(var(--accent) / <alpha-value>)",
+          hover: "rgb(var(--accent-hover) / <alpha-value>)",
           ink: "rgb(var(--accent-ink) / <alpha-value>)",
         },
-        success: "rgb(var(--success) / <alpha-value>)",
-        warning: "rgb(var(--warning) / <alpha-value>)",
-        danger: "rgb(var(--danger) / <alpha-value>)",
+        success: {
+          DEFAULT: "rgb(var(--success) / <alpha-value>)",
+          ink: "rgb(var(--success-ink) / <alpha-value>)",
+        },
+        warning: {
+          DEFAULT: "rgb(var(--warning) / <alpha-value>)",
+          ink: "rgb(var(--warning-ink) / <alpha-value>)",
+        },
+        danger: {
+          DEFAULT: "rgb(var(--danger) / <alpha-value>)",
+          ink: "rgb(var(--danger-ink) / <alpha-value>)",
+        },
         wa: {
           DEFAULT: "rgb(var(--wa) / <alpha-value>)",
+          hover: "rgb(var(--wa-hover) / <alpha-value>)",
           ink: "rgb(var(--wa-ink) / <alpha-value>)",
         },
         tg: {
           DEFAULT: "rgb(var(--tg) / <alpha-value>)",
+          hover: "rgb(var(--tg-hover) / <alpha-value>)",
           ink: "rgb(var(--tg-ink) / <alpha-value>)",
         },
         // ── Admin palette (unchanged) ─────────────────────────────────────

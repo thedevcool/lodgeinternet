@@ -167,16 +167,20 @@ export default function ForgotPasswordPage() {
       subtitle={stepSubtitle[step]}
     >
       {step !== "done" && (
-        <button
+        // A plain Button so it is 44 px to tap (standard F5): it was a bare
+        // line of text, 20 px tall. The margins keep the words where they were.
+        <Button
+          variant="plain"
+          size="sm"
+          className="-ml-3 -mt-5 mb-2"
           onClick={() => {
             if (step === "code") { setStep("email"); setError(""); }
             else if (step === "password") { setStep("code"); setError(""); }
             else router.push("/login");
           }}
-          className="ui-subhead -mt-2 mb-5 inline-flex items-center gap-0.5 font-medium text-accent-ink"
         >
           <ChevronLeft className="h-5 w-5" /> {step === "email" ? "Back to Sign In" : "Back"}
-        </button>
+        </Button>
       )}
 
       {error && step !== "done" && <InlineAlert className="mb-5">{error}</InlineAlert>}
@@ -213,14 +217,9 @@ export default function ForgotPasswordPage() {
             Continue
           </Button>
           <div className="text-center">
-            <button
-              type="button"
-              onClick={handleResend}
-              disabled={loading}
-              className="ui-subhead font-medium text-accent-ink disabled:opacity-50"
-            >
+            <Button variant="plain" size="sm" className="-my-3" onClick={handleResend} disabled={loading}>
               Didn&apos;t receive it? Resend code
-            </button>
+            </Button>
           </div>
         </form>
       )}

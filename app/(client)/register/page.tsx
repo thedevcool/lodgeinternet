@@ -375,13 +375,22 @@ function RegisterContent() {
     done: "Your account has been verified",
   };
   const showTabs = step === "hostel" || step === "credentials";
+
+  // Hostels that aren't under any school: in a location with no school, or
+  // in no location at all. Once a school exists the first screen asks for
+  // the school, and these hostels could not be picked at all; they are
+  // listed under the schools so their residents can still sign up.
+  const collegesInSchools = new Set(colleges.filter((college) => college.schoolId).map((college) => college.id));
+  const hostelsOutsideSchools = hostels.filter((hostel) => !hostel.collageId || !collegesInSchools.has(hostel.collageId));
   const stepIndex = { hostel: 0, credentials: 1, verify: 2, done: 3 }[step];
 
   return (
-    <AuthShell tabs={showTabs ? "register" : undefined} title={titles[step]} subtitle={subtitles[step]}>
+    <AuthShell tabs={showTabs ? "register" : undefined} redirect={redirectTarget} title={titles[step]} subtitle={subtitles[step]}>
       {/* Progress (hostel → account → verify) */}
       {step !== "done" && (
-        <div className="-mt-3 mb-6 flex gap-1.5" aria-label={`Step ${stepIndex + 1} of 3`}>
+        // role="img": without a role a <div>'s aria-label is ignored, so a
+        // screen reader never heard which step this is.
+        <div className="-mt-3 mb-6 flex gap-1.5" role="img" aria-label={`Step ${stepIndex + 1} of 3`}>
           {[0, 1, 2].map((i) => (
             <span
               key={i}
@@ -393,21 +402,26 @@ function RegisterContent() {
 
       {/* Back — hidden on verify/done where going "back" is unsafe (would
           either lose verification progress or orphan an unfinished account). */}
+      {/* These were bare lines of text, 20 px tall to tap. As plain Buttons
+          they are 44 px (standard F5); the negative margins keep the words
+          where they were. */}
       {step === "credentials" && (
-        <button
+        <Button
+          variant="plain"
+          size="sm"
+          className="-ml-3 -mt-5 mb-1"
           onClick={() => {
             setStep("hostel");
             setError("");
           }}
-          className="ui-subhead -mt-2 mb-4 inline-flex items-center gap-0.5 font-medium text-accent-ink"
         >
           <ChevronLeft className="h-5 w-5" /> Change Hostel
-        </button>
+        </Button>
       )}
       {step === "hostel" && verifyOnly && (
-        <button onClick={() => router.back()} className="ui-subhead -mt-2 mb-4 inline-flex items-center gap-0.5 font-medium text-accent-ink">
+        <Button variant="plain" size="sm" className="-ml-3 -mt-5 mb-1" onClick={() => router.back()}>
           <ChevronLeft className="h-5 w-5" /> Back
-        </button>
+        </Button>
       )}
 
       {error && step !== "done" && <InlineAlert className="mb-5">{error}</InlineAlert>}
@@ -434,11 +448,24 @@ function RegisterContent() {
                 </GroupedList>
               )}
 
+              {schools.length > 0 && !selectedSchool && hostelsOutsideSchools.length > 0 && (
+                <GroupedList header="Not in a school? Choose your hostel">
+                  {hostelsOutsideSchools.map((hostel) => (
+                    <ListRow
+                      key={hostel.id}
+                      onClick={() => handleHostelSelect(hostel.name)}
+                      leading={<Monogram name={hostel.name} />}
+                      title={hostel.name}
+                    />
+                  ))}
+                </GroupedList>
+              )}
+
               {selectedSchool && !selectedCollege && (
                 <>
-                  <button onClick={() => setSelectedSchool("")} className="ui-subhead inline-flex items-center gap-0.5 font-medium text-accent-ink">
+                  <Button variant="plain" size="sm" className="-my-3 -ml-3" onClick={() => setSelectedSchool("")}>
                     <ChevronLeft className="h-5 w-5" /> Change school
-                  </button>
+                  </Button>
                   <GroupedList header="Now choose your college">
                     {colleges
                       .filter((college) => college.schoolId === selectedSchool)
@@ -457,9 +484,9 @@ function RegisterContent() {
               {(!schools.length || (selectedSchool && selectedCollege)) && (
                 <>
                   {selectedCollege && (
-                    <button onClick={() => setSelectedCollege("")} className="ui-subhead inline-flex items-center gap-0.5 font-medium text-accent-ink">
+                    <Button variant="plain" size="sm" className="-my-3 -ml-3" onClick={() => setSelectedCollege("")}>
                       <ChevronLeft className="h-5 w-5" /> Change college
-                    </button>
+                    </Button>
                   )}
                   <GroupedList header="Your hostel">
                     {hostels
@@ -538,7 +565,7 @@ function RegisterContent() {
             error={confirmPassword && password !== confirmPassword ? "Passwords don't match yet." : null}
             hint={
               confirmPassword && password === confirmPassword && password.length >= 6 ? (
-                <span className="inline-flex items-center gap-1 text-success">
+                <span className="inline-flex items-center gap-1 text-success-ink">
                   <CheckCircle2 className="h-3.5 w-3.5" /> Passwords match.
                 </span>
               ) : undefined
@@ -551,11 +578,13 @@ function RegisterContent() {
           {/* Agreement at sign-up: the moment the customer accepts the terms. */}
           <p className="ui-footnote text-center text-ink-2">
             By creating an account you agree to our{" "}
-            <Link href="/legal/terms" className="text-accent-ink underline-offset-2 hover:underline">
+            {/* Underlined always: colour alone doesn't mark a link inside a
+                sentence for a reader who can't tell the blue from the grey. */}
+            <Link href="/legal/terms" className="text-accent-ink underline underline-offset-2">
               Terms of Service
             </Link>{" "}
             and{" "}
-            <Link href="/legal/privacy" className="text-accent-ink underline-offset-2 hover:underline">
+            <Link href="/legal/privacy" className="text-accent-ink underline underline-offset-2">
               Privacy Policy
             </Link>
             .
@@ -589,14 +618,9 @@ function RegisterContent() {
               {resendNotice && <InlineAlert tone="info">{resendNotice}</InlineAlert>}
 
               <div className="text-center">
-                <button
-                  type="button"
-                  onClick={handleResendCode}
-                  disabled={loading || resendCooldown > 0}
-                  className="ui-subhead font-medium text-accent-ink disabled:opacity-50"
-                >
+                <Button variant="plain" size="sm" className="-my-3" onClick={handleResendCode} disabled={loading || resendCooldown > 0}>
                   {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : "Didn't receive the code? Resend"}
-                </button>
+                </Button>
               </div>
             </form>
           )}
@@ -618,7 +642,13 @@ function RegisterContent() {
       {showTabs && (
         <p className="ui-subhead mt-6 text-center text-ink-2">
           Already have an account?{" "}
-          <Link href="/login" className="font-semibold text-accent-ink">
+          {/* Carries `redirect` on: a visitor sent here by Pay who already
+              has an account must land back on the plans page after signing
+              in. This link used to drop it, and they ended on the dashboard. */}
+          <Link
+            href={redirectTarget ? `/login?redirect=${encodeURIComponent(redirectTarget)}` : "/login"}
+            className="font-semibold text-accent-ink"
+          >
             Sign In
           </Link>
         </p>

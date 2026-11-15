@@ -33,7 +33,9 @@ export default function BrandMark({ href = "/", compact }: { href?: string; comp
     <Link
       href={href}
       aria-label="Lodge Internet home"
-      className="inline-flex items-center gap-2.5 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      // 44 x 44 px to tap (standard F5): the logo alone is 32 px, and on a
+      // phone the name is hidden once a page title takes the bar's centre.
+      className="inline-flex min-h-[44px] min-w-[44px] items-center gap-2.5 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent"
     >
       <BrandGlyph className="h-8 w-8" />
       {!compact && <span className="brand-name text-[17px] font-semibold tracking-[-0.02em] text-ink">Lodge Internet</span>}

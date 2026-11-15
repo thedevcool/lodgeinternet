@@ -9,7 +9,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Sheet from "@/components/ui/Sheet";
 import InlineAlert from "@/components/ui/InlineAlert";
 import { GroupedList, ListRow } from "@/components/ui/GroupedList";
-import { EmptyState, Skeleton } from "@/components/ui/States";
+import { EmptyState, ErrorState, Skeleton } from "@/components/ui/States";
 import { displayName } from "@/lib/hostelSlug";
 import { useHostelDirectory } from "@/lib/useHostelDirectory";
 import { LockedToYourHostel, useMyHostel } from "@/components/client/YourHostel";
@@ -113,6 +113,13 @@ export default function PlansScreen({ params }: { params: PlansParams }) {
             <div className="mt-5">
               {c.showLoading ? (
                 <PlanListSkeleton label={c.loading ? "Loading plans…" : "Checking availability…"} />
+              ) : c.plansLoadFailed ? (
+                // Not the empty state below: the hostel has plans, we just
+                // couldn't fetch them, and "No plans available" would send
+                // the customer away from a hostel that sells.
+                <div className="rounded-card bg-surface shadow-card">
+                  <ErrorState title="Couldn’t load the plans" onRetry={c.retryPlans} />
+                </div>
               ) : c.displayPlans.length === 0 ? (
                 <div className="rounded-card bg-surface shadow-card">
                   <EmptyState icon={<WifiOff />} title={emptyText} message="Check another tab, or ask us on WhatsApp." />

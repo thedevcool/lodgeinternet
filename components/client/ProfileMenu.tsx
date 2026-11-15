@@ -101,16 +101,24 @@ export default function ProfileMenu({ email }: { email: string }) {
             setOpen(true);
           }
         }}
+        // The button is 44 px to tap (standard F5); what is drawn is the
+        // 36 px circle inside it. `-mr-1` keeps the circle on the bar's edge.
         className={cx(
-          "flex h-9 select-none items-center justify-center rounded-full font-semibold transition-[transform,background-color] duration-200 ease-ios active:scale-[0.97]",
+          "group -mr-1 flex h-11 min-w-[44px] select-none items-center justify-center rounded-full md:mr-0",
           "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-          // Phone: the round initial. Desktop: the gray "Account" capsule.
-          "w-9 bg-accent/10 text-[15px] text-accent-ink",
-          "md:w-auto md:bg-ink/[0.06] md:px-4 md:tracking-[-0.01em] md:text-ink md:hover:bg-ink/10",
         )}
       >
-        <span className="md:hidden">{initial}</span>
-        <span className="hidden md:inline">Account</span>
+        <span
+          className={cx(
+            "flex h-9 items-center justify-center rounded-full font-semibold transition-[transform,background-color] duration-200 ease-ios group-active:scale-[0.97]",
+            // Phone: the round initial. Desktop: the gray "Account" capsule.
+            "w-9 bg-accent/10 text-[15px] text-accent-ink",
+            "md:w-auto md:bg-ink/[0.06] md:px-4 md:tracking-[-0.01em] md:text-ink md:group-hover:bg-ink/10",
+          )}
+        >
+          <span className="md:hidden">{initial}</span>
+          <span className="hidden md:inline">Account</span>
+        </span>
       </button>
 
       {open && (
@@ -135,7 +143,7 @@ export default function ProfileMenu({ email }: { email: string }) {
             ))}
           </div>
           <div className="border-t border-hairline py-1">
-            <button type="button" role="menuitem" tabIndex={-1} onClick={openDelete} className={cx(ITEM, "text-danger")}>
+            <button type="button" role="menuitem" tabIndex={-1} onClick={openDelete} className={cx(ITEM, "text-danger-ink")}>
               <Trash2 className="h-[18px] w-[18px]" />
               Delete my account
             </button>

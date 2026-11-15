@@ -1,0 +1,8 @@
+{
+  "_about": "Admin sign-ins for the blog review desk. ifeoma is the superadmin (the only one who may review posts); segun is an ordinary admin, used to prove he is refused.",
+  "password": "Review-e2e-1",
+  "admins": {
+    "ifeoma": { "username": "ifeoma", "isSuperAdmin": true, "modulePermissions": [], "hostels": [] },
+    "segun": { "username": "segun", "isSuperAdmin": false, "modulePermissions": [{ "module": "data-codes", "permission": "read" }], "hostels": ["hst_unity_lodge"] }
+  }
+}

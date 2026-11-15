@@ -228,14 +228,18 @@ export default function WaitlistPage() {
   return (
     <div className="mx-auto w-full max-w-[460px] px-4 pb-16 pt-6 sm:px-6 md:pt-12">
       {step !== "done" && (
-        <button onClick={goBack} className="ui-subhead mb-5 inline-flex items-center gap-0.5 font-medium text-accent-ink">
+        // A plain Button so it is 44 px to tap (standard F5): it was a bare
+        // line of text, 20 px tall. The margins keep the word where it was.
+        <Button variant="plain" size="sm" className="-ml-3 -mt-3 mb-2" onClick={goBack}>
           <ChevronLeft className="h-5 w-5" /> Back
-        </button>
+        </Button>
       )}
 
       {/* Progress */}
       {showProgress && (
-        <div className="mb-6 flex gap-1.5" aria-label={`Step ${stepIndex + 1} of ${STEP_ORDER.length}`}>
+        // role="img": without a role a <div>'s aria-label is ignored, so a
+        // screen reader never heard which step this is.
+        <div className="mb-6 flex gap-1.5" role="img" aria-label={`Step ${stepIndex + 1} of ${STEP_ORDER.length}`}>
           {STEP_ORDER.map((s, i) => (
             <span key={s} className={cx("h-1 flex-1 rounded-full transition-colors duration-300", i <= stepIndex ? "bg-accent" : "bg-ink/10")} />
           ))}

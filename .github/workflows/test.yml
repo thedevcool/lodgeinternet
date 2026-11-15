@@ -1,0 +1,66 @@
+# Every push and pull request: types, lint, unit tests, then the end-to-end
+# tests on a production build at phone sizes. Vercel deploys the site itself;
+# turn on "wait for checks" there (or branch protection here) and a red run
+# stops a deploy. Nothing in this workflow reaches production or needs secrets:
+# the end-to-end tests talk to a stand-in API (e2e/mock-api.mjs).
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Types, lint and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Types
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests, with coverage
+        run: npm run test:coverage
+      - name: Keep the coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 14
+
+  e2e:
+    name: End-to-end at phone sizes
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install the test browser
+        run: npx playwright install --with-deps chromium
+      - name: End-to-end tests
+        run: npm run e2e
+        env:
+          CI: "true"
+      - name: Keep the report when something fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

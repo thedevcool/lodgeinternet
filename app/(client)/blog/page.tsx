@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Newspaper } from "lucide-react";
+import { Newspaper, RefreshCw } from "lucide-react";
 import Container from "@/components/ui/Container";
 import PageHeader from "@/components/ui/PageHeader";
 import Badge from "@/components/ui/Badge";
+import { ButtonLink } from "@/components/ui/Button";
 import { Chip, ChipRow } from "@/components/ui/Chips";
 import { EmptyState } from "@/components/ui/States";
+import BlogCover from "@/components/blog/BlogCover";
 import { AUDIENCE_LABEL, fetchBlog, formatBlogDate, type BlogSummary } from "@/lib/blog";
 
 /**
@@ -23,15 +25,18 @@ function PostCard({ post, lead }: { post: BlogSummary; lead?: boolean }) {
   return (
     <Link
       href={`/blog/${post.slug}`}
-      className="block rounded-card bg-surface p-5 shadow-card ring-1 ring-hairline transition-colors hover:bg-surface-2"
+      className="block overflow-hidden rounded-card bg-surface shadow-card ring-1 ring-hairline transition-colors hover:bg-surface-2"
     >
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge tone="accent">{post.sectionTitle}</Badge>
-        <span className="ui-footnote text-ink-3">{formatBlogDate(post.published)}</span>
+      <BlogCover src={post.cover} />
+      <div className="p-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone="accent">{post.sectionTitle}</Badge>
+          <span className="ui-footnote text-ink-3">{formatBlogDate(post.published)}</span>
+        </div>
+        <h2 className={lead ? "ui-title-1 mt-3 text-ink" : "ui-title-3 mt-3 text-ink"}>{post.title}</h2>
+        <p className="ui-subhead mt-2 text-ink-2">{post.summary}</p>
+        <p className="ui-footnote mt-3 text-ink-3">{AUDIENCE_LABEL[post.audience]}</p>
       </div>
-      <h2 className={lead ? "ui-title-1 mt-3 text-ink" : "ui-title-3 mt-3 text-ink"}>{post.title}</h2>
-      <p className="ui-subhead mt-2 text-ink-2">{post.summary}</p>
-      <p className="ui-footnote mt-3 text-ink-3">{AUDIENCE_LABEL[post.audience]}</p>
     </Link>
   );
 }
@@ -65,7 +70,14 @@ export default async function BlogHome({ searchParams }: { searchParams: { secti
           className="mt-10"
           icon={<Newspaper />}
           title="The blog didn't load"
-          message="Our server didn't answer. Give it a minute and refresh the page."
+          message="Our server didn't answer. Give it a minute and try again."
+          // A plain link back to this page (`reload`): the page is written on
+          // the server, so trying again means asking the server again.
+          action={
+            <ButtonLink href="/blog" reload variant="tinted" size="md">
+              <RefreshCw className="h-4 w-4" /> Try again
+            </ButtonLink>
+          }
         />
       ) : !lead ? (
         <EmptyState className="mt-10" icon={<Newspaper />} title="Nothing here yet" message="New posts land here as we publish them." />

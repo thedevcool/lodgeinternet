@@ -7,6 +7,11 @@ import { cx } from "./cx";
 /**
  * iOS segmented control. Each option is either a button (onSelect) or a link
  * (href) — the auth pages use links so Log in ⇄ Create account are real routes.
+ *
+ * The track is 44 px tall and each segment fills that height, so the whole
+ * height is the tap target (standard F5). The sliding thumb stays 36 px,
+ * 4 px in from the track's edges, which is how the control has always looked:
+ * the segments used to stop at the thumb's height and were 36 px to tap.
  */
 export type Segment = { value: string; label: ReactNode; href?: string };
 
@@ -27,7 +32,7 @@ export default function SegmentedControl({
     <div
       role="tablist"
       aria-label={ariaLabel}
-      className={cx("relative flex w-full rounded-full bg-ink/[0.06] p-1", className)}
+      className={cx("relative flex w-full rounded-full bg-ink/[0.06] px-1", className)}
     >
       {/* sliding thumb (iOS 27) */}
       <span
@@ -41,7 +46,7 @@ export default function SegmentedControl({
       {segments.map((s) => {
         const active = s.value === value;
         const cls = cx(
-          "relative flex h-9 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[14px] font-semibold transition-colors duration-300",
+          "relative flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[14px] font-semibold transition-colors duration-300",
           active ? "text-ink" : "text-ink-2 hover:text-ink",
         );
         if (s.href) {

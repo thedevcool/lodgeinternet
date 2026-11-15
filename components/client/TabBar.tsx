@@ -10,6 +10,7 @@ import { useCustomer } from "./CustomerProvider";
 /**
  * Floating Liquid Glass tab bar (mobile only).
  * Minimizes while scrolling down (labels tuck away) and restores on scroll up.
+ * Minimized, a tab is still 44 px tall (standard F5): it used to shrink to 40.
  */
 type TabKey = "home" | "hostels" | "support" | "account";
 
@@ -71,7 +72,7 @@ export default function TabBar() {
             aria-current={active ? "page" : undefined}
             className={cx(
               "relative flex flex-1 flex-col items-center justify-center rounded-full transition-all duration-300 ease-ios active:scale-90",
-              compact ? "h-10" : "h-[52px]",
+              compact ? "h-11" : "h-[52px]",
               active ? "text-accent-ink" : "text-ink-2",
             )}
           >

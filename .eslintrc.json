@@ -1,0 +1,4 @@
+{
+  "extends": "next/core-web-vitals",
+  "ignorePatterns": ["coverage/", "playwright-report/", "test-results/"]
+}

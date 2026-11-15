@@ -1,0 +1,31 @@
+{
+  "_about": "The hostel directory the stand-in API serves: locations ('collages' in the API), hostels and, in the 'with-school' variant, a school with one college. Every name here is made up for the tests. 'UNITY ESTATE' is stored in capitals on purpose: the site must show it as 'Unity Estate'.",
+  "collages": [
+    { "id": "loc_unity", "name": "UNITY ESTATE", "slug": "unity-estate", "schoolId": null, "isActive": true, "createdAt": "2026-01-12T09:00:00Z", "updatedAt": "2026-01-12T09:00:00Z" },
+    { "id": "loc_palm", "name": "Palm Grove", "slug": "palm-grove", "schoolId": null, "isActive": true, "createdAt": "2026-02-03T09:00:00Z", "updatedAt": "2026-02-03T09:00:00Z" },
+    { "id": "loc_cedar", "name": "Cedar Heights", "slug": "cedar-heights", "schoolId": null, "isActive": true, "createdAt": "2026-03-20T09:00:00Z", "updatedAt": "2026-03-20T09:00:00Z" }
+  ],
+  "hostels": [
+    { "id": "hst_unity_lodge", "name": "Unity Lodge", "collageId": "loc_unity", "isActive": true, "planTypes": ["device", "unlimited", "tv"], "deviceUserCounts": [3, 5], "controllerId": null, "controllerName": null, "createdAt": "2026-01-12T10:00:00Z", "updatedAt": "2026-01-12T10:00:00Z" },
+    { "id": "hst_unity_annex", "name": "Unity Annex", "collageId": "loc_unity", "isActive": true, "planTypes": ["device", "unlimited"], "deviceUserCounts": [3], "controllerId": null, "controllerName": null, "createdAt": "2026-01-13T10:00:00Z", "updatedAt": "2026-01-13T10:00:00Z" },
+    { "id": "hst_harmony", "name": "Harmony House", "collageId": "loc_unity", "isActive": true, "planTypes": ["device"], "deviceUserCounts": [3], "controllerId": null, "controllerName": null, "createdAt": "2026-01-14T10:00:00Z", "updatedAt": "2026-01-14T10:00:00Z" },
+    { "id": "hst_crest", "name": "Crest View", "collageId": "loc_unity", "isActive": true, "planTypes": ["device"], "deviceUserCounts": [3], "controllerId": null, "controllerName": null, "createdAt": "2026-01-15T10:00:00Z", "updatedAt": "2026-01-15T10:00:00Z" },
+    { "id": "hst_sunrise", "name": "Sunrise Villa", "collageId": "loc_unity", "isActive": true, "planTypes": ["device"], "deviceUserCounts": [3], "controllerId": null, "controllerName": null, "createdAt": "2026-01-16T10:00:00Z", "updatedAt": "2026-01-16T10:00:00Z" },
+    { "id": "hst_palm_court", "name": "Palm Court", "collageId": "loc_palm", "isActive": true, "planTypes": ["device", "unlimited"], "deviceUserCounts": [3], "controllerId": null, "controllerName": null, "createdAt": "2026-02-03T10:00:00Z", "updatedAt": "2026-02-03T10:00:00Z" },
+    { "id": "hst_coconut", "name": "Coconut Hall", "collageId": "loc_palm", "isActive": true, "planTypes": ["device"], "deviceUserCounts": [3], "controllerId": null, "controllerName": null, "createdAt": "2026-02-04T10:00:00Z", "updatedAt": "2026-02-04T10:00:00Z" },
+    { "id": "hst_riverside", "name": "Riverside Lodge", "collageId": null, "isActive": true, "planTypes": ["device"], "deviceUserCounts": [3], "controllerId": null, "controllerName": null, "createdAt": "2026-04-01T10:00:00Z", "updatedAt": "2026-04-01T10:00:00Z" }
+  ],
+  "schools": [],
+  "withSchool": {
+    "schools": [
+      { "id": "sch_lakeside", "name": "Lakeside University", "slug": "lakeside-university", "isActive": true, "createdAt": "2026-05-01T09:00:00Z", "updatedAt": "2026-05-01T09:00:00Z" }
+    ],
+    "collages": [
+      { "id": "loc_science", "name": "College of Science", "slug": "college-of-science", "schoolId": "sch_lakeside", "isActive": true, "createdAt": "2026-05-02T09:00:00Z", "updatedAt": "2026-05-02T09:00:00Z" }
+    ],
+    "hostels": [
+      { "id": "hst_newton", "name": "Newton Hall", "collageId": "loc_science", "isActive": true, "planTypes": ["device"], "deviceUserCounts": [3], "controllerId": null, "controllerName": null, "createdAt": "2026-05-03T10:00:00Z", "updatedAt": "2026-05-03T10:00:00Z" }
+    ]
+  },
+  "supportContacts": [{ "username": "Emeka", "whatsappPhone": "2348030000001" }]
+}

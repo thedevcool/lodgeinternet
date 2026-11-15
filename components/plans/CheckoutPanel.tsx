@@ -244,13 +244,16 @@ function SecureNote() {
       <p className="ui-footnote flex items-center justify-center gap-1.5 text-ink-2">
         <Lock className="h-3.5 w-3.5" /> Secure payment
       </p>
-      <p className="ui-footnote text-ink-3">
+      {/* ink-2, and the links underlined: this line is read on the glass of
+          the checkout sheet, where ink-3 was too faint, and its links looked
+          like the words around them. */}
+      <p className="ui-footnote text-ink-2">
         By paying you agree to our{" "}
-        <Link href="/legal/terms" className="underline-offset-2 hover:underline">
+        <Link href="/legal/terms" className="underline underline-offset-2">
           Terms
         </Link>{" "}
         and{" "}
-        <Link href="/legal/refunds" className="underline-offset-2 hover:underline">
+        <Link href="/legal/refunds" className="underline underline-offset-2">
           Refund & Wallet Policy
         </Link>
         .

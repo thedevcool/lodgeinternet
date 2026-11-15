@@ -37,6 +37,7 @@ export default function BlogReviewDesk() {
   const [desk, setDesk] = useState<Desk | null>(null);
   const [failed, setFailed] = useState("");
   const [tab, setTab] = useState<Tab>("waiting");
+  const [approvingCovers, setApprovingCovers] = useState(false);
 
   const load = useCallback(async () => {
     setFailed("");
@@ -60,6 +61,25 @@ export default function BlogReviewDesk() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Live posts whose only change is a new cover illustration: one tap for all.
+  const newCovers = (desk?.posts ?? []).filter((post) => post.coverOnly).length;
+  const approveCovers = async () => {
+    setApprovingCovers(true);
+    try {
+      const res = await adminFetch("/api/admin/blog-covers/approve", { method: "POST" });
+      if (res.status === 401) {
+        router.replace("/blog/admin/login");
+        return;
+      }
+      if (!res.ok) setFailed("The covers weren't approved. Try again.");
+      else await load();
+    } catch {
+      setFailed("The covers weren't approved. Check your connection and try again.");
+    } finally {
+      setApprovingCovers(false);
+    }
+  };
 
   // A post with unpublished edits waits for a yes, wherever it stands.
   const tabOf = (post: BlogReviewRow): Tab =>
@@ -112,10 +132,24 @@ export default function BlogReviewDesk() {
             ))}
           </ChipRow>
 
+          {newCovers > 0 && (
+            <div className="mt-5 flex max-w-3xl flex-col gap-3 rounded-card bg-accent/10 p-4 sm:flex-row sm:items-center">
+              <p className="ui-subhead min-w-0 flex-1 text-ink">
+                <span className="font-semibold">
+                  {newCovers} live {newCovers === 1 ? "post has" : "posts have"} a new cover illustration.
+                </span>{" "}
+                Their words are unchanged. Open any one to look first, or approve them all.
+              </p>
+              <Button onClick={approveCovers} disabled={approvingCovers}>
+                {approvingCovers ? "Approving…" : `Approve ${newCovers === 1 ? "the cover" : `all ${newCovers} covers`}`}
+              </Button>
+            </div>
+          )}
+
           {desk.broken.length > 0 && (
             <div className="mt-5 rounded-card bg-danger/10 p-4">
-              <p className="ui-headline flex items-center gap-2 text-danger">
-                <FileWarning className="h-5 w-5" /> {desk.broken.length} post file(s) can't be read
+              <p className="ui-headline flex items-center gap-2 text-danger-ink">
+                <FileWarning className="h-5 w-5" /> {desk.broken.length} post file(s) can&apos;t be read
               </p>
               <ul className="ui-footnote mt-2 space-y-1 text-ink-2">
                 {desk.broken.map((b) => (
@@ -142,11 +176,12 @@ export default function BlogReviewDesk() {
                       <div className="flex flex-wrap items-center gap-1.5">
                         <Badge tone={STATUS_BADGE[post.status].tone}>{STATUS_BADGE[post.status].label}</Badge>
                         {post.edited && <Badge tone="warning">Edited</Badge>}
+                        {post.coverOnly && <Badge tone="neutral">New cover only</Badge>}
                         <span className="ui-footnote text-ink-3">{post.sectionTitle}</span>
                       </div>
                       <p className="ui-headline mt-1.5 text-ink">{post.title}</p>
                       {post.note && (
-                        <p className="ui-footnote mt-1 flex items-start gap-1.5 text-warning">
+                        <p className="ui-footnote mt-1 flex items-start gap-1.5 text-warning-ink">
                           <StickyNote className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                           <span className="line-clamp-2">{post.note}</span>
                         </p>

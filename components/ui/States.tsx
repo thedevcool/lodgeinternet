@@ -8,10 +8,14 @@ export function Skeleton({ className }: { className?: string }) {
   return <div aria-hidden className={cx("ui-skeleton", className)} />;
 }
 
-/** A grouped-list shaped skeleton: N rows with a tile, a title and a subtitle. */
+/**
+ * A grouped-list shaped skeleton: N rows with a tile, a title and a subtitle.
+ * role="status" is what makes "Loading" reach a screen reader: on a <div>
+ * with no role the aria-label was ignored.
+ */
 export function ListSkeleton({ rows = 4 }: { rows?: number }) {
   return (
-    <div className="overflow-hidden rounded-card bg-surface shadow-card" aria-busy aria-label="Loading">
+    <div className="overflow-hidden rounded-card bg-surface shadow-card" role="status" aria-busy aria-label="Loading">
       {Array.from({ length: rows }).map((_, i) => (
         <div key={i} className="flex items-center gap-3.5 px-4 py-3.5">
           <Skeleton className="h-12 w-12 rounded-[13px]" />

@@ -15,8 +15,8 @@ export default function InlineAlert({
   className?: string;
 }) {
   const styles = {
-    danger: "bg-danger/10 text-danger",
-    warning: "bg-warning/10 text-warning",
+    danger: "bg-danger/10 text-danger-ink",
+    warning: "bg-warning/10 text-warning-ink",
     info: "bg-accent/10 text-accent-ink",
   }[tone];
   const Icon = tone === "info" ? Info : AlertTriangle;
@@ -25,7 +25,8 @@ export default function InlineAlert({
       <Icon className="mt-0.5 h-[18px] w-[18px] shrink-0" strokeWidth={2.2} />
       <div className="ui-subhead min-w-0 flex-1">
         {title && <p className="font-semibold">{title}</p>}
-        <div className={cx(title && "mt-0.5 opacity-90")}>{children}</div>
+        {/* No opacity here: 90% of the tone's colour on its own tint fell under 4.5:1. */}
+        <div className={cx(title && "mt-0.5")}>{children}</div>
       </div>
     </div>
   );

@@ -1,0 +1,73 @@
+{
+  "_about": "The legal pages as the stand-in serves them (GET /api/legal and /api/legal/<slug>). The six slugs match the footer's fixed links (lib/legal.ts LEGAL_LINKS). The wording is placeholder text for tests, not the company's real terms.",
+  "company": "Davo-Nexus Limited",
+  "contactEmail": "legal@example.com",
+  "documents": [
+    {
+      "slug": "terms",
+      "title": "Terms of Service",
+      "summary": "The agreement between you and Lodge Internet when you buy a plan.",
+      "updated": "2026-10-23",
+      "sections": [
+        { "heading": "1. Using the service", "blocks": [
+          { "type": "p", "text": "Lodge Internet sells internet access codes for the hostels it serves. A code works on that hostel's network only." },
+          { "type": "h", "text": "Your account" },
+          { "type": "list", "items": ["Keep your password to yourself.", "One account belongs to one hostel.", "Tell us if someone else has used your account."] }
+        ] },
+        { "heading": "2. Paying", "blocks": [
+          { "type": "p", "text": "The total shown before you pay includes every charge. You are never asked for more after that." }
+        ] }
+      ]
+    },
+    {
+      "slug": "privacy",
+      "title": "Privacy Policy",
+      "summary": "What we collect, why, and how to have it removed.",
+      "updated": "2026-11-01",
+      "effective": "2026-11-01",
+      "version": "2.1",
+      "sections": [
+        { "heading": "1. What we collect", "blocks": [
+          { "type": "p", "text": "Your name, email address, phone number and the hostel you choose when you register." },
+          { "type": "list", "items": ["Purchases you make.", "The codes we issue to you."] }
+        ] }
+      ]
+    },
+    {
+      "slug": "refunds",
+      "title": "Refund & Wallet Policy",
+      "summary": "When money comes back to you, and how your wallet works.",
+      "updated": "2026-10-23",
+      "sections": [
+        { "heading": "1. Refunds", "blocks": [{ "type": "p", "text": "If we cannot give you a code after you pay, the money goes back to your wallet." }] }
+      ]
+    },
+    {
+      "slug": "acceptable-use",
+      "title": "Acceptable Use",
+      "summary": "What the network may and may not be used for.",
+      "updated": "2026-09-14",
+      "sections": [
+        { "heading": "1. Fair use", "blocks": [{ "type": "p", "text": "Do not use the network to harm other people or other networks." }] }
+      ]
+    },
+    {
+      "slug": "cookies",
+      "title": "Cookies & Storage",
+      "summary": "The few things this site keeps in your browser.",
+      "updated": "2026-09-14",
+      "sections": [
+        { "heading": "1. Sign-in", "blocks": [{ "type": "p", "text": "One cookie keeps you signed in. Your theme choice is kept on your device." }] }
+      ]
+    },
+    {
+      "slug": "data-deletion",
+      "title": "Delete your data",
+      "summary": "How to close your account and what we must keep.",
+      "updated": "2026-10-02",
+      "sections": [
+        { "heading": "1. Closing your account", "blocks": [{ "type": "p", "text": "Open the menu, choose Delete my account, and confirm with your password." }] }
+      ]
+    }
+  ]
+}

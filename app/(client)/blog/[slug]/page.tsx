@@ -5,6 +5,7 @@ import { ChevronLeft } from "lucide-react";
 import Container from "@/components/ui/Container";
 import Badge from "@/components/ui/Badge";
 import BlogBody from "@/components/blog/BlogBody";
+import BlogCover from "@/components/blog/BlogCover";
 import { AUDIENCE_LABEL, fetchBlog, fetchBlogPost, formatBlogDate, readingMinutes } from "@/lib/blog";
 
 /**
@@ -50,7 +51,9 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
           Lodge Internet · {formatBlogDate(post.published)} · {readingMinutes(post.blocks)} min read
         </p>
 
-        <div className="mt-8 border-t border-hairline pt-6">
+        <BlogCover src={post.cover} className="mt-6 rounded-card" />
+
+        <div className={post.cover ? "mt-8" : "mt-8 border-t border-hairline pt-6"}>
           <BlogBody blocks={post.blocks} />
         </div>
 

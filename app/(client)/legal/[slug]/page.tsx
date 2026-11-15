@@ -4,14 +4,31 @@ import { notFound } from "next/navigation";
 import Container from "@/components/ui/Container";
 import PageHeader from "@/components/ui/PageHeader";
 import { cx } from "@/components/ui/cx";
-import { LEGAL_LINKS, fetchLegalDocument, formatLegalDate } from "@/lib/legal";
+import { LEGAL_LINKS, LegalUnavailable, fetchLegalDocument, formatLegalDate } from "@/lib/legal";
 
-/** /legal/<slug> — one legal page, written on the server from the backend's copy. */
+/**
+ * /legal/<slug> — one legal page, written on the server from the backend's copy.
+ *
+ * A slug the backend doesn't know is a 404. When the backend can't be asked,
+ * `fetchLegalDocument` throws and ./error.tsx is shown instead ("didn't
+ * load", with Try again). Throwing, and not drawing that message here, is on
+ * purpose: Next.js never saves a page that threw, and it keeps serving the
+ * last good copy of this page when a 10-minute refresh fails. A message
+ * drawn here would be saved and served to everyone for those ten minutes.
+ */
 export const revalidate = 600;
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const doc = await fetchLegalDocument(params.slug);
-  return doc ? { title: `${doc.title} · Lodge Internet`, description: doc.summary } : { title: "Lodge Internet" };
+  const fallback = { title: "Lodge Internet" };
+  try {
+    const doc = await fetchLegalDocument(params.slug);
+    return doc ? { title: `${doc.title} · Lodge Internet`, description: doc.summary } : fallback;
+  } catch (err) {
+    // The page itself reports the failure (below, then ./error.tsx); the tab
+    // title only needs something sensible. Anything else is not ours to hide.
+    if (err instanceof LegalUnavailable) return fallback;
+    throw err;
+  }
 }
 
 export default async function LegalPage({ params }: { params: { slug: string } }) {

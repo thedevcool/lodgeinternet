@@ -1,0 +1,271 @@
+{
+  "_about": "The blog as the stand-in serves it. 'posts' is every post file in the pretend repository; 'reviews' says where each stands on the superadmin's review desk (live, waiting, update, rejected). Readers (GET /api/blog) get only the posts whose review has a 'published' date. 'how-to-buy-a-data-plan' uses every kind of block and inline mark the website can draw, including the live hostel list. Two posts have a cover illustration ('coverSvg': shapes only, 1200 x 630); readers and the review desk only see covers when the scenario's 'covers' knob says so.",
+  "today": "2026-11-15",
+  "sections": [
+    {
+      "key": "guides",
+      "title": "Guides"
+    },
+    {
+      "key": "engineering",
+      "title": "Engineering"
+    },
+    {
+      "key": "news",
+      "title": "News"
+    }
+  ],
+  "posts": [
+    {
+      "slug": "how-to-buy-a-data-plan",
+      "title": "How to buy a data plan",
+      "summary": "Pick your hostel, choose a plan and pay. Your code shows on screen straight away.",
+      "section": "guides",
+      "audience": "customers",
+      "checked": "2026-11-10",
+      "note": "",
+      "covers": [
+        "frontend/components/plans/usePlansCheckout.ts",
+        "backend/app/routers/data_codes.py"
+      ],
+      "contentHash": "hash-buy-01",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Buying internet for your room takes about a minute. You need **your email** and a way to pay, and *nothing else*."
+        },
+        {
+          "type": "h2",
+          "text": "Find your hostel"
+        },
+        {
+          "type": "p",
+          "text": "Start from [the hostel list](/hostels) or pick yours below. Every hostel we serve is on this list:"
+        },
+        {
+          "type": "hostels"
+        },
+        {
+          "type": "h2",
+          "text": "Choose a plan"
+        },
+        {
+          "type": "ul",
+          "items": [
+            "Device plans cover three or five devices.",
+            "Unlimited plans run for a set number of days.",
+            "TV plans are tied to one television."
+          ]
+        },
+        {
+          "type": "h3",
+          "text": "What you pay"
+        },
+        {
+          "type": "p",
+          "text": "The figure on the plan is the figure you pay. Read the [terms](https://lodgeinternet.com/legal/terms) if you want the detail, or see [this outside page](https://example.org/elsewhere)."
+        },
+        {
+          "type": "p",
+          "text": "A link dressed up to look like one of our pages, such as [this look-alike](//example.org/plans) or [this one](/\\example.org), is shown as plain words too."
+        },
+        {
+          "type": "ol",
+          "items": [
+            "Tap the plan you want.",
+            "Tap Continue, then Pay.",
+            "Keep the page open until your code appears."
+          ]
+        },
+        {
+          "type": "quote",
+          "text": "Keep the page open until your code is on screen."
+        },
+        {
+          "type": "p",
+          "text": "Your code is a short number such as `48213907`. Type it on the hostel Wi-Fi sign-in page."
+        },
+        {
+          "type": "code",
+          "lang": "text",
+          "text": "Wi-Fi name:  Lodge Internet\nSign-in page opens by itself\nEnter code:  your 8 digits"
+        }
+      ],
+      "coverSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1200 630\"><rect width=\"1200\" height=\"630\" fill=\"#2563eb\"/><circle cx=\"600\" cy=\"315\" r=\"180\" fill=\"#ffffff\" opacity=\"0.2\"/><rect x=\"420\" y=\"255\" width=\"360\" height=\"120\" rx=\"28\" fill=\"#ffffff\"/></svg>"
+    },
+    {
+      "slug": "what-happens-when-you-pay",
+      "title": "What happens when you pay",
+      "summary": "We hold a code for you before you pay, so the one you paid for is always the one you get.",
+      "section": "guides",
+      "audience": "everyone",
+      "checked": "2026-11-08",
+      "note": "Rewritten after the wallet launch: the middle section is new.",
+      "covers": [
+        "backend/app/routers/data_codes.py"
+      ],
+      "contentHash": "hash-pay-02",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "When you tap Pay, we first set one code aside with your name on it. Only then does the payment page open."
+        },
+        {
+          "type": "h2",
+          "text": "If you close the payment page"
+        },
+        {
+          "type": "p",
+          "text": "The code goes back on the shelf for the next person. Nothing is charged."
+        }
+      ]
+    },
+    {
+      "slug": "how-we-hold-your-code",
+      "title": "How we hold your code",
+      "summary": "A look at the reservation step that stops two people buying the last code.",
+      "section": "engineering",
+      "audience": "engineers",
+      "checked": "2026-11-05",
+      "note": "",
+      "covers": [
+        "backend/app/routers/data_codes.py",
+        "backend/app/services/pool.py"
+      ],
+      "contentHash": "hash-hold-03",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Two students tapping Pay in the same second used to race for the last code. Now the first tap wins it and the second is told straight away."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "text": "reservation_id, expires = await reserve_code_for_pool(pool=pool, uid=uid)"
+        }
+      ],
+      "coverSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1200 630\"><rect width=\"1200\" height=\"630\" fill=\"#2563eb\"/><circle cx=\"600\" cy=\"315\" r=\"180\" fill=\"#ffffff\" opacity=\"0.2\"/><rect x=\"420\" y=\"255\" width=\"360\" height=\"120\" rx=\"28\" fill=\"#ffffff\"/></svg>"
+    },
+    {
+      "slug": "your-wallet-explained",
+      "title": "Your wallet, explained",
+      "summary": "Top up once by bank transfer, then buy any plan in one tap.",
+      "section": "guides",
+      "audience": "customers",
+      "checked": "2026-11-12",
+      "note": "Please check the part about account numbers reads clearly.",
+      "covers": [
+        "frontend/components/wallet/WalletSection.tsx"
+      ],
+      "contentHash": "hash-wallet-04",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Your wallet is money you keep with Lodge Internet for buying plans. It comes with a bank account number that is yours alone."
+        },
+        {
+          "type": "h2",
+          "text": "Topping up"
+        },
+        {
+          "type": "p",
+          "text": "Send any amount to your account number from your bank app. It lands in your wallet within a minute or two."
+        }
+      ]
+    },
+    {
+      "slug": "sharing-a-plan-with-roommates",
+      "title": "Sharing a plan with roommates",
+      "summary": "One plan can cover three or five devices. Here is how to split it fairly.",
+      "section": "guides",
+      "audience": "customers",
+      "checked": "2026-11-13",
+      "note": "",
+      "covers": [
+        "frontend/components/plans/PlanPicker.tsx"
+      ],
+      "contentHash": "hash-share-05",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A five-device plan is the cheapest way for a full room to get online. One person buys it and shares the code."
+        }
+      ]
+    },
+    {
+      "slug": "our-first-year",
+      "title": "Our first year",
+      "summary": "What we built, what broke, and what we are doing next.",
+      "section": "news",
+      "audience": "everyone",
+      "checked": "2026-10-30",
+      "note": "",
+      "covers": [
+        "docs/platform-and-app-plan.md"
+      ],
+      "contentHash": "hash-year-06",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A year ago Lodge Internet served one hostel. This is the story of how that grew."
+        }
+      ]
+    }
+  ],
+  "reviews": {
+    "how-to-buy-a-data-plan": {
+      "status": "live",
+      "published": "2026-11-03",
+      "updated": "2026-11-10",
+      "reviewNote": null,
+      "reviewedBy": "ifeoma",
+      "reviewedAt": "2026-11-10T10:00:00+00:00"
+    },
+    "what-happens-when-you-pay": {
+      "status": "update",
+      "published": "2026-10-28",
+      "updated": "2026-10-28",
+      "reviewNote": null,
+      "reviewedBy": "ifeoma",
+      "reviewedAt": "2026-10-28T10:00:00+00:00"
+    },
+    "how-we-hold-your-code": {
+      "status": "live",
+      "published": "2026-10-19",
+      "updated": "2026-10-19",
+      "reviewNote": null,
+      "reviewedBy": "ifeoma",
+      "reviewedAt": "2026-10-19T10:00:00+00:00"
+    },
+    "your-wallet-explained": {
+      "status": "waiting",
+      "published": null,
+      "updated": null,
+      "reviewNote": null,
+      "reviewedBy": null,
+      "reviewedAt": null
+    },
+    "sharing-a-plan-with-roommates": {
+      "status": "waiting",
+      "published": null,
+      "updated": null,
+      "reviewNote": null,
+      "reviewedBy": null,
+      "reviewedAt": null
+    },
+    "our-first-year": {
+      "status": "rejected",
+      "published": null,
+      "updated": null,
+      "reviewNote": "Too early to publish. Come back to this in January.",
+      "reviewedBy": "ifeoma",
+      "reviewedAt": "2026-11-01T10:00:00+00:00"
+    }
+  },
+  "broken": [
+    {
+      "slug": "draft-notes",
+      "reason": "the summary line is missing"
+    }
+  ]
+}

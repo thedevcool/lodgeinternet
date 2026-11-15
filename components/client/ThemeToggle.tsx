@@ -60,17 +60,26 @@ const OPTIONS: Array<{ value: ThemePref; label: string; icon: typeof Sun }> = [
   { value: "system", label: "System", icon: Monitor },
 ];
 
-/** Three-way pill with a sliding thumb. `withLabels` shows the words too. */
+/**
+ * Three-way pill with a sliding thumb. `withLabels` shows the words too.
+ *
+ * Each option is 44 px tall to tap (standard F5), but the pill is drawn at
+ * the 40 px it always was: the grey track is a layer set 2 px in from the
+ * top and bottom, and `-my-0.5` gives those 2 px back to the page so nothing
+ * around the toggle moves. Without labels an option is 44 px wide as well.
+ */
 export default function ThemeToggle({ withLabels, className }: { withLabels?: boolean; className?: string }) {
   const [pref, choose] = useThemePref();
   const index = OPTIONS.findIndex((o) => o.value === pref);
 
   return (
-    <div role="radiogroup" aria-label="Appearance" className={cx("relative inline-flex rounded-full bg-ink/[0.06] p-1", className)}>
+    <div role="radiogroup" aria-label="Appearance" className={cx("relative -my-0.5 inline-flex px-1", className)}>
+      {/* the visible track */}
+      <span aria-hidden className="absolute inset-x-0 inset-y-0.5 rounded-full bg-ink/[0.06]" />
       {/* sliding thumb */}
       <span
         aria-hidden
-        className="absolute bottom-1 left-1 top-1 rounded-full bg-surface shadow-[0_2px_8px_rgb(0_0_0/0.14)] transition-transform duration-500 ease-spring"
+        className="absolute bottom-1.5 left-1 top-1.5 rounded-full bg-surface shadow-[0_2px_8px_rgb(0_0_0/0.14)] transition-transform duration-500 ease-spring"
         style={{ width: `calc((100% - 8px) / ${OPTIONS.length})`, transform: `translateX(${index * 100}%)` }}
       />
       {OPTIONS.map(({ value, label, icon: Icon }) => (
@@ -83,8 +92,8 @@ export default function ThemeToggle({ withLabels, className }: { withLabels?: bo
           title={label}
           onClick={() => choose(value)}
           className={cx(
-            "relative flex h-8 flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold transition-colors",
-            withLabels ? "px-3" : "w-9",
+            "relative flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold transition-colors",
+            withLabels ? "px-3" : "w-11",
             pref === value ? "text-ink" : "text-ink-2 hover:text-ink",
           )}
         >

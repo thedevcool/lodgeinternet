@@ -86,7 +86,7 @@ function LoginContent() {
   };
 
   return (
-    <AuthShell tabs="login" title="Welcome back" subtitle="Sign in to manage your Lodge Internet connection.">
+    <AuthShell tabs="login" redirect={redirectTarget} title="Welcome back" subtitle="Sign in to manage your Lodge Internet connection.">
       <form onSubmit={handleLogin} className="space-y-5">
         {error && <InlineAlert>{error}</InlineAlert>}
 
@@ -123,7 +123,11 @@ function LoginContent() {
 
       <p className="ui-subhead mt-6 text-center text-ink-2">
         Don&apos;t have an account?{" "}
-        <Link href="/register" className="font-semibold text-accent-ink">
+        {/* Carries `redirect` on, as the register page's "Sign In" link does. */}
+        <Link
+          href={redirectTarget ? `/register?redirect=${encodeURIComponent(redirectTarget)}` : "/register"}
+          className="font-semibold text-accent-ink"
+        >
           Create Account
         </Link>
       </p>

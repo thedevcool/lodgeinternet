@@ -27,15 +27,15 @@ export function PaymentWarningAlert({ c }: { c: PlansCheckout }) {
     // No onClose: the only way on is "I Understand", exactly as before.
     <Sheet open={c.showPaymentWarning} variant="alert" layer="alert" ariaLabel="Before you pay">
       <div className="payment-warning-shake text-center">
-        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-danger/10 text-danger">
+        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-danger/10 text-danger-ink">
           <TriangleAlert className="h-7 w-7" />
         </span>
-        <h2 className="ui-title-3 mt-4 text-danger">Bad Things Will Happen If You Do Not Read This Modal</h2>
+        <h2 className="ui-title-3 mt-4 text-danger-ink">Bad Things Will Happen If You Do Not Read This Modal</h2>
         <p className="ui-subhead mt-2 text-ink-2">
           After making payment, you must return to this site to get your access code. If you leave before your code
           appears, it may be difficult to recover it.
         </p>
-        <p className="ui-footnote mt-4 rounded-inner bg-danger/10 px-3 py-2.5 font-semibold text-danger">
+        <p className="ui-footnote mt-4 rounded-inner bg-danger/10 px-3 py-2.5 font-semibold text-danger-ink">
           Keep this page open until your code is displayed.
         </p>
         <Button full className="mt-5" onClick={() => c.acknowledgePaymentWarning()}>
@@ -93,7 +93,7 @@ export function CodeSheet({ c }: { c: PlansCheckout }) {
         </div>
       ) : (
         <div className="pt-1 text-center">
-          <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-success/10 text-success">
+          <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-success/10 text-success-ink">
             <span className="h-8 w-8 animate-spin rounded-full border-[3px] border-current border-t-transparent" />
           </span>
           <h2 className="ui-title-2 mt-4 text-ink">Payment successful!</h2>
@@ -118,7 +118,7 @@ function FeedbackRow({ c }: { c: PlansCheckout }) {
 
   if (c.feedbackSubmitted) {
     return (
-      <div className="mt-5 rounded-2xl bg-success/10 px-4 py-3 text-left text-success">
+      <div className="mt-5 rounded-2xl bg-success/10 px-4 py-3 text-left text-success-ink">
         <p className="ui-subhead font-semibold">Thank you for your feedback!</p>
         <p className="ui-footnote mt-0.5 opacity-90">We appreciate you taking the time to share your thoughts with us.</p>
       </div>

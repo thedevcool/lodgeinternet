@@ -1,0 +1,21 @@
+# The website's test runner for `npm run test:server` (tools/test_server.sh).
+#
+# Node 22, the same as CI (.github/workflows/test.yml): Playwright's own image
+# ships a newer Node whose built-in localStorage breaks the unit tests'
+# browser-like environment, so the browser is installed here instead.
+# Dependencies and the browser come first so their layers stay cached on the
+# server until package-lock.json changes; only the code is re-copied each run.
+FROM node:22-bookworm
+
+ENV CI=true \
+    NEXT_TELEMETRY_DISABLED=1 \
+    # The test server has about 3.5 GB in all: keep the build inside it.
+    NODE_OPTIONS=--max-old-space-size=1536
+
+WORKDIR /site
+
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund \
+    && npx playwright install --with-deps chromium
+
+COPY . .

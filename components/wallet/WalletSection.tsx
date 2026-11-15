@@ -265,6 +265,10 @@ function CardTopUp() {
 
   return (
     <form
+      // noValidate: `min` below made the browser stop an amount under 500
+      // with its own bubble, so our message ("Top up at least ₦500.", tied
+      // to the field for screen readers) only ever showed for an empty box.
+      noValidate
       onSubmit={(e) => {
         e.preventDefault();
         start();
@@ -292,9 +296,9 @@ function CardTopUp() {
 
 // Label + icon per ledger entry type (literal classes so Tailwind keeps them).
 const ACTIVITY: Record<string, { label: string; icon: typeof ArrowDownLeft; tile: string }> = {
-  wallet_topup: { label: "Top-up", icon: ArrowDownLeft, tile: "bg-success/10 text-success" },
+  wallet_topup: { label: "Top-up", icon: ArrowDownLeft, tile: "bg-success/10 text-success-ink" },
   wallet_spend: { label: "Plan purchase", icon: ArrowUpRight, tile: "bg-accent/10 text-accent-ink" },
-  wallet_spend_reversal: { label: "Refund", icon: RotateCcw, tile: "bg-success/10 text-success" },
+  wallet_spend_reversal: { label: "Refund", icon: RotateCcw, tile: "bg-success/10 text-success-ink" },
   wallet_adjustment: { label: "Adjustment", icon: SlidersHorizontal, tile: "bg-ink/[0.06] text-ink-2" },
 };
 
@@ -326,7 +330,7 @@ function ActivityRow({ item }: { item: WalletActivity }) {
           : "—"
       }
       trailing={
-        <span className={cx("font-semibold tabular-nums", moneyIn ? "text-success" : "text-ink")}>
+        <span className={cx("font-semibold tabular-nums", moneyIn ? "text-success-ink" : "text-ink")}>
           {moneyIn ? "+" : "−"}
           {naira(Math.abs(item.changeKobo))}
         </span>
