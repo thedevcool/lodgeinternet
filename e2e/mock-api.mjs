@@ -749,7 +749,18 @@ const routes = {
   "GET /api/giveaways/mine": ({ req, session }) => {
     const customer = signedInCustomer(req, session);
     if (!customer) return apiError(401, "Sign in to claim your welcome code.", "AUTH_REQUIRED");
-    return answer(200, { claim: session.welcomeClaims[customer.uid] ?? null });
+    const claim = session.welcomeClaims[customer.uid] ?? null;
+    // No code yet: one is on offer when a claim at their own hostel would pass.
+    const isNew = Boolean(session.signups[customer.uid]);
+    const mayClaim =
+      !claim &&
+      welcomeStatus(session) === "open" &&
+      customer.emailVerified &&
+      customer.hostelId === WELCOME.hostel &&
+      customer.phone &&
+      (isNew || session.scenario.giveaway === "everyone");
+    const offer = mayClaim ? { hostel: WELCOME.hostel, gives: WELCOME.gives, auto: isNew } : null;
+    return answer(200, { claim, offer });
   },
 
   "POST /api/giveaways/claim": ({ req, session, body }) => {
@@ -760,7 +771,9 @@ const routes = {
     if (mine) return answer(200, { claim: mine, alreadyClaimed: true });
 
     const status = welcomeStatus(session);
-    if (!status || body.token !== WELCOME.token) return WELCOME_NOT_FOUND();
+    // With no token the claim is at the customer's own hostel (the Account page).
+    const here = body.token ? body.token === WELCOME.token : customer.hostelId === WELCOME.hostel;
+    if (!status || !here) return WELCOME_NOT_FOUND();
     if (status === "out_of_codes") {
       return apiError(409, `All the welcome codes at ${WELCOME.hostel} have been claimed.`, "GIVEAWAY_OUT_OF_CODES");
     }

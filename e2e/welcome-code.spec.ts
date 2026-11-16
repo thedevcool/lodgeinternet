@@ -4,7 +4,9 @@
  *
  * The poster's QR code opens /welcome/<token>. The stand-in knows one
  * giveaway, Palm Court's (e2e/mock-api.mjs, WELCOME), switched with the
- * `giveaway` scenario knob. Who may claim is the backend's decision; these
+ * `giveaway` scenario knob. Since 2026-11-16 no poster is needed: a resident
+ * who signs up at the hostel is given the code on landing on the Account
+ * page, and the last tests here follow that. Who may claim is the backend's decision; these
  * check that the website asks, shows the code, and shows the backend's
  * reason when it says no.
  */
@@ -156,3 +158,69 @@ test("an Account page with no welcome code shows no welcome-code section", async
   await expect(page.getByRole("heading", { level: 1, name: "Account" })).toBeVisible();
   await expect(page.getByText("Your welcome code")).toHaveCount(0);
 });
+
+test("a resident who signs up at a switched-on hostel, with no poster, is given the code on landing on the Account page", async ({ page, api }) => {
+  await api.scenario({ giveaway: "open", wallet: "new" });
+  await page.goto("/register?hostel=Palm%20Court");
+
+  await expect(page.getByText("Create your account for Palm Court")).toBeVisible();
+  await page.getByLabel("Full Name").fill("Ngozi Eze");
+  await page.getByLabel("Email Address").fill("ngozi.eze@example.com");
+  await page.getByLabel("Phone Number").fill("0803 555 0177");
+  await page.getByLabel("Password", { exact: true }).fill("first-password");
+  await page.getByLabel("Confirm Password").fill("first-password");
+  await page.getByRole("button", { name: "Create Account" }).click();
+  await page.getByLabel("Verification Code").fill(VERIFICATION_CODE);
+  await page.getByRole("button", { name: "Verify Email" }).click();
+
+  // ── Landed: the code is in a sheet, nothing pressed ────────────────────
+  await expect(page).toHaveURL("/dashboard");
+  const sheet = page.getByRole("dialog", { name: "Your free welcome code" });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByText(WELCOME_CODE)).toBeVisible();
+  await expect(sheet.getByText(WELCOME_GIVES)).toBeVisible();
+  await expect(sheet.getByText(/We've emailed it to you too/)).toBeVisible();
+  await checkPage(page);
+
+  // One claim, with no poster token.
+  const claims = (await api.state()).log.filter((entry) => entry.path === "/api/giveaways/claim");
+  expect(claims.map((entry) => entry.body)).toEqual([{}]);
+
+  // ── Done: it stays on the page, and coming back opens no second sheet ──
+  await sheet.getByRole("button", { name: "Done" }).click();
+  await expect(sheet).toBeHidden();
+  await expect(page.getByText("Your welcome code")).toBeVisible();
+  await expect(page.getByText(WELCOME_CODE)).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("Your welcome code")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Your free welcome code" })).toHaveCount(0);
+  await checkPage(page);
+});
+
+test("where everyone may claim, an older account gets a button on the Account page and the code when it is pressed", async ({ page, api }) => {
+  await api.scenario({ giveaway: "everyone" });
+  await api.signIn("tunde");
+  await page.goto("/dashboard");
+
+  await expect(page.getByText("A free welcome code")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Your free welcome code" })).toHaveCount(0);
+  await checkPage(page);
+
+  await page.getByRole("button", { name: "Get my free code" }).click();
+
+  const sheet = page.getByRole("dialog", { name: "Your free welcome code" });
+  await expect(sheet.getByText(WELCOME_CODE)).toBeVisible();
+  await checkPage(page);
+  await sheet.getByRole("button", { name: "Done" }).click();
+  await expect(page.getByText("Your welcome code")).toBeVisible();
+});
+
+test("an older account at a hostel giving to new accounts only is shown nothing about welcome codes", async ({ page, api }) => {
+  await api.scenario({ giveaway: "open" });
+  await api.signIn("tunde");
+  await page.goto("/dashboard");
+
+  await expect(page.getByRole("heading", { level: 1, name: "Account" })).toBeVisible();
+  await expect(page.getByText(/welcome code/i)).toHaveCount(0);
+});
+
