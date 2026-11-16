@@ -3,19 +3,23 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Gift, Printer, Users } from "lucide-react";
+import { Gift, Printer, RefreshCw, Users } from "lucide-react";
 import { adminFetch } from "@/lib/apiClient";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
 import { AdminPage, EmptyState, GLASS_INPUT, Modal, Panel, SegToggle } from "@/components/admin/ui";
 import {
   STATUS_CHIP,
-  STATUS_LABEL,
+  describeSync,
   endOfDayIso,
   formatDay,
+  formatMoment,
+  isSwitchedOn,
   isoToDateInput,
   lastDay,
   startOfDayIso,
+  statusLabel,
   toDateInput,
+  type BonusSyncReport,
   type GiveawayHostel,
   type GiveawayOverview,
 } from "@/lib/giveaway";
@@ -25,16 +29,23 @@ import {
  * each resident who creates an account (backend: app/routers/
  * admin_giveaways.py). Superadmin only, because it gives stock away.
  *
- * Three things happen here:
+ * Four things happen here:
  *  - the bonus words, which tell the sync which voucher groups on a
  *    controller are free codes and must never be sold;
  *  - each hostel's switch, dates, who may claim and ceiling;
+ *  - fetching the codes: "Sync codes" on a switched-on hostel reads its
+ *    controller's bonus groups (and nothing for sale), and switching a hostel
+ *    on does the same straight away. The codes are the controller's, so every
+ *    switched-on hostel on it gives from the same ones;
  *  - each hostel's poster (its QR code opens the claim) and its claims.
  *
  * The codes themselves are uploaded on the controller, not here.
  */
 
 type Claim = { claimedAt: string | null; email: string; code: string; gives: string; group: string };
+
+/** What the last "Sync codes" on this page found, shown under the hostel it was pressed on. */
+type SyncResult = { hostelId: string; ok: boolean; found: string; skipped: string[] };
 
 export default function AdminGiveawaysPage() {
   const searchParams = useSearchParams();
@@ -46,6 +57,8 @@ export default function AdminGiveawaysPage() {
   const [editing, setEditing] = useState<GiveawayHostel | null>(null);
   const [claimsFor, setClaimsFor] = useState<GiveawayHostel | null>(null);
   const [openedFromLink, setOpenedFromLink] = useState(false);
+  const [syncing, setSyncing] = useState<string | null>(null);
+  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
 
   const load = useCallback(() => {
     setError("");
@@ -59,6 +72,26 @@ export default function AdminGiveawaysPage() {
   }, []);
 
   useEffect(load, [load]);
+
+  // Fetch the welcome codes from a hostel's controller and say what came back.
+  const syncCodes = async (hostel: GiveawayHostel) => {
+    setSyncing(hostel.hostelId);
+    setSyncResult(null);
+    try {
+      const res = await adminFetch(`/api/admin/giveaways/${encodeURIComponent(hostel.hostelId)}/sync`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Could not fetch the codes");
+      const words = { bonus: overview?.bonusWords ?? [], blocked: overview?.blockedWords ?? [] };
+      const said = describeSync(data.report as BonusSyncReport, hostel.controller || "the controller", words);
+      setSyncResult({ hostelId: hostel.hostelId, ...said });
+    } catch (err: any) {
+      setSyncResult({ hostelId: hostel.hostelId, ok: false, found: err.message || "Could not fetch the codes", skipped: [] });
+    } finally {
+      setSyncing(null);
+      // Reload either way: the counts on every hostel of that controller moved.
+      load();
+    }
+  };
 
   useEffect(() => {
     if (!overview || openedFromLink || !hostelFromLink) return;
@@ -91,7 +124,7 @@ export default function AdminGiveawaysPage() {
             <Panel
               eyebrow="HOSTELS"
               title="Who is giving codes"
-              description="Switch a hostel on, set its dates, then print its poster. Residents scan the poster to claim."
+              description="Switch a hostel on and set its dates: its controller's codes are fetched straight away. Then print its poster. Residents scan the poster to claim."
             >
               {onControllers.length === 0 ? (
                 <EmptyState title="No hostel is on a controller yet.">
@@ -103,6 +136,10 @@ export default function AdminGiveawaysPage() {
                     <HostelRow
                       key={hostel.hostelId}
                       hostel={hostel}
+                      syncing={syncing === hostel.hostelId}
+                      syncBusy={syncing !== null}
+                      syncResult={syncResult?.hostelId === hostel.hostelId ? syncResult : null}
+                      onSync={() => syncCodes(hostel)}
                       onEdit={() => setEditing(hostel)}
                       onClaims={() => setClaimsFor(hostel)}
                     />
@@ -122,9 +159,13 @@ export default function AdminGiveawaysPage() {
           <SettingsModal
             hostel={editing}
             onClose={() => setEditing(null)}
-            onSaved={() => {
+            onSaved={(switchedOn) => {
+              const hostel = editing;
               setEditing(null);
-              load();
+              // Switching a hostel on fetches its controller's codes at once,
+              // so it never sits "on" with codes waiting on the controller.
+              if (switchedOn) void syncCodes(hostel);
+              else load();
             }}
           />
         )}
@@ -140,7 +181,8 @@ function BonusCodes({ overview, onSaved }: { overview: GiveawayOverview; onSaved
   const [words, setWords] = useState(overview.bonusWords.join(", "));
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
-  const withCodes = overview.controllers.filter((c) => c.bonusAvailable > 0 || c.bonusClaimed > 0);
+  const withCodes = overview.controllers.filter((c) => c.bonusAvailable > 0 || c.bonusClaimed > 0 || c.lastBonusSync);
+  const skipWords = { bonus: overview.bonusWords, blocked: overview.blockedWords };
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,28 +214,42 @@ function BonusCodes({ overview, onSaved }: { overview: GiveawayOverview; onSaved
         <>
           Upload them on the controller as a voucher group named like a plan, with a bonus word in the name, for example{" "}
           <span className="break-all font-mono text-slate-700">BONUS|2GB|3|1|0</span> (name, data, devices, days, price 0).
-          Then run a sync. A group with a bonus word is never sold.
+          Then press Sync codes on a hostel below. A group with a bonus word is never sold.
         </>
       }
     >
       {withCodes.length === 0 ? (
         <EmptyState icon={<Gift size={22} />} title="No bonus codes on any controller yet.">
-          Create a bonus voucher group on a controller, then sync it from the Data Codes page.
+          Create a bonus voucher group on a controller, switch a hostel on below, then press Sync codes on it.
         </EmptyState>
       ) : (
         <ul className="space-y-2">
-          {withCodes.map((controller) => (
-            <li key={controller.id} className="glass-card flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-              <div className="min-w-0">
-                <p className="break-words font-semibold text-slate-900">{controller.name}</p>
-                <p className="text-sm text-slate-500">{controller.gives || "None left to give out"}</p>
-              </div>
-              <p className="text-sm text-slate-700">
-                <span className="font-semibold text-slate-900">{controller.bonusAvailable}</span> ready ·{" "}
-                {controller.bonusClaimed} claimed
-              </p>
-            </li>
-          ))}
+          {withCodes.map((controller) => {
+            // What the latest fetch skipped stays here until the next one, so
+            // a group whose name doesn't fit is seen and not guessed at.
+            const last = controller.lastBonusSync;
+            const skipped = last ? describeSync(last, controller.name, skipWords).skipped : [];
+            return (
+              <li key={controller.id} className="glass-card">
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                  <div className="min-w-0">
+                    <p className="break-words font-semibold text-slate-900">{controller.name}</p>
+                    <p className="text-sm text-slate-500">{controller.gives || "None ready to give out"}</p>
+                  </div>
+                  <p className="text-sm text-slate-700">
+                    <span className="font-semibold text-slate-900">{controller.bonusAvailable}</span> ready ·{" "}
+                    {controller.bonusClaimed} claimed
+                  </p>
+                </div>
+                {last && <p className="mt-1 text-xs text-slate-500">Codes last fetched {formatMoment(last.ranAt)}</p>}
+                {skipped.map((line) => (
+                  <p key={line} className="mt-2 break-words rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    {line}
+                  </p>
+                ))}
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -228,7 +284,25 @@ function BonusCodes({ overview, onSaved }: { overview: GiveawayOverview; onSaved
 
 /* ── One hostel ── */
 
-function HostelRow({ hostel, onEdit, onClaims }: { hostel: GiveawayHostel; onEdit: () => void; onClaims: () => void }) {
+function HostelRow({
+  hostel,
+  syncing,
+  syncBusy,
+  syncResult,
+  onSync,
+  onEdit,
+  onClaims,
+}: {
+  hostel: GiveawayHostel;
+  /** This hostel's fetch is running. */
+  syncing: boolean;
+  /** Some hostel's fetch is running: one at a time. */
+  syncBusy: boolean;
+  syncResult: SyncResult | null;
+  onSync: () => void;
+  onEdit: () => void;
+  onClaims: () => void;
+}) {
   const settings = hostel.giveaway;
   const ceiling = settings?.maxCodes ? ` of ${settings.maxCodes}` : "";
   return (
@@ -240,7 +314,7 @@ function HostelRow({ hostel, onEdit, onClaims }: { hostel: GiveawayHostel; onEdi
             {hostel.controller} · {hostel.bonusAvailable} bonus code{hostel.bonusAvailable === 1 ? "" : "s"} ready
           </p>
         </div>
-        <span className={`text-xs ${STATUS_CHIP[hostel.status]}`}>{STATUS_LABEL[hostel.status]}</span>
+        <span className={`text-xs ${STATUS_CHIP[hostel.status]}`}>{statusLabel(hostel)}</span>
       </div>
       {settings && (
         <p className="mt-2 text-sm text-slate-600">
@@ -253,6 +327,11 @@ function HostelRow({ hostel, onEdit, onClaims }: { hostel: GiveawayHostel; onEdi
         <button type="button" onClick={onEdit} className="glass-button">
           {settings ? "Change" : "Set up"}
         </button>
+        {isSwitchedOn(hostel) && (
+          <button type="button" onClick={onSync} disabled={syncBusy} className="glass-button">
+            <RefreshCw size={16} className={syncing ? "animate-spin" : ""} /> {syncing ? "Fetching codes…" : "Sync codes"}
+          </button>
+        )}
         {settings && (
           <Link href={`/admin/giveaways/poster?hostel=${encodeURIComponent(hostel.hostelId)}`} className="glass-button">
             <Printer size={16} /> Poster
@@ -264,13 +343,34 @@ function HostelRow({ hostel, onEdit, onClaims }: { hostel: GiveawayHostel; onEdi
           </button>
         )}
       </div>
+      {syncResult && (
+        <div role="status" className="mt-3 space-y-2 text-sm">
+          <p className={`break-words rounded-xl px-3 py-2 ${syncResult.ok ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>
+            {syncResult.found}
+          </p>
+          {syncResult.skipped.map((line) => (
+            <p key={line} className="break-words rounded-xl bg-amber-50 px-3 py-2 text-amber-800">
+              {line}
+            </p>
+          ))}
+        </div>
+      )}
     </li>
   );
 }
 
 /* ── A hostel's settings ── */
 
-function SettingsModal({ hostel, onClose, onSaved }: { hostel: GiveawayHostel; onClose: () => void; onSaved: () => void }) {
+function SettingsModal({
+  hostel,
+  onClose,
+  onSaved,
+}: {
+  hostel: GiveawayHostel;
+  onClose: () => void;
+  /** `switchedOn`: the hostel was saved with its switch on. */
+  onSaved: (switchedOn: boolean) => void;
+}) {
   const current = hostel.giveaway;
   const today = toDateInput(new Date());
   const [enabled, setEnabled] = useState(current ? current.enabled : true);
@@ -298,7 +398,7 @@ function SettingsModal({ hostel, onClose, onSaved }: { hostel: GiveawayHostel; o
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Could not save");
-      onSaved();
+      onSaved(enabled);
     } catch (err: any) {
       setError(err.message || "Could not save");
     } finally {
@@ -313,7 +413,7 @@ function SettingsModal({ hostel, onClose, onSaved }: { hostel: GiveawayHostel; o
       const res = await adminFetch(`/api/admin/giveaways/${encodeURIComponent(hostel.hostelId)}/poster`, { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Could not replace the poster link");
-      onSaved();
+      onSaved(false);
     } catch (err: any) {
       setError(err.message || "Could not replace the poster link");
     } finally {
@@ -342,7 +442,7 @@ function SettingsModal({ hostel, onClose, onSaved }: { hostel: GiveawayHostel; o
         <p className={hostel.bonusAvailable > 0 ? "rounded-xl bg-blue-50 px-3 py-2 text-blue-800" : "rounded-xl bg-amber-50 px-3 py-2 text-amber-800"}>
           {hostel.bonusAvailable > 0
             ? `${hostel.controller} holds ${hostel.bonusAvailable} bonus code${hostel.bonusAvailable === 1 ? "" : "s"} ready to give out.`
-            : `${hostel.controller} has no bonus codes yet. Upload them on the controller and sync, or residents will be told there are none left.`}
+            : `${hostel.controller} has no bonus codes here yet. Saving with the switch on fetches them from the controller.`}
         </p>
 
         <label className="flex min-h-[44px] items-center gap-3">

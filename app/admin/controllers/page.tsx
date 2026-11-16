@@ -7,7 +7,7 @@ import { useAuthStore } from "@/store/authStore";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import { AdminPage, EmptyState, GLASS_INPUT, IconButton, Kpi, Modal, Panel, SegToggle } from "@/components/admin/ui";
-import { endOfDayIso, lastDay, startOfDayIso, toDateInput, type GiveawayOverview } from "@/lib/giveaway";
+import { endOfDayIso, isSwitchedOn, lastDay, startOfDayIso, statusLabel, toDateInput, type GiveawayOverview } from "@/lib/giveaway";
 import {
   Building2,
   Check,
@@ -982,13 +982,17 @@ export default function AdminControllersPage() {
                                     {(() => {
                                       const row = giveaways?.hostels.find((g) => g.hostel === h);
                                       if (!row || (row.bonusAvailable <= 0 && !row.giveaway)) return null;
-                                      const label = `Welcome codes at ${h}: ${row.status === "open" ? "on" : "off"}`;
+                                      // The switch, not the stock, decides on or off: a hostel
+                                      // switched on and waiting for its codes is on (amber).
+                                      const label = `Welcome codes at ${h}: ${statusLabel(row)}`;
+                                      const tone =
+                                        row.status === "open" ? "text-emerald-600" : isSwitchedOn(row) ? "text-amber-600" : "text-slate-500";
                                       return (
                                         <Link
                                           href={`/admin/giveaways?hostel=${encodeURIComponent(row.hostelId)}`}
                                           aria-label={label}
                                           title={label}
-                                          className={`glass-icon shrink-0 ${row.status === "open" ? "text-emerald-600" : "text-slate-500"}`}
+                                          className={`glass-icon shrink-0 ${tone}`}
                                         >
                                           <Gift className="w-4 h-4" />
                                         </Link>
