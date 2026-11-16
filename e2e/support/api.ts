@@ -32,6 +32,8 @@ export type Scenario = {
   blog?: "default" | "empty";
   covers?: "none" | "approved" | "new";
   tv?: "none" | "returning";
+  /** Welcome codes at Palm Court (poster link: WELCOME_POSTER in support/data.ts). */
+  giveaway?: "none" | "open" | "ended" | "out-of-codes" | "everyone";
   maintenance?: boolean;
   fail?: BrokenRoute[];
   /** Routes ("GET /api/hostels") whose answer waits for `release()`. */

@@ -20,6 +20,7 @@ import { GroupedList, ListRow } from "@/components/ui/GroupedList";
 import { EmptyState, ErrorState, ListSkeleton, Skeleton } from "@/components/ui/States";
 import { cx } from "@/components/ui/cx";
 import WalletSection from "@/components/wallet/WalletSection";
+import WelcomeCodeSection from "@/components/giveaway/WelcomeCode";
 
 /**
  * /dashboard — the customer's Account (iOS Settings style).
@@ -426,6 +427,9 @@ export default function DashboardPage() {
           subtitle="Buy more plans"
         />
       </GroupedList>
+
+      {/* ── Welcome code (renders nothing unless they claimed one) ──────── */}
+      <WelcomeCodeSection />
 
       {/* ── Active codes (saved on this device) ─────────────────────────── */}
       {balances.length > 0 && (

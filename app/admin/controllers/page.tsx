@@ -1,16 +1,19 @@
 "use client";
 import { adminFetch } from "@/lib/apiClient";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/authStore";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
 import ConfirmationModal from "@/components/ConfirmationModal";
-import { AdminPage, EmptyState, GLASS_INPUT, IconButton, Kpi, Modal, Panel } from "@/components/admin/ui";
+import { AdminPage, EmptyState, GLASS_INPUT, IconButton, Kpi, Modal, Panel, SegToggle } from "@/components/admin/ui";
+import { endOfDayIso, lastDay, startOfDayIso, toDateInput, type GiveawayOverview } from "@/lib/giveaway";
 import {
   Building2,
   Check,
   ChevronDown,
   ChevronUp,
+  Gift,
   Globe,
   Pencil,
   Plus,
@@ -97,6 +100,12 @@ export default function AdminControllersPage() {
   const [assignHostels, setAssignHostels] = useState<string[]>([]);
   const [assigning, setAssigning] = useState(false);
 
+  // Welcome codes (the giveaway): which controllers hold bonus codes, and
+  // whether the hostels being added should start giving them out.
+  const [giveaways, setGiveaways] = useState<GiveawayOverview | null>(null);
+  const [giveOnAssign, setGiveOnAssign] = useState(false);
+  const [giveDays, setGiveDays] = useState<"7" | "14">("7");
+
   // Unassign hostel
   const [unassignTarget, setUnassignTarget] = useState<{
     controllerId: string;
@@ -146,6 +155,19 @@ export default function AdminControllersPage() {
       setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
       setLoading(false);
+    }
+    void loadGiveaways();
+  };
+
+  // Welcome codes are an extra on this page: if they can't be loaded, the
+  // controllers still work and the bonus-code notes simply don't show.
+  const loadGiveaways = async () => {
+    if (!useAuthStore.getState().adminProfile?.isSuperAdmin) return;
+    try {
+      const res = await adminFetch("/api/admin/giveaways");
+      setGiveaways(res.ok ? await res.json() : null);
+    } catch {
+      setGiveaways(null);
     }
   };
 
@@ -313,6 +335,33 @@ export default function AdminControllersPage() {
   const openAssign = (ctrl: Controller) => {
     setAssignTarget(ctrl);
     setAssignHostels([]);
+    setGiveOnAssign(false);
+    setGiveDays("7");
+  };
+
+  /** Switch welcome codes on at hostels just added, from today, for new
+      accounts only. Returns how many were switched on. Dates, ceiling and
+      the poster are on the Welcome codes page. */
+  const startGiveaways = async (hostelNames: string[]): Promise<number> => {
+    const today = toDateInput(new Date());
+    let started = 0;
+    for (const name of hostelNames) {
+      const hostel = allHostels.find((h) => h.name === name);
+      if (!hostel) continue;
+      const res = await adminFetch(`/api/admin/giveaways/${encodeURIComponent(hostel.id)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          enabled: true,
+          startsAt: startOfDayIso(today),
+          endsAt: endOfDayIso(lastDay(today, Number(giveDays))),
+          openTo: "new",
+          maxCodes: null,
+        }),
+      });
+      if (res.ok) started += 1;
+    }
+    return started;
   };
 
   const handleAssign = async () => {
@@ -335,6 +384,14 @@ export default function AdminControllersPage() {
       const parts = [];
       if (assigned.length) parts.push(`${assigned.length} assigned`);
       if (notFound.length) parts.push(`${notFound.length} not found`);
+      if (giveOnAssign && assigned.length) {
+        const started = await startGiveaways(assigned);
+        parts.push(
+          started === assigned.length
+            ? `welcome codes on at ${started}`
+            : `welcome codes on at ${started} of ${assigned.length}: check the Welcome codes page`,
+        );
+      }
       showSuccess(parts.join(", ") || "Done");
       setAssignTarget(null);
       await fetchData();
@@ -922,6 +979,21 @@ export default function AdminControllersPage() {
                                   </div>
                                 ) : (
                                   <div className="flex items-center gap-2">
+                                    {(() => {
+                                      const row = giveaways?.hostels.find((g) => g.hostel === h);
+                                      if (!row || (row.bonusAvailable <= 0 && !row.giveaway)) return null;
+                                      const label = `Welcome codes at ${h}: ${row.status === "open" ? "on" : "off"}`;
+                                      return (
+                                        <Link
+                                          href={`/admin/giveaways?hostel=${encodeURIComponent(row.hostelId)}`}
+                                          aria-label={label}
+                                          title={label}
+                                          className={`glass-icon shrink-0 ${row.status === "open" ? "text-emerald-600" : "text-slate-500"}`}
+                                        >
+                                          <Gift className="w-4 h-4" />
+                                        </Link>
+                                      );
+                                    })()}
                                     {isSuperAdmin && (
                                       <>
                                         <IconButton
@@ -1068,6 +1140,45 @@ export default function AdminControllersPage() {
               Select hostels to assign. Hostels already assigned to
               another controller must be unassigned first.
             </p>
+            {(() => {
+              const bonus = giveaways?.controllers.find((c) => c.id === assignTarget.id);
+              if (!bonus || bonus.bonusAvailable <= 0) return null;
+              return (
+                <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3 text-sm text-emerald-900">
+                  <p className="flex items-start gap-2">
+                    <Gift className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>
+                      {assignTarget.name} holds {bonus.bonusAvailable} bonus code{bonus.bonusAvailable === 1 ? "" : "s"}
+                      {bonus.gives ? ` (${bonus.gives})` : ""}.
+                    </span>
+                  </p>
+                  <label className="mt-2 flex min-h-[44px] items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={giveOnAssign}
+                      onChange={(e) => setGiveOnAssign(e.target.checked)}
+                      className="h-5 w-5 shrink-0 rounded border-slate-300"
+                    />
+                    <span className="font-semibold">Give welcome codes at the hostels I add</span>
+                  </label>
+                  {giveOnAssign && (
+                    <div className="mt-1">
+                      <SegToggle
+                        value={giveDays}
+                        onChange={setGiveDays}
+                        options={[
+                          { value: "7", label: "For one week" },
+                          { value: "14", label: "For two weeks" },
+                        ]}
+                      />
+                      <p className="mt-2">
+                        From today, new accounts only. Change the dates or print the poster on the Welcome codes page.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             {(() => {
               const available = availableForAssign(assignTarget);
               return available.length === 0 ? (

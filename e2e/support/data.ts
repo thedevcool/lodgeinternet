@@ -37,3 +37,8 @@ export function naira(amount: number): string {
 /** The plans pages the specs use most. */
 export const UNITY_LODGE_PLANS = "/unity-estate/unity-lodge/plans";
 export const PALM_COURT_PLANS = "/palm-grove/palm-court/plans";
+
+/** The page Palm Court's welcome-code poster opens, and the code it gives (e2e/mock-api.mjs, WELCOME). */
+export const WELCOME_POSTER = "/welcome/palm-court-poster-1";
+export const WELCOME_CODE = "WELC7Q2M";
+export const WELCOME_GIVES = "2GB for 1 day, up to 3 devices";

@@ -79,6 +79,10 @@ const DEFAULT_SCENARIO = {
   // address on file, so a TV purchase goes straight to payment. The stand-in
   // then takes the payment but can't put the TV on the network yet.
   tv: "none",
+  // Welcome codes at Palm Court (its poster link is WELCOME.token below):
+  // "none" (no giveaway: the link is unknown) | "open" | "ended" |
+  // "out-of-codes" | "everyone" (open, and not only to new accounts).
+  giveaway: "none",
   // The backend's lockdown switch (GET /api/service-status).
   maintenance: false,
   // Routes to break: [{ route: "GET /api/hostels", status: 500, times: 1 }]
@@ -86,6 +90,15 @@ const DEFAULT_SCENARIO = {
   fail: [],
   // Routes whose answer waits until POST /__release: ["GET /api/hostels"].
   hold: [],
+};
+
+/** The one giveaway the stand-in knows: Palm Court's, behind this poster link. */
+const WELCOME = {
+  token: "palm-court-poster-1",
+  hostel: "Palm Court",
+  gives: "2GB for 1 day, up to 3 devices",
+  code: "WELC7Q2M",
+  endsAt: "2026-11-29T22:59:59Z",
 };
 
 const sessions = new Map();
@@ -107,6 +120,8 @@ function freshSession(knobs = {}) {
     reservations: {},
     // Codes issued, by payment reference (so a second claim gets the same one).
     claims: {},
+    // Welcome codes claimed, by uid (one each, ever).
+    welcomeClaims: {},
     // Wallet / bank-transfer orders, by pending id.
     orders: {},
     walletBalanceKobo: walletState.available ? walletState.balanceKobo : 0,
@@ -257,6 +272,20 @@ function signedInAdmin(req) {
 }
 
 const NOT_SIGNED_IN = () => apiError(401, "Not signed in.", "NOT_SIGNED_IN");
+
+/** Where Palm Court's giveaway stands in this world, or null when there is none. */
+function welcomeStatus(session) {
+  return { none: null, open: "open", everyone: "open", ended: "ended", "out-of-codes": "out_of_codes" }[
+    session.scenario.giveaway
+  ];
+}
+
+const WELCOME_NOT_FOUND = () =>
+  apiError(
+    404,
+    "This welcome code link is no longer in use. Ask the Lodge Internet team at your hostel for the new poster.",
+    "GIVEAWAY_NOT_FOUND",
+  );
 
 function profileOf(customer) {
   return {
@@ -702,6 +731,65 @@ const routes = {
 
   "POST /api/account/delete": ({ req, session }) =>
     signedInCustomer(req, session) ? answer(200, { success: true }, [clearCookie("lodge_customer")]) : NOT_SIGNED_IN(),
+
+  // ── Welcome codes (the giveaway) ──────────────────────────────────────────
+  "GET /api/giveaways/poster/:token": ({ session, params }) => {
+    const status = welcomeStatus(session);
+    if (!status || params.token !== WELCOME.token) return WELCOME_NOT_FOUND();
+    const open = status === "open";
+    return answer(200, {
+      hostel: WELCOME.hostel,
+      status,
+      gives: open ? WELCOME.gives : null,
+      newAccountsOnly: session.scenario.giveaway !== "everyone",
+      endsAt: open ? WELCOME.endsAt : null,
+    });
+  },
+
+  "GET /api/giveaways/mine": ({ req, session }) => {
+    const customer = signedInCustomer(req, session);
+    if (!customer) return apiError(401, "Sign in to claim your welcome code.", "AUTH_REQUIRED");
+    return answer(200, { claim: session.welcomeClaims[customer.uid] ?? null });
+  },
+
+  "POST /api/giveaways/claim": ({ req, session, body }) => {
+    const customer = signedInCustomer(req, session);
+    if (!customer) return apiError(401, "Sign in to claim your welcome code.", "AUTH_REQUIRED");
+    // Asked twice: the same code.
+    const mine = session.welcomeClaims[customer.uid];
+    if (mine) return answer(200, { claim: mine, alreadyClaimed: true });
+
+    const status = welcomeStatus(session);
+    if (!status || body.token !== WELCOME.token) return WELCOME_NOT_FOUND();
+    if (status === "out_of_codes") {
+      return apiError(409, `All the welcome codes at ${WELCOME.hostel} have been claimed.`, "GIVEAWAY_OUT_OF_CODES");
+    }
+    if (status !== "open") return apiError(409, `The welcome codes at ${WELCOME.hostel} have ended.`, "GIVEAWAY_ENDED");
+    if (!customer.emailVerified) {
+      return apiError(403, "Confirm your email first, then come back for your welcome code.", "EMAIL_NOT_VERIFIED");
+    }
+    if (customer.hostelId !== WELCOME.hostel) {
+      return apiError(
+        403,
+        `These welcome codes are for residents of ${WELCOME.hostel}. Your account belongs to ${customer.hostelId || "no hostel yet"}.`,
+        "GIVEAWAY_WRONG_HOSTEL",
+      );
+    }
+    // "New" here: an account made during the test, not one from the fixtures.
+    if (session.scenario.giveaway !== "everyone" && !session.signups[customer.uid]) {
+      return apiError(
+        403,
+        `These welcome codes are for new accounts at ${WELCOME.hostel}. Yours was made before they started.`,
+        "GIVEAWAY_NEW_ACCOUNTS_ONLY",
+      );
+    }
+    if (!customer.phone) {
+      return apiError(400, "Add your phone number to your account, then claim your welcome code.", "PHONE_REQUIRED");
+    }
+    const claim = { code: WELCOME.code, gives: WELCOME.gives, hostel: WELCOME.hostel, claimedAt: new Date().toISOString() };
+    session.welcomeClaims[customer.uid] = claim;
+    return answer(200, { claim, alreadyClaimed: false });
+  },
 
   "GET /api/tv/subscriptions": ({ req, session }) => {
     if (!signedInCustomer(req, session)) return NOT_SIGNED_IN();

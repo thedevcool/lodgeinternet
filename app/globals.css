@@ -106,6 +106,12 @@
        a phone the whole desktop sidebar rendered above every page. */
     .admin-sidebar.glass-drawer { display: none; }
   }
+  /* Printing an admin page (the welcome-code poster) prints the page alone:
+     no sidebar, no top bar, no room kept for either. */
+  @media print {
+    .admin-sidebar, .admin-topbar { display: none !important; }
+    .admin-main { margin-left: 0 !important; }
+  }
   .drawer-footer { @apply mt-4 flex items-center justify-between gap-3 border-t border-white/80 pt-4; }
   .drawer-signout { @apply inline-flex shrink-0 items-center gap-2 rounded-full border border-white/90 px-3 py-2 text-sm font-medium text-slate-700 shadow-[0_6px_18px_rgba(15,23,42,.07)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white hover:text-red-600; background: rgba(255,255,255,.65); }
   .glass-button { @apply inline-flex min-h-[40px] items-center justify-center gap-2 rounded-full border border-white/90 px-4 py-2 text-sm font-medium shadow-[0_6px_18px_rgba(15,23,42,.07)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0; background: rgba(255,255,255,.65); }

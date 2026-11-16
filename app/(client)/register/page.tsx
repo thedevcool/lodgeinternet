@@ -143,6 +143,17 @@ function RegisterContent() {
     });
   }, [verifyOnly, prefillEmail, prefillHostel, email, redirectTarget, router]);
 
+  // A link that names the hostel (a welcome-code poster sends residents
+  // here with ?hostel=) starts at the account details, with the hostel
+  // already chosen. Only for a visitor who isn't signed in, and only when
+  // the name is a hostel on the list; "Change Hostel" still goes back.
+  useEffect(() => {
+    if (verifyOnly || !prefillHostel || loadingHostels || !signInKnown || signedIn) return;
+    if (stepRef.current === "hostel" && hostels.some((h) => h.name === prefillHostel)) {
+      setStep("credentials");
+    }
+  }, [verifyOnly, prefillHostel, loadingHostels, signInKnown, signedIn, hostels]);
+
   // verifyOnly needs someone signed in: once we know nobody is, bounce to
   // /login (and back here after) so we don't spin forever.
   useEffect(() => {
